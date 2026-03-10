@@ -1,0 +1,87 @@
+import { Type } from "@sinclair/typebox";
+
+export const AssetTypeObj = Type.Object({
+  code: Type.String(),
+  label: Type.String(),
+});
+
+export const StateObj = Type.Object({
+  code: Type.String(),
+  label: Type.String(),
+});
+
+export const AssetListQuery = Type.Object({
+  q: Type.Optional(Type.String()),
+  type_code: Type.Optional(Type.String()),
+  state_code: Type.Optional(Type.String()),
+  page: Type.Optional(Type.Integer({ minimum: 1 })),
+  page_size: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+});
+
+export const AssetListItem = Type.Object({
+  id: Type.Integer(),
+  asset_tag: Type.String(),
+  name: Type.String(),
+  asset_type: AssetTypeObj,
+  state: StateObj,
+});
+
+export const AssetListResponse = Type.Object({
+  ok: Type.Boolean(),
+  data: Type.Object({
+    items: Type.Array(AssetListItem),
+    page: Type.Integer(),
+    page_size: Type.Integer(),
+    total: Type.Integer(),
+  }),
+  meta: Type.Object({
+    request_id: Type.String(),
+  }),
+});
+
+export const AssetDetailResponse = Type.Object({
+  ok: Type.Boolean(),
+  data: Type.Object({
+    asset: Type.Object({
+      id: Type.Integer(),
+      asset_tag: Type.String(),
+      name: Type.String(),
+      status: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      asset_type: AssetTypeObj,
+      state: StateObj,
+      owner_department_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+      current_custodian_identity_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+      location_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+    }),
+  }),
+  meta: Type.Object({
+    request_id: Type.String(),
+  }),
+});
+
+export const AssetCreateBody = Type.Object({
+  asset_tag: Type.String({ minLength: 1 }),
+  name: Type.String({ minLength: 1 }),
+  asset_type_code: Type.String({ minLength: 1 }),
+  initial_state_code: Type.String({ minLength: 1 }),
+  status: Type.Optional(Type.String()),
+  owner_department_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  current_custodian_identity_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  location_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+});
+
+export const AssetUpdateBody = Type.Partial(
+  Type.Object({
+    name: Type.String({ minLength: 1 }),
+    status: Type.String(),
+    owner_department_id: Type.Union([Type.Integer(), Type.Null()]),
+    current_custodian_identity_id: Type.Union([Type.Integer(), Type.Null()]),
+    location_id: Type.Union([Type.Integer(), Type.Null()]),
+  })
+);
+
+export const SimpleOkResponse = Type.Object({
+  ok: Type.Boolean(),
+  data: Type.Object({ id: Type.Integer() }),
+  meta: Type.Object({ request_id: Type.String() }),
+});
