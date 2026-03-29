@@ -1,5 +1,3 @@
-// itam/apps/api/src/modules/documents/documents.repo.js
-
 function toNum(v) {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) return Number(v);

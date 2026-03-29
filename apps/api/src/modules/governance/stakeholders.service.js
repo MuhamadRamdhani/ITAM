@@ -4,6 +4,7 @@ import {
   insertStakeholdersRegister,
   updateStakeholdersRegister,
 } from "./stakeholders.repo.js";
+import { insertAuditEventDb } from "../../lib/audit.js";
 
 function makeError(message, statusCode = 400, code = "BAD_REQUEST", details) {
   const err = new Error(message);
@@ -65,6 +66,11 @@ function getActorUserIdFromRequest(request) {
 
   if (!Number.isFinite(userId) || userId <= 0) return null;
   return userId;
+}
+
+function actorFromUserId(userId) {
+  if (Number.isFinite(userId) && userId > 0) return `USER:${userId}`;
+  return "SYSTEM";
 }
 
 function assertCanReadStakeholders(request) {
@@ -234,6 +240,22 @@ export async function createStakeholdersRegisterService(db, request, body) {
     actorUserId,
   });
 
+  await insertAuditEventDb(db, {
+    tenantId,
+    actor: actorFromUserId(actorUserId),
+    action: "STAKEHOLDER_CREATED",
+    entityType: "STAKEHOLDER",
+    entityId: created?.id ?? null,
+    payload: {
+      name,
+      category_code: categoryCode,
+      priority_code: priorityCode,
+      status_code: statusCode,
+      owner_identity_id: ownerIdentityId,
+      review_date: reviewDate,
+    },
+  });
+
   return created;
 }
 
@@ -276,6 +298,32 @@ export async function updateStakeholdersRegisterService(db, request, id, body) {
     ownerIdentityId,
     reviewDate,
     actorUserId,
+  });
+
+  await insertAuditEventDb(db, {
+    tenantId,
+    actor: actorFromUserId(actorUserId),
+    action: "STAKEHOLDER_UPDATED",
+    entityType: "STAKEHOLDER",
+    entityId: updated?.id ?? numericId,
+    payload: {
+      before: {
+        name: existing.name,
+        category_code: existing.category_code,
+        priority_code: existing.priority_code,
+        status_code: existing.status_code,
+        owner_identity_id: existing.owner_identity_id,
+        review_date: existing.review_date,
+      },
+      after: {
+        name,
+        category_code: categoryCode,
+        priority_code: priorityCode,
+        status_code: statusCode,
+        owner_identity_id: ownerIdentityId,
+        review_date: reviewDate,
+      },
+    },
   });
 
   return updated;

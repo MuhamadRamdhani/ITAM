@@ -1,3 +1,23 @@
+export async function getTenantTargetById(app, tenantId) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      id,
+      code,
+      name,
+      status_code,
+      plan_code,
+      created_at,
+      updated_at
+    FROM public.tenants
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [tenantId]
+  );
+  return rows[0] || null;
+}
+
 export async function listRoles(app, tenantId) {
   const { rows } = await app.pg.query(
     `

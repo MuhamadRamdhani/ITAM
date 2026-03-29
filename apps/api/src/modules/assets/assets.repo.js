@@ -10,6 +10,11 @@ function toIntOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+function toDateOrNull(v) {
+  if (v === null || v === undefined || v === "") return null;
+  return String(v);
+}
+
 export async function countAssets(app, tenantId, filters) {
   const { whereSql, params } = buildWhere(tenantId, filters);
 
@@ -51,7 +56,6 @@ export async function listAssets(app, tenantId, filters, page, pageSize) {
     params
   );
 
-  // ✅ ensure id is integer (TypeBox expects Integer)
   return (rows || []).map((r) => ({
     id: toInt(r.id),
     asset_tag: r.asset_tag,
@@ -73,7 +77,15 @@ export async function getAssetById(app, tenantId, assetId) {
       jsonb_build_object('code', ls.code, 'label', ls.display_name) AS state,
       a.owner_department_id,
       a.current_custodian_identity_id,
-      a.location_id
+      a.location_id,
+
+      a.purchase_date,
+      a.warranty_start_date,
+      a.warranty_end_date,
+      a.support_start_date,
+      a.support_end_date,
+      a.subscription_start_date,
+      a.subscription_end_date
     FROM public.assets a
     JOIN public.asset_types at ON at.id = a.asset_type_id
     LEFT JOIN public.lifecycle_states ls ON ls.id = a.current_state_id
@@ -86,7 +98,6 @@ export async function getAssetById(app, tenantId, assetId) {
   const r = rows[0];
   if (!r) return null;
 
-  // ✅ convert BIGINT/string -> number/null for schema
   return {
     id: toInt(r.id),
     asset_tag: r.asset_tag,
@@ -97,6 +108,14 @@ export async function getAssetById(app, tenantId, assetId) {
     owner_department_id: toIntOrNull(r.owner_department_id),
     current_custodian_identity_id: toIntOrNull(r.current_custodian_identity_id),
     location_id: toIntOrNull(r.location_id),
+
+    purchase_date: toDateOrNull(r.purchase_date),
+    warranty_start_date: toDateOrNull(r.warranty_start_date),
+    warranty_end_date: toDateOrNull(r.warranty_end_date),
+    support_start_date: toDateOrNull(r.support_start_date),
+    support_end_date: toDateOrNull(r.support_end_date),
+    subscription_start_date: toDateOrNull(r.subscription_start_date),
+    subscription_end_date: toDateOrNull(r.subscription_end_date),
   };
 }
 
@@ -104,10 +123,26 @@ export async function insertAsset(app, row) {
   const { rows } = await app.pg.query(
     `
     INSERT INTO public.assets
-      (tenant_id, asset_tag, name, status, asset_type_id, current_state_id,
-       owner_department_id, current_custodian_identity_id, location_id)
+      (
+        tenant_id,
+        asset_tag,
+        name,
+        status,
+        asset_type_id,
+        current_state_id,
+        owner_department_id,
+        current_custodian_identity_id,
+        location_id,
+        purchase_date,
+        warranty_start_date,
+        warranty_end_date,
+        support_start_date,
+        support_end_date,
+        subscription_start_date,
+        subscription_end_date
+      )
     VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
     RETURNING id
     `,
     [
@@ -120,10 +155,16 @@ export async function insertAsset(app, row) {
       row.owner_department_id ?? null,
       row.current_custodian_identity_id ?? null,
       row.location_id ?? null,
+      row.purchase_date ?? null,
+      row.warranty_start_date ?? null,
+      row.warranty_end_date ?? null,
+      row.support_start_date ?? null,
+      row.support_end_date ?? null,
+      row.subscription_start_date ?? null,
+      row.subscription_end_date ?? null,
     ]
   );
 
-  // RETURNING id bisa string kalau BIGINT, jadi convert
   return toInt(rows[0].id);
 }
 

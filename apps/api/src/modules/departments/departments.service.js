@@ -26,9 +26,19 @@ function actorStr(req) {
 }
 
 function mustHaveAnyRole(req, allowed) {
-  const roles = Array.isArray(req.requestContext?.roles)
+  const raw = Array.isArray(req.requestContext?.roles)
     ? req.requestContext.roles
     : [];
+  const roles = raw
+    .map((x) => {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        return x.code ?? x.role_code ?? x.roleCode ?? "";
+      }
+      return "";
+    })
+    .map((x) => String(x || "").trim().toUpperCase())
+    .filter(Boolean);
   const ok = allowed.some((r) => roles.includes(r));
   if (!ok) {
     const e = new Error("Forbidden");

@@ -10,6 +10,7 @@ import {
   forceScopeVersionActive,
   insertScopeEvent,
 } from "./scope.repo.js";
+import { insertAuditEventDb } from "../../lib/audit.js";
 
 function makeError(message, statusCode = 400, code = "BAD_REQUEST", details) {
   const err = new Error(message);
@@ -77,6 +78,11 @@ export function getActorUserIdFromRequest(request) {
 
   if (!Number.isFinite(userId) || userId <= 0) return null;
   return userId;
+}
+
+function actorFromUserId(userId) {
+  if (Number.isFinite(userId) && userId > 0) return `USER:${userId}`;
+  return "SYSTEM";
 }
 
 export function assertCanReadScope(request) {
@@ -214,6 +220,18 @@ export async function createScopeVersionService(db, request, body) {
       },
     });
 
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "SCOPE_VERSION_CREATED",
+      entityType: "SCOPE_VERSION",
+      entityId: created.id,
+      payload: {
+        status: created.status,
+        version_no: created.version_no,
+      },
+    });
+
     return created;
   });
 }
@@ -257,6 +275,15 @@ export async function submitScopeVersionService(db, request, id, body) {
       },
     });
 
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "SCOPE_VERSION_SUBMITTED",
+      entityType: "SCOPE_VERSION",
+      entityId: numericId,
+      payload: { from_status: "DRAFT", to_status: "SUBMITTED", note: note ?? null },
+    });
+
     return updated;
   });
 }
@@ -298,6 +325,15 @@ export async function approveScopeVersionService(db, request, id, body) {
         from_status: "SUBMITTED",
         to_status: "APPROVED",
       },
+    });
+
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "SCOPE_VERSION_APPROVED",
+      entityType: "SCOPE_VERSION",
+      entityId: numericId,
+      payload: { from_status: "SUBMITTED", to_status: "APPROVED", note: note ?? null },
     });
 
     return updated;
@@ -351,6 +387,15 @@ export async function activateScopeVersionService(db, request, id, body) {
             replaced_by_scope_version_id: numericId,
           },
         });
+
+        await insertAuditEventDb(trx, {
+          tenantId,
+          actor: actorFromUserId(actorUserId),
+          action: "SCOPE_VERSION_SUPERSEDED",
+          entityType: "SCOPE_VERSION",
+          entityId: superseded.id,
+          payload: { replaced_by_scope_version_id: numericId },
+        });
       }
     }
 
@@ -375,6 +420,15 @@ export async function activateScopeVersionService(db, request, id, body) {
         from_status: "APPROVED",
         to_status: "ACTIVE",
       },
+    });
+
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "SCOPE_VERSION_ACTIVATED",
+      entityType: "SCOPE_VERSION",
+      entityId: numericId,
+      payload: { from_status: "APPROVED", to_status: "ACTIVE", note: note ?? null },
     });
 
     return activated;

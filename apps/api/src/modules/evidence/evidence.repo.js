@@ -22,13 +22,15 @@ export async function insertEvidenceFile(app, row) {
       row.uploaded_by_identity_id,
     ]
   );
+
   const r = rows[0];
   return {
     ...r,
     id: toNum(r.id),
     tenant_id: toNum(r.tenant_id),
     size_bytes: toNum(r.size_bytes),
-    uploaded_by_identity_id: r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
+    uploaded_by_identity_id:
+      r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
   };
 }
 
@@ -41,14 +43,17 @@ export async function getEvidenceFileById(app, tenantId, id) {
     `,
     [tenantId, id]
   );
+
   if (!rows[0]) return null;
+
   const r = rows[0];
   return {
     ...r,
     id: toNum(r.id),
     tenant_id: toNum(r.tenant_id),
     size_bytes: toNum(r.size_bytes),
-    uploaded_by_identity_id: r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
+    uploaded_by_identity_id:
+      r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
   };
 }
 
@@ -93,7 +98,8 @@ export async function listEvidenceFiles(app, tenantId, q, page, pageSize) {
     id: toNum(r.id),
     tenant_id: toNum(r.tenant_id),
     size_bytes: toNum(r.size_bytes),
-    uploaded_by_identity_id: r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
+    uploaded_by_identity_id:
+      r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
   }));
 
   return { items, total };
@@ -117,6 +123,7 @@ export async function insertEvidenceLink(app, row) {
       row.created_by_identity_id,
     ]
   );
+
   const r = rows[0];
   return {
     ...r,
@@ -124,7 +131,8 @@ export async function insertEvidenceLink(app, row) {
     tenant_id: toNum(r.tenant_id),
     target_id: toNum(r.target_id),
     evidence_file_id: toNum(r.evidence_file_id),
-    created_by_identity_id: r.created_by_identity_id == null ? null : toNum(r.created_by_identity_id),
+    created_by_identity_id:
+      r.created_by_identity_id == null ? null : toNum(r.created_by_identity_id),
   };
 }
 
@@ -141,7 +149,6 @@ export async function listEvidenceLinksByTarget(app, tenantId, targetType, targe
   );
   const total = Number(totalRes.rows[0]?.c ?? 0);
 
-  // join is allowed even without FK
   const { rows } = await app.pg.query(
     `
     select
@@ -165,7 +172,8 @@ export async function listEvidenceLinksByTarget(app, tenantId, targetType, targe
     target_id: toNum(r.target_id),
     evidence_file_id: toNum(r.evidence_file_id),
     note: r.note ?? null,
-    created_by_identity_id: r.created_by_identity_id == null ? null : toNum(r.created_by_identity_id),
+    created_by_identity_id:
+      r.created_by_identity_id == null ? null : toNum(r.created_by_identity_id),
     created_at: r.created_at,
     file: {
       id: toNum(r.evidence_file_id),
@@ -177,4 +185,53 @@ export async function listEvidenceLinksByTarget(app, tenantId, targetType, targe
   }));
 
   return { items, total };
+}
+
+export async function deleteEvidenceLinkById(
+  app,
+  tenantId,
+  linkId,
+  targetType = null,
+  targetId = null
+) {
+  const args = [tenantId, linkId];
+  let sql = `
+    delete from public.evidence_links
+    where tenant_id = $1
+      and id = $2
+  `;
+
+  let idx = 3;
+
+  if (targetType != null) {
+    sql += ` and target_type = $${idx}`;
+    args.push(targetType);
+    idx += 1;
+  }
+
+  if (targetId != null) {
+    sql += ` and target_id = $${idx}`;
+    args.push(targetId);
+    idx += 1;
+  }
+
+  sql += `
+    returning id, tenant_id, target_type, target_id, evidence_file_id, note, created_by_identity_id, created_at
+  `;
+
+  const { rows } = await app.pg.query(sql, args);
+  if (!rows[0]) return null;
+
+  const r = rows[0];
+  return {
+    id: toNum(r.id),
+    tenant_id: toNum(r.tenant_id),
+    target_type: r.target_type,
+    target_id: toNum(r.target_id),
+    evidence_file_id: toNum(r.evidence_file_id),
+    note: r.note ?? null,
+    created_by_identity_id:
+      r.created_by_identity_id == null ? null : toNum(r.created_by_identity_id),
+    created_at: r.created_at,
+  };
 }

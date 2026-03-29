@@ -9,6 +9,7 @@ import {
   attachEvidenceLinkService,
   listEvidenceLinksService,
 } from "./evidence.service.js";
+import { checkUploadRateLimit } from "../../lib/uploadRateLimit.js";
 
 function mustTenantId(req) {
   const tenantId = req.tenantId ?? req.requestContext?.tenantId;
@@ -19,6 +20,28 @@ function mustTenantId(req) {
     throw e;
   }
   return tenantId;
+}
+
+function mustHaveAnyRole(req, allowed) {
+  const raw = Array.isArray(req.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = raw
+    .map((x) => {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        return x.code ?? x.role_code ?? x.roleCode ?? "";
+      }
+      return "";
+    })
+    .map((x) => String(x || "").trim().toUpperCase())
+    .filter(Boolean);
+  const ok = allowed.some((r) => roles.includes(r));
+  if (!ok) {
+    const e = new Error("Forbidden");
+    e.statusCode = 403;
+    e.code = "FORBIDDEN";
+    e.details = { required_any: allowed, got: roles };
+    throw e;
+  }
 }
 
 export default async function evidenceRoutes(app) {
@@ -48,10 +71,32 @@ export default async function evidenceRoutes(app) {
     }
   );
 
-  // POST /api/v1/evidence/files (multipart)
+  // POST /api/v1/evidence/files (multipart with file upload security)
   app.post("/evidence/files", async (req, reply) => {
     const tenantId = mustTenantId(req);
+    mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER", "ASSET_CUSTODIAN"]);
+
     const actorId = req.requestContext?.identityId ?? null;
+    const userIp = req.ip;
+
+    // Check rate limit BEFORE reading file
+    const rateLimitCheck = checkUploadRateLimit({
+      userId: actorId,
+      userIp,
+      fileSizeMB: 0, // Will check after getting file size
+    });
+
+    if (!rateLimitCheck.allowed) {
+      return reply.code(429).send({
+        ok: false,
+        error: {
+          code: rateLimitCheck.code,
+          message: rateLimitCheck.reason,
+          retry_after_seconds: rateLimitCheck.retryAfterSeconds,
+        },
+        meta: { request_id: req.id },
+      });
+    }
 
     const part = await req.file(); // expects field name "file"
     if (!part) {
@@ -62,13 +107,43 @@ export default async function evidenceRoutes(app) {
       });
     }
 
-    const fileRow = await uploadEvidenceFileService(app, { tenantId, actorId, part });
+    try {
+      const fileRow = await uploadEvidenceFileService(app, { tenantId, actorId, part });
 
-    return reply.send({
-      ok: true,
-      data: { file: fileRow },
-      meta: { request_id: req.id },
-    });
+      // Record successful upload in rate limit
+      checkUploadRateLimit({
+        userId: actorId,
+        userIp,
+        fileSizeMB: fileRow.size_bytes / 1024 / 1024,
+      });
+
+      return reply.send({
+        ok: true,
+        data: { file: fileRow },
+        meta: { request_id: req.id },
+      });
+    } catch (err) {
+      // Handle upload security errors
+      if (
+        err.code === "INVALID_FILE_TYPE" ||
+        err.code === "FILE_TOO_LARGE" ||
+        err.code === "DANGEROUS_FILE_TYPE" ||
+        err.code === "SUSPICIOUS_FILE_CONTENT" ||
+        err.code === "INVALID_FILE_PATH"
+      ) {
+        return reply.code(400).send({
+          ok: false,
+          error: {
+            code: err.code,
+            message: err.message,
+          },
+          meta: { request_id: req.id },
+        });
+      }
+
+      // Re-throw other errors
+      throw err;
+    }
   });
 
   // GET /api/v1/evidence/files/:id (metadata)
@@ -164,6 +239,8 @@ export default async function evidenceRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER", "ASSET_CUSTODIAN"]);
+
       const actorId = req.requestContext?.identityId ?? null;
 
       const link = await attachEvidenceLinkService(app, {

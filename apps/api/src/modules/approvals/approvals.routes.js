@@ -17,6 +17,28 @@ function mustTenantId(req) {
   return tenantId;
 }
 
+function mustHaveAnyRole(req, allowed) {
+  const raw = Array.isArray(req.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = raw
+    .map((x) => {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        return x.code ?? x.role_code ?? x.roleCode ?? "";
+      }
+      return "";
+    })
+    .map((x) => String(x || "").trim().toUpperCase())
+    .filter(Boolean);
+  const ok = allowed.some((r) => roles.includes(r));
+  if (!ok) {
+    const e = new Error("Forbidden");
+    e.statusCode = 403;
+    e.code = "FORBIDDEN";
+    e.details = { required_any: allowed, got: roles };
+    throw e;
+  }
+}
+
 async function resolvePageSize(app, tenantId, requested) {
   const cfg = await getUiConfig(app, tenantId);
   const options = Array.isArray(cfg.page_size_options) ? cfg.page_size_options : [];
@@ -129,6 +151,8 @@ export default async function approvalsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER", "PROCUREMENT_CONTRACT_MANAGER"]);
+
       const approvalId = Number(req.params.id);
 
       if (!Number.isFinite(approvalId)) {

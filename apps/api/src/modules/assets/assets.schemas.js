@@ -10,6 +10,10 @@ export const StateObj = Type.Object({
   label: Type.String(),
 });
 
+const NullableDateString = Type.Optional(Type.Union([Type.String(), Type.Null()]));
+const NullableInt = Type.Optional(Type.Union([Type.Integer(), Type.Null()]));
+const NullableString = Type.Optional(Type.Union([Type.String(), Type.Null()]));
+
 export const AssetListQuery = Type.Object({
   q: Type.Optional(Type.String()),
   type_code: Type.Optional(Type.String()),
@@ -46,12 +50,20 @@ export const AssetDetailResponse = Type.Object({
       id: Type.Integer(),
       asset_tag: Type.String(),
       name: Type.String(),
-      status: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      status: NullableString,
       asset_type: AssetTypeObj,
       state: StateObj,
-      owner_department_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
-      current_custodian_identity_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
-      location_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+      owner_department_id: NullableInt,
+      current_custodian_identity_id: NullableInt,
+      location_id: NullableInt,
+
+      purchase_date: NullableDateString,
+      warranty_start_date: NullableDateString,
+      warranty_end_date: NullableDateString,
+      support_start_date: NullableDateString,
+      support_end_date: NullableDateString,
+      subscription_start_date: NullableDateString,
+      subscription_end_date: NullableDateString,
     }),
   }),
   meta: Type.Object({
@@ -65,9 +77,17 @@ export const AssetCreateBody = Type.Object({
   asset_type_code: Type.String({ minLength: 1 }),
   initial_state_code: Type.String({ minLength: 1 }),
   status: Type.Optional(Type.String()),
-  owner_department_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
-  current_custodian_identity_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
-  location_id: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  owner_department_id: NullableInt,
+  current_custodian_identity_id: NullableInt,
+  location_id: NullableInt,
+
+  purchase_date: NullableDateString,
+  warranty_start_date: NullableDateString,
+  warranty_end_date: NullableDateString,
+  support_start_date: NullableDateString,
+  support_end_date: NullableDateString,
+  subscription_start_date: NullableDateString,
+  subscription_end_date: NullableDateString,
 });
 
 export const AssetUpdateBody = Type.Partial(
@@ -77,6 +97,14 @@ export const AssetUpdateBody = Type.Partial(
     owner_department_id: Type.Union([Type.Integer(), Type.Null()]),
     current_custodian_identity_id: Type.Union([Type.Integer(), Type.Null()]),
     location_id: Type.Union([Type.Integer(), Type.Null()]),
+
+    purchase_date: Type.Union([Type.String(), Type.Null()]),
+    warranty_start_date: Type.Union([Type.String(), Type.Null()]),
+    warranty_end_date: Type.Union([Type.String(), Type.Null()]),
+    support_start_date: Type.Union([Type.String(), Type.Null()]),
+    support_end_date: Type.Union([Type.String(), Type.Null()]),
+    subscription_start_date: Type.Union([Type.String(), Type.Null()]),
+    subscription_end_date: Type.Union([Type.String(), Type.Null()]),
   })
 );
 

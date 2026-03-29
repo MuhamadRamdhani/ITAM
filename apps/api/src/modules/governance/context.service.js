@@ -4,6 +4,7 @@ import {
   insertContextRegister,
   updateContextRegister,
 } from "./context.repo.js";
+import { insertAuditEventDb } from "../../lib/audit.js";
 
 function makeError(message, statusCode = 400, code = "BAD_REQUEST", details) {
   const err = new Error(message);
@@ -65,6 +66,11 @@ function getActorUserIdFromRequest(request) {
 
   if (!Number.isFinite(userId) || userId <= 0) return null;
   return userId;
+}
+
+function actorFromUserId(userId) {
+  if (Number.isFinite(userId) && userId > 0) return `USER:${userId}`;
+  return "SYSTEM";
 }
 
 function assertCanReadContext(request) {
@@ -230,6 +236,22 @@ export async function createContextRegisterService(db, request, body) {
     actorUserId,
   });
 
+  await insertAuditEventDb(db, {
+    tenantId,
+    actor: actorFromUserId(actorUserId),
+    action: "CONTEXT_CREATED",
+    entityType: "CONTEXT",
+    entityId: created?.id ?? null,
+    payload: {
+      title,
+      category_code: categoryCode,
+      priority_code: priorityCode,
+      status_code: statusCode,
+      owner_identity_id: ownerIdentityId,
+      review_date: reviewDate,
+    },
+  });
+
   return created;
 }
 
@@ -272,6 +294,32 @@ export async function updateContextRegisterService(db, request, id, body) {
     ownerIdentityId,
     reviewDate,
     actorUserId,
+  });
+
+  await insertAuditEventDb(db, {
+    tenantId,
+    actor: actorFromUserId(actorUserId),
+    action: "CONTEXT_UPDATED",
+    entityType: "CONTEXT",
+    entityId: updated?.id ?? numericId,
+    payload: {
+      before: {
+        title: existing.title,
+        category_code: existing.category_code,
+        priority_code: existing.priority_code,
+        status_code: existing.status_code,
+        owner_identity_id: existing.owner_identity_id,
+        review_date: existing.review_date,
+      },
+      after: {
+        title,
+        category_code: categoryCode,
+        priority_code: priorityCode,
+        status_code: statusCode,
+        owner_identity_id: ownerIdentityId,
+        review_date: reviewDate,
+      },
+    },
   });
 
   return updated;

@@ -88,6 +88,27 @@ function normalizeOptionalDate(v, fieldName) {
   return s;
 }
 
+function normalizeLimit(v, fallback = 1000, max = 5000) {
+  if (v == null || v === "") return fallback;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw makeError("limit must be a positive integer", 400, "VALIDATION_ERROR");
+  }
+  if (n > max) {
+    throw makeError(`limit cannot exceed ${max}`, 400, "VALIDATION_ERROR");
+  }
+  return Math.floor(n);
+}
+
+function normalizeOffset(v) {
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) {
+    throw makeError("offset must be a non-negative integer", 400, "VALIDATION_ERROR");
+  }
+  return Math.floor(n);
+}
+
 export async function listAuditEventsService(db, request, query) {
   assertCanReadAuditEvents(request);
 
@@ -124,5 +145,41 @@ export async function listAuditEventsService(db, request, query) {
     total: data.total,
     page,
     page_size: pageSize,
+  };
+}
+
+export async function exportAuditEventsService(db, request, query) {
+  assertCanReadAuditEvents(request);
+
+  const tenantId = getTenantIdFromRequest(request);
+  const actor = String(query?.actor ?? "").trim();
+  const action = normalizeUpperOrEmpty(query?.action);
+  const entityType = normalizeUpperOrEmpty(query?.entity_type);
+  const entityId = normalizeOptionalPositiveInt(query?.entity_id, "entity_id");
+  const dateFrom = normalizeOptionalDate(query?.date_from, "date_from");
+  const dateTo = normalizeOptionalDate(query?.date_to, "date_to");
+  const q = String(query?.q ?? "").trim();
+
+  const limit = normalizeLimit(query?.limit, 1000, 5000);
+  const offset = normalizeOffset(query?.offset);
+
+  const data = await listAuditEvents(db, {
+    tenantId,
+    actor,
+    action,
+    entityType,
+    entityId,
+    dateFrom,
+    dateTo,
+    q,
+    limit,
+    offset,
+  });
+
+  return {
+    items: data.items,
+    total: data.total,
+    limit,
+    offset,
   };
 }

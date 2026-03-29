@@ -1,5 +1,3 @@
-// itam/apps/api/src/modules/documents/documents.service.js
-
 import {
   listDocuments,
   createDocumentTx,
@@ -8,6 +6,7 @@ import {
   transitionStatusTx,
   archiveTx,
 } from "./documents.repo.js";
+import { insertAuditEvent } from "../../lib/audit.js";
 
 const DOC_STATUSES = ["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"];
 
@@ -17,6 +16,11 @@ function normStatus(s) {
 
 function normType(s) {
   return String(s ?? "").toUpperCase();
+}
+
+function actorFromIdentityId(identityId) {
+  if (Number.isFinite(identityId) && identityId > 0) return `IDENTITY:${identityId}`;
+  return "SYSTEM";
 }
 
 export async function listDocumentsService(app, { tenantId, q, status, type, page, pageSize }) {
@@ -51,6 +55,20 @@ export async function createDocumentService(app, {
       title: String(title).trim(),
       contentJson: contentJson ?? {},
       actorId: actorId ?? null,
+    });
+
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "DOCUMENT_CREATED",
+      entityType: "DOCUMENT",
+      entityId: out.document?.id ?? null,
+      payload: {
+        doc_type_code: out.document?.doc_type_code ?? null,
+        title: out.document?.title ?? null,
+        status_code: out.document?.status_code ?? null,
+        version_no: out.document?.current_version ?? 1,
+      },
     });
     return { ok: true, ...out };
   } catch (e) {
@@ -100,6 +118,15 @@ export async function addDocumentVersionService(app, {
       return { ok: false, code: "BAD_REQUEST", message: "Failed to add version" };
     }
 
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "DOCUMENT_VERSION_ADDED",
+      entityType: "DOCUMENT",
+      entityId: documentId,
+      payload: { version_no: out.version_no, note: note ?? null },
+    });
+
     return { ok: true, version: out.version, version_no: out.version_no };
   } catch (e) {
     if (e?.code === "23505") {
@@ -111,7 +138,7 @@ export async function addDocumentVersionService(app, {
 
 // Workflow transitions
 export async function submitDocumentService(app, { tenantId, documentId, actorId, note }) {
-  return transitionStatusTx(app, {
+  const out = await transitionStatusTx(app, {
     tenantId,
     documentId,
     fromStatus: "DRAFT",
@@ -121,10 +148,23 @@ export async function submitDocumentService(app, { tenantId, documentId, actorId
     note: note ?? null,
     payload: {},
   });
+
+  if (out?.ok) {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "DOCUMENT_SUBMITTED",
+      entityType: "DOCUMENT",
+      entityId: documentId,
+      payload: { from_status: "DRAFT", to_status: "IN_REVIEW", note: note ?? null },
+    });
+  }
+
+  return out;
 }
 
 export async function approveDocumentService(app, { tenantId, documentId, actorId, note }) {
-  return transitionStatusTx(app, {
+  const out = await transitionStatusTx(app, {
     tenantId,
     documentId,
     fromStatus: "IN_REVIEW",
@@ -134,10 +174,23 @@ export async function approveDocumentService(app, { tenantId, documentId, actorI
     note: note ?? null,
     payload: {},
   });
+
+  if (out?.ok) {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "DOCUMENT_APPROVED",
+      entityType: "DOCUMENT",
+      entityId: documentId,
+      payload: { from_status: "IN_REVIEW", to_status: "APPROVED", note: note ?? null },
+    });
+  }
+
+  return out;
 }
 
 export async function publishDocumentService(app, { tenantId, documentId, actorId, note }) {
-  return transitionStatusTx(app, {
+  const out = await transitionStatusTx(app, {
     tenantId,
     documentId,
     fromStatus: "APPROVED",
@@ -147,13 +200,39 @@ export async function publishDocumentService(app, { tenantId, documentId, actorI
     note: note ?? null,
     payload: {},
   });
+
+  if (out?.ok) {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "DOCUMENT_PUBLISHED",
+      entityType: "DOCUMENT",
+      entityId: documentId,
+      payload: { from_status: "APPROVED", to_status: "PUBLISHED", note: note ?? null },
+    });
+  }
+
+  return out;
 }
 
 export async function archiveDocumentService(app, { tenantId, documentId, actorId, note }) {
-  return archiveTx(app, {
+  const out = await archiveTx(app, {
     tenantId,
     documentId,
     actorId: actorId ?? null,
     note: note ?? null,
   });
+
+  if (out?.ok) {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "DOCUMENT_ARCHIVED",
+      entityType: "DOCUMENT",
+      entityId: documentId,
+      payload: { note: note ?? null },
+    });
+  }
+
+  return out;
 }

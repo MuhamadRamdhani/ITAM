@@ -6,20 +6,30 @@ import { Transform } from "node:stream";
 
 import { getUiConfig } from "../config/config.repo.js";
 import { requireExistsById } from "../../lib/refIntegrity.js";
+import { insertAuditEvent } from "../../lib/audit.js";
 import {
   insertEvidenceFile,
   getEvidenceFileById,
   listEvidenceFiles,
   insertEvidenceLink,
   listEvidenceLinksByTarget,
+  deleteEvidenceLinkById,
 } from "./evidence.repo.js";
+import {
+  validateFileUpload,
+  detectFileTypeFromMagicBytes,
+  checkFileSuspicious,
+  isSafeFilePath,
+} from "../../lib/uploadSecurity.js";
 
 function mustTargetTable(targetType) {
   const t = String(targetType || "").toUpperCase();
   if (t === "ASSET") return "assets";
   if (t === "DOCUMENT") return "documents";
   if (t === "APPROVAL") return "approvals";
-  const e = new Error("Invalid target_type (must be ASSET|DOCUMENT|APPROVAL)");
+  if (t === "CONTRACT") return "contracts";
+
+  const e = new Error("Invalid target_type (must be ASSET|DOCUMENT|APPROVAL|CONTRACT)");
   e.statusCode = 400;
   e.code = "BAD_REQUEST";
   throw e;
@@ -46,6 +56,7 @@ async function resolvePageSizeStrict(app, tenantId, requested) {
     e.details = { got: requested };
     throw e;
   }
+
   if (!options.includes(n)) {
     const e = new Error(`page_size must be one of: ${options.join(", ")}`);
     e.statusCode = 400;
@@ -53,12 +64,18 @@ async function resolvePageSizeStrict(app, tenantId, requested) {
     e.details = { allowed: options, got: n };
     throw e;
   }
+
   return n;
 }
 
 function sanitizeFilename(name) {
   const base = path.basename(String(name || "file"));
   return base.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function actorFromIdentityId(identityId) {
+  if (Number.isFinite(identityId) && identityId > 0) return `IDENTITY:${identityId}`;
+  return "SYSTEM";
 }
 
 export async function uploadEvidenceFileService(app, { tenantId, actorId, part }) {
@@ -70,6 +87,14 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
   }
 
   const originalName = sanitizeFilename(part.filename);
+
+  if (!originalName || originalName === "file") {
+    const e = new Error("Invalid filename");
+    e.statusCode = 400;
+    e.code = "BAD_REQUEST";
+    throw e;
+  }
+
   const ext = path.extname(originalName);
   const now = new Date();
   const yyyy = String(now.getUTCFullYear());
@@ -81,15 +106,28 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
   const uploadsRoot = path.join(process.cwd(), "uploads");
   const fullPath = path.join(uploadsRoot, storagePath);
 
+  if (!isSafeFilePath(uploadsRoot, fullPath)) {
+    const e = new Error("Invalid file path (directory traversal detected)");
+    e.statusCode = 400;
+    e.code = "INVALID_FILE_PATH";
+    throw e;
+  }
+
   await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
 
   const hash = crypto.createHash("sha256");
   let sizeBytes = 0;
+  let firstChunk = null;
 
   const tap = new Transform({
     transform(chunk, _enc, cb) {
       sizeBytes += chunk.length;
       hash.update(chunk);
+
+      if (firstChunk === null) {
+        firstChunk = chunk;
+      }
+
       cb(null, chunk);
     },
   });
@@ -97,16 +135,67 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
   await pipeline(part.file, tap, fs.createWriteStream(fullPath));
 
   const sha256 = hash.digest("hex");
-  const mimeType = part.mimetype || "application/octet-stream";
+  const clientMimeType = part.mimetype || "application/octet-stream";
+  const detectedMimeType = detectFileTypeFromMagicBytes(firstChunk);
+  const actualMimeType = detectedMimeType || clientMimeType;
+
+  const validation = validateFileUpload({
+    filename: originalName,
+    mimetype: clientMimeType,
+    sizeBytes,
+    detectedMimeType,
+  });
+
+  if (!validation.valid) {
+    try {
+      await fs.promises.unlink(fullPath);
+    } catch {
+      // ignore
+    }
+
+    const e = new Error(validation.error);
+    e.statusCode = 400;
+    e.code = validation.code;
+    throw e;
+  }
+
+  const suspiciousCheck = checkFileSuspicious(firstChunk);
+  if (suspiciousCheck.suspicious) {
+    try {
+      await fs.promises.unlink(fullPath);
+    } catch {
+      // ignore
+    }
+
+    const e = new Error(`File rejected: ${suspiciousCheck.reason}`);
+    e.statusCode = 400;
+    e.code = "SUSPICIOUS_FILE_CONTENT";
+    throw e;
+  }
 
   const row = await insertEvidenceFile(app, {
     tenant_id: tenantId,
     storage_path: storagePath,
     original_name: originalName,
-    mime_type: mimeType,
+    mime_type: actualMimeType,
     size_bytes: sizeBytes,
     sha256,
     uploaded_by_identity_id: actorId ?? null,
+  });
+
+  await insertAuditEvent(app, {
+    tenantId,
+    actor: actorFromIdentityId(actorId),
+    action: "EVIDENCE_FILE_UPLOADED",
+    entityType: "EVIDENCE_FILE",
+    entityId: row?.id ?? null,
+    payload: {
+      original_name: row?.original_name ?? originalName,
+      mime_type: row?.mime_type ?? actualMimeType,
+      size_bytes: row?.size_bytes ?? sizeBytes,
+      sha256: row?.sha256 ?? sha256,
+      mime_detected: detectedMimeType ? true : false,
+    },
   });
 
   return row;
@@ -135,6 +224,7 @@ export async function attachEvidenceLinkService(app, { tenantId, actorId, body }
     e.code = "BAD_REQUEST";
     throw e;
   }
+
   if (!Number.isFinite(evidenceFileId) || evidenceFileId <= 0) {
     const e = new Error("Invalid evidence_file_id");
     e.statusCode = 400;
@@ -144,11 +234,9 @@ export async function attachEvidenceLinkService(app, { tenantId, actorId, body }
 
   const targetTable = mustTargetTable(targetType);
 
-  // validate existence (no FK)
   await requireExistsById(app, tenantId, targetTable, targetId);
   await requireExistsById(app, tenantId, "evidence_files", evidenceFileId);
 
-  // config-driven limit (fallback 10)
   const uiCfg = await getUiConfig(app, tenantId);
   const maxPerTarget = toPositiveInt(uiCfg?.evidence_max_per_target, 10);
 
@@ -184,6 +272,20 @@ export async function attachEvidenceLinkService(app, { tenantId, actorId, body }
     created_by_identity_id: actorId ?? null,
   });
 
+  await insertAuditEvent(app, {
+    tenantId,
+    actor: actorFromIdentityId(actorId),
+    action: "EVIDENCE_LINK_ATTACHED",
+    entityType: "EVIDENCE_LINK",
+    entityId: link?.id ?? null,
+    payload: {
+      target_type: targetType,
+      target_id: targetId,
+      evidence_file_id: evidenceFileId,
+      note: body.note ?? null,
+    },
+  });
+
   return link;
 }
 
@@ -202,9 +304,54 @@ export async function listEvidenceLinksService(app, { tenantId, targetType, targ
     throw e;
   }
 
-  // validate target exists
   await requireExistsById(app, tenantId, table, tid);
 
   const out = await listEvidenceLinksByTarget(app, tenantId, t, tid, p, ps);
   return { items: out.items, total: out.total, page: p, page_size: ps };
+}
+
+export async function detachEvidenceLinkService(app, { tenantId, actorId, linkId, targetType, targetId }) {
+  const lid = Number(linkId);
+  if (!Number.isFinite(lid) || lid <= 0) {
+    const e = new Error("Invalid link id");
+    e.statusCode = 400;
+    e.code = "BAD_REQUEST";
+    throw e;
+  }
+
+  const t = String(targetType || "").toUpperCase();
+  const table = mustTargetTable(t);
+
+  const tid = Number(targetId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    const e = new Error("Invalid target_id");
+    e.statusCode = 400;
+    e.code = "BAD_REQUEST";
+    throw e;
+  }
+
+  await requireExistsById(app, tenantId, table, tid);
+
+  const deleted = await deleteEvidenceLinkById(app, tenantId, lid, t, tid);
+  if (!deleted) {
+    const e = new Error("Evidence link not found");
+    e.statusCode = 404;
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  await insertAuditEvent(app, {
+    tenantId,
+    actor: actorFromIdentityId(actorId),
+    action: "EVIDENCE_LINK_DETACHED",
+    entityType: "EVIDENCE_LINK",
+    entityId: deleted?.id ?? null,
+    payload: {
+      target_type: deleted?.target_type ?? t,
+      target_id: deleted?.target_id ?? tid,
+      evidence_file_id: deleted?.evidence_file_id ?? null,
+    },
+  });
+
+  return deleted;
 }

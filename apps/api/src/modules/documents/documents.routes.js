@@ -1,5 +1,3 @@
-// itam/apps/api/src/modules/documents/documents.routes.js
-
 import { Type } from "@sinclair/typebox";
 import {
   listDocumentsService,
@@ -22,6 +20,28 @@ function mustTenantId(req) {
     throw e;
   }
   return tenantId;
+}
+
+function mustHaveAnyRole(req, allowed) {
+  const raw = Array.isArray(req.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = raw
+    .map((x) => {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        return x.code ?? x.role_code ?? x.roleCode ?? "";
+      }
+      return "";
+    })
+    .map((x) => String(x || "").trim().toUpperCase())
+    .filter(Boolean);
+  const ok = allowed.some((r) => roles.includes(r));
+  if (!ok) {
+    const e = new Error("Forbidden");
+    e.statusCode = 403;
+    e.code = "FORBIDDEN";
+    e.details = { required_any: allowed, got: roles };
+    throw e;
+  }
 }
 
 async function resolvePageSize(app, tenantId, requested) {
@@ -108,6 +128,8 @@ export default async function documentsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER"]);
+
       const actorId = req.requestContext?.identityId ?? null;
 
       const out = await createDocumentService(app, {
@@ -180,6 +202,8 @@ export default async function documentsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER"]);
+
       const actorId = req.requestContext?.identityId ?? null;
       const documentId = Number(req.params.id);
 
@@ -221,6 +245,8 @@ export default async function documentsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER"]);
+
       const actorId = req.requestContext?.identityId ?? null;
       const documentId = Number(req.params.id);
 
@@ -256,6 +282,8 @@ export default async function documentsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN"]);
+
       const actorId = req.requestContext?.identityId ?? null;
       const documentId = Number(req.params.id);
 
@@ -291,6 +319,8 @@ export default async function documentsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN"]);
+
       const actorId = req.requestContext?.identityId ?? null;
       const documentId = Number(req.params.id);
 
@@ -326,6 +356,8 @@ export default async function documentsRoutes(app) {
     },
     async (req, reply) => {
       const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN"]);
+
       const actorId = req.requestContext?.identityId ?? null;
       const documentId = Number(req.params.id);
 

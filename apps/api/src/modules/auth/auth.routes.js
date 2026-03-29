@@ -1,9 +1,15 @@
 import { Type } from "@sinclair/typebox";
 import {
   loginService,
+  meService,
   refreshService,
   logoutService,
 } from "./auth.service.js";
+import {
+  sanitizeString,
+  validateEmail,
+  validatePassword,
+} from "../../lib/inputValidation.js";
 
 const ACCESS_COOKIE = process.env.AUTH_ACCESS_COOKIE || "itam_at";
 const REFRESH_COOKIE = process.env.AUTH_REFRESH_COOKIE || "itam_rt";
@@ -55,10 +61,36 @@ export default async function authRoutes(app) {
       const userAgent = String(req.headers["user-agent"] || "");
       const ip = String(req.ip || "");
 
+      const tenantCode = sanitizeString(req.body.tenant_code, 100);
+      const email = sanitizeString(req.body.email, 255);
+      const password = req.body.password;
+
+      if (!tenantCode) {
+        const e = new Error("Tenant code is required");
+        e.statusCode = 400;
+        e.code = "BAD_REQUEST";
+        throw e;
+      }
+
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        const e = new Error(emailValidation.error);
+        e.statusCode = 400;
+        e.code = "BAD_REQUEST";
+        throw e;
+      }
+
+      if (!password || typeof password !== "string") {
+        const e = new Error("Password is required");
+        e.statusCode = 400;
+        e.code = "BAD_REQUEST";
+        throw e;
+      }
+
       const out = await loginService(app, {
-        tenantCode: req.body.tenant_code,
-        email: req.body.email,
-        password: req.body.password,
+        tenantCode,
+        email: emailValidation.value,
+        password,
         userAgent,
         ip,
       });
@@ -68,11 +100,10 @@ export default async function authRoutes(app) {
         path: "/",
       });
 
-      // refresh cookie: lebih sempit path-nya
       reply.setCookie(REFRESH_COOKIE, out.refreshTokenRaw, {
         ...cookieBase(),
-        path: "/api/v1/auth",
-        maxAge: Number(process.env.AUTH_REFRESH_DAYS || 30) * 24 * 60 * 60, // seconds
+        path: "/",
+        maxAge: Number(process.env.AUTH_REFRESH_DAYS || 30) * 24 * 60 * 60,
       });
 
       return reply.send({
@@ -90,14 +121,16 @@ export default async function authRoutes(app) {
   // GET /api/v1/auth/me
   app.get("/me", async (req, reply) => {
     const p = mustAccessPayload(app, req);
+
+    const out = await meService(app, {
+      tenantId: Number(p.tenant_id),
+      userId: Number(p.user_id),
+      identityId: p.identity_id ?? null,
+    });
+
     return reply.send({
       ok: true,
-      data: {
-        tenant_id: Number(p.tenant_id),
-        user_id: Number(p.user_id),
-        roles: Array.isArray(p.roles) ? p.roles : [],
-        identity_id: p.identity_id ?? null,
-      },
+      data: out,
       meta: { request_id: req.id },
     });
   });
@@ -121,7 +154,7 @@ export default async function authRoutes(app) {
 
     reply.setCookie(REFRESH_COOKIE, out.refreshTokenRaw, {
       ...cookieBase(),
-      path: "/api/v1/auth",
+      path: "/",
       maxAge: Number(process.env.AUTH_REFRESH_DAYS || 30) * 24 * 60 * 60,
     });
 
@@ -143,6 +176,10 @@ export default async function authRoutes(app) {
     reply.clearCookie(ACCESS_COOKIE, { path: "/" });
     reply.clearCookie(REFRESH_COOKIE, { path: "/api/v1/auth" });
 
-    return reply.send({ ok: true, data: { ok: true }, meta: { request_id: req.id } });
+    return reply.send({
+      ok: true,
+      data: { ok: true },
+      meta: { request_id: req.id },
+    });
   });
 }

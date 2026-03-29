@@ -15,21 +15,19 @@ import {
 } from "./assets.service.js";
 
 export default async function assetsRoutes(app) {
-  // GET /api/v1/assets
   app.get(
     "/",
     { schema: { querystring: AssetListQuery, response: { 200: AssetListResponse } } },
     async (req) => {
-      const data = await listAssets(app, req.tenantId, req.query);
+      const data = await listAssets(app, req, req.query);
       return { ok: true, data, meta: { request_id: req.id } };
     }
   );
 
-  // GET /api/v1/assets/:id
   app.get(
     "/:id",
     { schema: { response: { 200: AssetDetailResponse } } },
-    async (req, reply) => {
+    async (req) => {
       const assetId = Number(req.params.id);
       if (!Number.isFinite(assetId)) {
         const e = new Error("Invalid asset id");
@@ -37,7 +35,7 @@ export default async function assetsRoutes(app) {
         throw e;
       }
 
-      const asset = await getAssetDetail(app, req.tenantId, assetId);
+      const asset = await getAssetDetail(app, req, assetId);
       if (!asset) {
         const e = new Error("Asset not found");
         e.statusCode = 404;
@@ -48,21 +46,19 @@ export default async function assetsRoutes(app) {
     }
   );
 
-  // POST /api/v1/assets (create)
   app.post(
     "/",
     { schema: { body: AssetCreateBody, response: { 200: SimpleOkResponse } } },
     async (req) => {
-      const id = await createAsset(app, req.tenantId, req.body);
+      const id = await createAsset(app, req, req.body);
       return { ok: true, data: { id }, meta: { request_id: req.id } };
     }
   );
 
-  // PATCH /api/v1/assets/:id (update)
   app.patch(
     "/:id",
     { schema: { body: AssetUpdateBody, response: { 200: SimpleOkResponse } } },
-    async (req, reply) => {
+    async (req) => {
       const assetId = Number(req.params.id);
       if (!Number.isFinite(assetId)) {
         const e = new Error("Invalid asset id");
@@ -70,7 +66,7 @@ export default async function assetsRoutes(app) {
         throw e;
       }
 
-      const id = await patchAsset(app, req.tenantId, assetId, req.body);
+      const id = await patchAsset(app, req, assetId, req.body);
       if (!id) {
         const e = new Error("Asset not found");
         e.statusCode = 404;

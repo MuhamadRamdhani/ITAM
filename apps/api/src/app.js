@@ -7,6 +7,7 @@ import multipart from "@fastify/multipart";
 import dbPlugin from "./plugins/db.js";
 import errorHandler from "./plugins/errorHandler.js";
 import requestContext from "./plugins/requestContext.js";
+import { securityHeadersPlugin } from "./plugins/securityHeaders.js";
 import iamRoutes from "./modules/iam/routes.js";
 import superadminRoutes from "./modules/superadmin/routes.js";
 import departmentsRoutes from "./modules/departments/routes.js";
@@ -25,9 +26,17 @@ import documentsRoutes from "./modules/documents/documents.routes.js";
 import evidenceRoutes from "./modules/evidence/evidence.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
 import auditEventsRoutes from "./modules/audit-events/audit-events.routes.js";
+import vendorsRoutes from "./modules/vendors/routes.js";
+import contractsRoutes from "./modules/contracts/routes.js";
+import reportsRoutes from "./modules/reports/routes.js";
 import governanceScopeRoutes from "./modules/governance/scope.routes.js";
 import governanceContextRoutes from "./modules/governance/context.routes.js"; 
 import governanceStakeholdersRoutes from "./modules/governance/stakeholders.routes.js";
+import softwareProductsRoutes from "./modules/software-products/routes.js";
+import softwareInstallationsRoutes from "./modules/software-installations/routes.js";
+import softwareAssignmentsRoutes from "./modules/software-assignments/routes.js";
+import softwareEntitlementsRoutes from "./modules/software-entitlements/routes.js";
+import softwareEntitlementAllocationsRoutes from "./modules/software-entitlement-allocations/routes.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -56,6 +65,8 @@ export async function buildApp() {
 
   await app.register(errorHandler);
 
+  await app.register(securityHeadersPlugin);
+
   app.get("/health", async () => ({
     ok: true,
     service: "api",
@@ -71,7 +82,7 @@ export async function buildApp() {
   await app.register(locationsRoutes, { prefix: "/api/v1/admin" });
   await app.register(identitiesRoutes, { prefix: "/api/v1/admin" });
   await app.register(adminConfigRoutes, { prefix: "/api/v1/admin" });
-
+  
   await app.register(multipart, {
     limits: {
       fileSize: 10 * 1024 * 1024,
@@ -89,6 +100,15 @@ export async function buildApp() {
   await app.register(evidenceRoutes, { prefix: "/api/v1" });
   await app.register(dashboardRoutes, { prefix: "/api/v1/dashboard" });
   await app.register(auditEventsRoutes, { prefix: "/api/v1/audit-events"});
+  await app.register(reportsRoutes, { prefix: "/api/v1/reports" });
+  await app.register(vendorsRoutes, { prefix: "/api/v1/vendors" });
+  await app.register(contractsRoutes, { prefix: "/api/v1/contracts" });
+  await app.register(softwareProductsRoutes, { prefix: "/api/v1/software-products" });
+  await app.register(softwareInstallationsRoutes, { prefix: "/api/v1/assets" });
+  await app.register(softwareAssignmentsRoutes, { prefix: "/api/v1/assets" });
+  await app.register(softwareEntitlementsRoutes, { prefix: "/api/v1/contracts" });
+  await app.register(softwareEntitlementAllocationsRoutes, { prefix: "/api/v1/software-entitlements" });
+
   await app.register(governanceScopeRoutes, {
     prefix: "/api/v1/governance/scope/versions",
   });
