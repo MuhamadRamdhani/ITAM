@@ -213,52 +213,52 @@ export default function OwnershipPanel(props: {
   }
 
   return (
-    <div className="rounded-b-lg border border-t-0 border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-gray-900">Current Snapshot</p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current Snapshot</p>
+          <p className="mt-1 text-sm text-slate-600">
             (sementara tampil ID dulu; nanti kalau BE resolve label, otomatis bisa tampil nama)
           </p>
         </div>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="itam-primary-action"
         >
           Change Ownership
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-md border border-gray-200 p-3">
-          <p className="text-xs font-semibold uppercase text-gray-500">Owner Department</p>
-          <p className="mt-1 text-sm text-gray-900">{props.currentOwnerDepartmentId ?? "-"}</p>
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Owner Department</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{props.currentOwnerDepartmentId ?? "-"}</p>
         </div>
-        <div className="rounded-md border border-gray-200 p-3">
-          <p className="text-xs font-semibold uppercase text-gray-500">Custodian</p>
-          <p className="mt-1 text-sm text-gray-900">{props.currentCustodianIdentityId ?? "-"}</p>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Custodian</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{props.currentCustodianIdentityId ?? "-"}</p>
         </div>
-        <div className="rounded-md border border-gray-200 p-3">
-          <p className="text-xs font-semibold uppercase text-gray-500">Location</p>
-          <p className="mt-1 text-sm text-gray-900">{props.currentLocationId ?? "-"}</p>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Location</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{props.currentLocationId ?? "-"}</p>
         </div>
       </div>
 
-      <div className="mt-6">
-        <p className="text-sm font-medium text-gray-900">Ownership History</p>
+      <div className="mt-8">
+        <p className="text-sm font-semibold text-slate-900">Ownership History</p>
         {loading ? (
-          <p className="mt-2 text-sm text-gray-600">Loading history...</p>
+          <p className="mt-2 text-sm text-slate-600">Loading history...</p>
         ) : error ? (
-          <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error}
           </div>
         ) : history.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">No ownership history yet.</p>
+          <p className="mt-2 text-sm text-slate-600">No ownership history yet.</p>
         ) : (
-          <div className="mt-3 overflow-hidden rounded-md border border-gray-200">
+          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200">
             <table className="w-full table-auto text-sm">
-              <thead className="bg-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 <tr>
                   <th className="px-3 py-2">From</th>
                   <th className="px-3 py-2">To</th>
@@ -268,23 +268,23 @@ export default function OwnershipPanel(props: {
                   <th className="px-3 py-2">Reason</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {history.map((h) => (
                   <tr key={h.id}>
-                    <td className="px-3 py-2">{new Date(h.effective_from).toLocaleString()}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 text-slate-700">{new Date(h.effective_from).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-700">
                       {h.effective_to ? new Date(h.effective_to).toLocaleString() : "-"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 text-slate-700">
                       {h.owner_department_name ?? h.owner_department_id ?? "-"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 text-slate-700">
                       {h.custodian_display_name ?? h.custodian_identity_id ?? "-"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-3 text-slate-700">
                       {h.location_name ?? h.location_id ?? "-"}
                     </td>
-                    <td className="px-3 py-2">{h.change_reason ?? "-"}</td>
+                    <td className="px-4 py-3 text-slate-700">{h.change_reason ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -292,45 +292,45 @@ export default function OwnershipPanel(props: {
           </div>
         )}
 
-        <div className="mt-3 text-xs text-gray-500">
+        <div className="mt-3 text-xs text-slate-500">
           API: <code>GET /api/v1/assets/:id/ownership-history</code> +{" "}
           <code>POST /api/v1/assets/:id/ownership-changes</code>
         </div>
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-lg bg-white p-5 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Change Ownership</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Change Ownership</h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               >
                 Close
               </button>
             </div>
 
             {modalErr ? (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {modalErr}
               </div>
             ) : null}
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-5 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Owner Department</label>
+                <label className="block text-sm font-medium text-slate-700">Owner Department</label>
                 <input
                   value={deptQ}
                   onChange={(e) => setDeptQ(e.target.value)}
                   placeholder="Search department..."
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 />
                 <select
                   value={ownerDepartmentId}
                   onChange={(e) => setOwnerDepartmentId(e.target.value ? Number(e.target.value) : "")}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 >
                   <option value="">(empty)</option>
                   {deptOptions.map((x) => (
@@ -342,17 +342,17 @@ export default function OwnershipPanel(props: {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Custodian (Identity)</label>
+                <label className="block text-sm font-medium text-slate-700">Custodian (Identity)</label>
                 <input
                   value={idenQ}
                   onChange={(e) => setIdenQ(e.target.value)}
                   placeholder="Search identity..."
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 />
                 <select
                   value={custodianIdentityId}
                   onChange={(e) => setCustodianIdentityId(e.target.value ? Number(e.target.value) : "")}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 >
                   <option value="">(empty)</option>
                   {idenOptions.map((x) => (
@@ -364,17 +364,17 @@ export default function OwnershipPanel(props: {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Location</label>
+                <label className="block text-sm font-medium text-slate-700">Location</label>
                 <input
                   value={locQ}
                   onChange={(e) => setLocQ(e.target.value)}
                   placeholder="Search location..."
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 />
                 <select
                   value={locationId}
                   onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : "")}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 >
                   <option value="">(empty)</option>
                   {locOptions.map((x) => (
@@ -386,12 +386,12 @@ export default function OwnershipPanel(props: {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Reason (optional)</label>
+                <label className="block text-sm font-medium text-slate-700">Reason (optional)</label>
                 <input
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="e.g. Reassign to new department"
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 />
               </div>
 
@@ -399,7 +399,7 @@ export default function OwnershipPanel(props: {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -407,7 +407,7 @@ export default function OwnershipPanel(props: {
                   type="button"
                   disabled={saving}
                   onClick={submitChange}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="itam-primary-action"
                 >
                   {saving ? "Saving..." : "Save"}
                 </button>

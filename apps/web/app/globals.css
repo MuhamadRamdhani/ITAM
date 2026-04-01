@@ -24,3 +24,188 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+.itam-page-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: rgb(15 23 42);
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.1), transparent 28%),
+    radial-gradient(circle at 80% 20%, rgba(14, 165, 233, 0.08), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.06), transparent 22%),
+    linear-gradient(180deg, #f8fafc 0%, #f8fafc 55%, #edf4fb 100%);
+}
+
+.itam-page-shell::before,
+.itam-page-shell::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(48px);
+}
+
+.itam-page-shell::before {
+  top: -6rem;
+  right: -6rem;
+  width: 20rem;
+  height: 20rem;
+  background: rgba(103, 232, 249, 0.12);
+}
+
+.itam-page-shell::after {
+  left: 0;
+  bottom: 0;
+  width: 18rem;
+  height: 18rem;
+  background: rgba(125, 211, 252, 0.08);
+}
+
+.itam-page-shell-inner {
+  position: relative;
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .itam-page-shell-inner {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .itam-page-shell-inner {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+}
+
+.itam-page-panel {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 24px 90px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(24px);
+}
+
+.itam-page-panel-inner {
+  padding: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .itam-page-panel-inner {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .itam-page-panel-inner {
+    padding: 2rem;
+  }
+}
+
+.itam-page-card {
+  border: 1px solid rgb(226 232 240);
+  border-radius: 1.5rem;
+  background: rgb(255 255 255);
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.1);
+}
+
+.itam-page-card-soft {
+  border: 1px solid rgb(226 232 240);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.itam-secondary-action,
+.itam-secondary-action-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(203 213 225);
+  border-radius: 9999px;
+  background: rgb(255 255 255);
+  color: rgb(51 65 85);
+  text-decoration: none;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease,
+    border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.itam-secondary-action {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+
+.itam-secondary-action-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+
+.itam-secondary-action:hover:not(:disabled),
+.itam-secondary-action-sm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgb(165 243 252);
+  background: rgb(236 254 255);
+  color: rgb(15 23 42);
+}
+
+.itam-secondary-action:disabled,
+.itam-secondary-action-sm:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.itam-primary-action,
+.itam-primary-action-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(165 243 252);
+  border-radius: 9999px;
+  background-image: linear-gradient(to right, rgb(6 182 212), rgb(14 165 233));
+  color: rgb(255 255 255);
+  text-decoration: none;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.itam-primary-action {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(14, 165, 233, 0.22);
+}
+
+.itam-primary-action-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(14, 165, 233, 0.22);
+}
+
+.itam-primary-action:hover:not(:disabled),
+.itam-primary-action-sm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(14, 165, 233, 0.28);
+}
+
+.itam-primary-action:disabled,
+.itam-primary-action-sm:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

@@ -141,7 +141,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="relative z-10">
         <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
             Loading scope version...
@@ -153,12 +153,12 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
 
   if (err) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="relative z-10">
         <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="mb-4">
             <Link
               href="/governance/scope"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="itam-secondary-action"
             >
               Back
             </Link>
@@ -174,12 +174,12 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="relative z-10">
         <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="mb-4">
             <Link
               href="/governance/scope"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="itam-secondary-action"
             >
               Back
             </Link>
@@ -197,7 +197,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
   const events = data.events;
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="relative z-10">
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -211,7 +211,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
 
           <Link
             href="/governance/scope"
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="itam-secondary-action"
           >
             Back
           </Link>
@@ -295,7 +295,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
                   type="button"
                   onClick={() => callAction("submit")}
                   disabled={!canSubmit || acting}
-                  className="rounded-md bg-amber-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                  className="itam-primary-action-sm disabled:opacity-50"
                 >
                   Submit
                 </button>
@@ -304,7 +304,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
                   type="button"
                   onClick={() => callAction("approve")}
                   disabled={!canApprove || acting}
-                  className="rounded-md bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                  className="itam-primary-action-sm disabled:opacity-50"
                 >
                   Approve
                 </button>
@@ -313,7 +313,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
                   type="button"
                   onClick={() => callAction("activate")}
                   disabled={!canActivate || acting}
-                  className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                  className="itam-primary-action-sm disabled:opacity-50"
                 >
                   Activate
                 </button>

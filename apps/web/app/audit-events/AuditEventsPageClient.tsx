@@ -42,12 +42,56 @@ function fmtDateTime(value?: string | null) {
   return d.toLocaleString();
 }
 
-function prettyJson(v: unknown) {
-  try {
-    return JSON.stringify(v ?? {}, null, 2);
-  } catch {
-    return String(v);
+function humanizeKey(value: string): string {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function toObjectRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function formatPayloadValue(value: unknown, depth = 0): string {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "-";
+    const items = value
+      .map((item) => formatPayloadValue(item, depth + 1))
+      .filter((item) => item !== "-");
+    if (items.length === 0) return "-";
+    return items.join(", ");
   }
+
+  const record = toObjectRecord(value);
+  if (!record) return String(value);
+
+  const entries = Object.entries(record);
+  if (entries.length === 0) return "-";
+  if (depth >= 1) {
+    return `Object(${entries.length})`;
+  }
+
+  return entries
+    .slice(0, 4)
+    .map(([key, nestedValue]) => `${humanizeKey(key)}: ${formatPayloadValue(nestedValue, depth + 1)}`)
+    .join("\n");
+}
+
+function buildPayloadSummary(value: unknown): Array<{ key: string; value: string }> {
+  const record = toObjectRecord(value);
+  if (!record) return [];
+
+  return Object.entries(record)
+    .map(([key, nestedValue]) => ({
+      key: humanizeKey(key),
+      value: formatPayloadValue(nestedValue),
+    }))
+    .filter((item) => item.value !== "-" && item.value.trim() !== "");
 }
 
 function toFriendlyErrorMessage(error: unknown) {
@@ -429,7 +473,7 @@ export default function AuditEventsPageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="relative z-10">
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -461,7 +505,7 @@ export default function AuditEventsPageClient() {
                 })}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action"
               >
                 Download JSON
               </a>
@@ -469,109 +513,109 @@ export default function AuditEventsPageClient() {
 
             <Link
               href="/"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="itam-secondary-action"
             >
               Back
             </Link>
           </div>
         </div>
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-sm">
-          <div className="font-semibold text-gray-900">Quick guide</div>
-          <div className="mt-1 text-gray-600">
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="font-semibold text-slate-900">Quick guide</div>
+          <div className="mt-1 text-slate-600">
             Event = what happened, Object = what was affected, Details = extra information.
           </div>
-          <div className="mt-1 text-gray-600">
+          <div className="mt-1 text-slate-600">
             Note: this page is restricted to SUPERADMIN / TENANT_ADMIN / ITAM_MANAGER / AUDITOR.
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => applyQuickFilter({ action: "AUTH_LOGIN_SUCCESS", entityType: "USER", days: 7 })}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Login success (7 days)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyQuickFilter({ action: "ASSET_CREATED", entityType: "ASSET", days: 7 })}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Asset created (7 days)
-            </button>
+              <button
+                type="button"
+                onClick={() => applyQuickFilter({ action: "AUTH_LOGIN_SUCCESS", entityType: "USER", days: 7 })}
+                className="itam-secondary-action-sm"
+              >
+                Login success (7 days)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyQuickFilter({ action: "ASSET_CREATED", entityType: "ASSET", days: 7 })}
+                className="itam-secondary-action-sm"
+              >
+                Asset created (7 days)
+              </button>
             <button
               type="button"
               onClick={() => applyQuickFilter({ action: "APPROVAL_DECIDED", entityType: "APPROVAL", days: 7 })}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="itam-secondary-action-sm"
             >
               Approval decided (7 days)
             </button>
-            <button
-              type="button"
-              onClick={() => applyQuickFilter({ action: "DOCUMENT_PUBLISHED", entityType: "DOCUMENT", days: 30 })}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Document published (30 days)
-            </button>
+              <button
+                type="button"
+                onClick={() => applyQuickFilter({ action: "DOCUMENT_PUBLISHED", entityType: "DOCUMENT", days: 30 })}
+                className="itam-secondary-action-sm"
+              >
+                Document published (30 days)
+              </button>
           </div>
         </div>
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <form className="grid grid-cols-1 gap-3 lg:grid-cols-4" onSubmit={onSubmitSearch}>
             <input
               value={actorInput}
               onChange={(e) => setActorInput(e.target.value)}
               placeholder="Actor (e.g., USER:1 / IDENTITY:10)"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <input
               value={actionInput}
               onChange={(e) => setActionInput(e.target.value)}
               placeholder="Event (e.g., ASSET_CREATED)"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <input
               value={entityTypeInput}
               onChange={(e) => setEntityTypeInput(e.target.value)}
               placeholder="Object type (e.g., USER / ASSET)"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <input
               value={entityIdInput}
               onChange={(e) => setEntityIdInput(e.target.value)}
               placeholder="Object ID (optional)"
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <input
               type="date"
               value={dateFromInput}
               onChange={(e) => setDateFromInput(e.target.value)}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <input
               type="date"
               value={dateToInput}
               onChange={(e) => setDateToInput(e.target.value)}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <input
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
               placeholder="Search actor/event/object/details..."
-              className="rounded-md border px-3 py-2 text-sm lg:col-span-2"
+              className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none lg:col-span-2 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             />
 
             <div className="flex gap-2 lg:col-span-4">
               <select
                 value={String(pageSize)}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="rounded-md border px-3 py-2 text-sm"
+                className="rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 {pageSizeOptions.map((n) => (
                   <option key={n} value={String(n)}>
@@ -580,38 +624,39 @@ export default function AuditEventsPageClient() {
                 ))}
               </select>
 
-              <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
+              <button className="itam-primary-action-sm">
                 Apply Filters
               </button>
 
               <Link
                 href="/audit-events"
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action"
               >
                 Reset
               </Link>
             </div>
           </form>
 
-          <div className="mt-4 text-sm text-gray-500">
+          <div className="mt-4 text-sm text-slate-500">
             Showing {shownFrom}–{shownTo} of {total}
           </div>
 
           {err ? (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {toFriendlyErrorMessage(err)}
             </div>
           ) : null}
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-gray-500">
+          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <div className="overflow-x-auto">
+            <table className="min-w-[960px] w-full text-[13px] leading-6">
+              <thead className="text-left text-slate-500">
                 <tr>
-                  <th className="py-2 pr-4">Time</th>
-                  <th className="py-2 pr-4">Actor</th>
-                  <th className="py-2 pr-4">Event</th>
-                  <th className="py-2 pr-4">Object</th>
-                  <th className="py-2 pr-4">Details</th>
+                  <th className="px-4 py-4 pr-6">Time</th>
+                  <th className="px-4 py-4 pr-6">Actor</th>
+                  <th className="px-4 py-4 pr-6">Event</th>
+                  <th className="px-4 py-4 pr-6">Object</th>
+                  <th className="px-4 py-4 pr-6">Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -624,40 +669,53 @@ export default function AuditEventsPageClient() {
                     <SkeletonTableRow cols={5} />
                   </>
                 ) : items.length === 0 ? (
-                  <tr className="border-t">
-                    <td colSpan={5} className="py-6 text-gray-600">
+                  <tr className="border-t border-slate-100">
+                    <td colSpan={5} className="px-4 py-8 text-slate-600">
                       No data.
                     </td>
                   </tr>
                 ) : (
                   items.map((row) => (
-                    <tr key={String(row.id)} className="border-t align-top">
-                      <td className="whitespace-nowrap py-2 pr-4">{fmtDateTime(row.created_at)}</td>
-                      <td className="py-2 pr-4">
-                        <div className="font-medium text-gray-900">{actorLabel(row.actor)}</div>
+                    <tr key={String(row.id)} className="border-t border-slate-100 align-top">
+                      <td className="whitespace-nowrap px-4 py-4 pr-6 align-top">{fmtDateTime(row.created_at)}</td>
+                      <td className="px-4 py-4 pr-6 align-top">
+                        <div className="font-medium text-slate-900">{actorLabel(row.actor)}</div>
                         {row.actor ? (
-                          <div className="text-xs text-gray-500">{row.actor}</div>
+                          <div className="mt-1 text-xs text-slate-500">{row.actor}</div>
                         ) : null}
                       </td>
-                      <td className="py-2 pr-4">
-                        <div className="font-medium text-gray-900">{actionLabel(row.action)}</div>
-                        <div className="text-xs text-gray-500">{row.action}</div>
+                      <td className="px-4 py-4 pr-6 align-top">
+                        <div className="font-medium text-slate-900">{actionLabel(row.action)}</div>
+                        <div className="mt-1 text-xs text-slate-500">{row.action}</div>
                       </td>
-                      <td className="py-2 pr-4">
-                        <div className="font-medium text-gray-900">{entityLabel(row.entity_type)}</div>
-                        <div className="text-xs text-gray-500">{row.entity_type}</div>
-                        <div className="text-xs text-gray-500">
+                      <td className="px-4 py-4 pr-6 align-top">
+                        <div className="font-medium text-slate-900">{entityLabel(row.entity_type)}</div>
+                        <div className="mt-1 text-xs text-slate-500">{row.entity_type}</div>
+                        <div className="text-xs text-slate-500">
                           ID: {row.entity_id ?? "-"}
                         </div>
                       </td>
-                      <td className="py-2 pr-4">
+                      <td className="px-4 py-4 pr-6 align-top">
                         <details>
-                          <summary className="cursor-pointer text-xs font-medium text-blue-700">
+                          <summary className="cursor-pointer text-xs font-medium text-cyan-700">
                             View details
                           </summary>
-                          <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-gray-50 p-3 text-xs">
-                            {prettyJson(row.payload)}
-                          </pre>
+                          <div className="mt-3 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-700 shadow-sm">
+                            {buildPayloadSummary(row.payload).length > 0 ? (
+                              <div className="space-y-3">
+                                {buildPayloadSummary(row.payload).map((item) => (
+                                  <div key={`${item.key}-${item.value}`} className="space-y-1">
+                                    <div className="font-semibold text-slate-900">{item.key}</div>
+                                    <div className="whitespace-pre-wrap break-words text-slate-700">
+                                      {item.value}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-slate-500">No details.</div>
+                            )}
+                          </div>
                         </details>
                       </td>
                     </tr>
@@ -665,17 +723,17 @@ export default function AuditEventsPageClient() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
-
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-slate-500">
               Page {pageFromUrl} / {totalPages} (page size: {pageSize})
             </div>
 
             <div className="flex gap-2">
               {canPrev ? (
                 <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="itam-secondary-action-sm"
                   href={buildHref({
                     actor,
                     action,
@@ -691,14 +749,14 @@ export default function AuditEventsPageClient() {
                   Prev
                 </Link>
               ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <span className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
                   Prev
                 </span>
               )}
 
               {canNext ? (
                 <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="itam-secondary-action-sm"
                   href={buildHref({
                     actor,
                     action,
@@ -714,7 +772,7 @@ export default function AuditEventsPageClient() {
                   Next
                 </Link>
               ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <span className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
                   Next
                 </span>
               )}

@@ -3,8 +3,12 @@ import ScopeVersionsPageClient from "./ScopeVersionsPageClient";
 
 export default function GovernanceScopePage() {
   return (
-    <Suspense>
-      <ScopeVersionsPageClient />
-    </Suspense>
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <Suspense>
+          <ScopeVersionsPageClient />
+        </Suspense>
+      </div>
+    </main>
   );
 }

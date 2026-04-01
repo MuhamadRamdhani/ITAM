@@ -61,19 +61,43 @@ export default function TenantSubscriptionBanner() {
   if (contractHealth !== "EXPIRING") return null;
 
   return (
-    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
-      <div className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-700">
-        Tenant Subscription Warning
+    <div className="relative overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-200/25 blur-3xl" />
+
+      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+        Tenant Subscription Alert
       </div>
 
-      <div className="mt-2 text-sm leading-6 text-amber-900">
-        Kontrak tenant Anda akan berakhir
-        {typeof daysToExpiry === "number" ? ` dalam ${daysToExpiry} hari` : ""}.
-        {contractEndDate ? ` Tanggal akhir kontrak: ${contractEndDate}.` : ""}
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+        Kontrak tenant Anda perlu perhatian
       </div>
 
-      <div className="mt-2 text-xs leading-5 text-amber-700">
-        Hubungi administrator platform untuk proses perpanjangan sebelum akses tenant terblokir.
+      <div className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+        {tenant?.name ? `${tenant.name} ` : ""}
+        {typeof daysToExpiry === "number"
+          ? `akan berakhir dalam ${daysToExpiry} hari`
+          : "akan segera berakhir"}
+        {contractEndDate ? `, dengan tanggal akhir ${contractEndDate}.` : "."}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+          Health: {contractHealth}
+        </span>
+        {typeof daysToExpiry === "number" ? (
+          <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+            Days left: {daysToExpiry}
+          </span>
+        ) : null}
+        {tenant?.code ? (
+          <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+            Tenant: {tenant.code}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 text-sm font-semibold text-amber-700">
+        Hubungi administrator platform untuk perpanjangan sebelum akses tenant terblokir.
       </div>
     </div>
   );

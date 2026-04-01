@@ -357,9 +357,10 @@ export default function ScopeVersionsPageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="relative z-10">
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
+        <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Governance Scope</h1>
             <p className="mt-1 text-sm text-gray-600">
@@ -369,14 +370,16 @@ export default function ScopeVersionsPageClient() {
 
           <Link
             href="/"
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="itam-secondary-action"
           >
             Back
           </Link>
+          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mt-8 rounded-3xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
             <div className="text-base font-semibold text-gray-900">New Scope Version</div>
             <div className="mt-1 text-sm text-gray-600">
               Buat draft scope version baru untuk tenant aktif.
@@ -520,7 +523,7 @@ export default function ScopeVersionsPageClient() {
                   type="button"
                   onClick={createScopeVersion}
                   disabled={creating}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="itam-primary-action disabled:opacity-50"
                 >
                   {creating ? "Creating..." : "Create Scope Version"}
                 </button>
@@ -528,7 +531,8 @@ export default function ScopeVersionsPageClient() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {STATUSES.map((s) => (
@@ -625,7 +629,7 @@ export default function ScopeVersionsPageClient() {
               <div className="flex gap-2">
                 {canPrev ? (
                   <Link
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="itam-secondary-action-sm"
                     href={buildHref({ status, page: pageFromUrl - 1, pageSize })}
                   >
                     Prev
@@ -638,7 +642,7 @@ export default function ScopeVersionsPageClient() {
 
                 {canNext ? (
                   <Link
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="itam-secondary-action-sm"
                     href={buildHref({ status, page: pageFromUrl + 1, pageSize })}
                   >
                     Next
@@ -657,6 +661,8 @@ export default function ScopeVersionsPageClient() {
                 {prettyJson(scopeJsonPreview)}
               </pre>
             </div>
+            </div>
+          </div>
           </div>
         </div>
       </div>

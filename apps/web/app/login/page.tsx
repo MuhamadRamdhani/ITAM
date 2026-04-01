@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiPostJson } from "../lib/api";
 import { useGlobalLoadingAction } from "../components/useGlobalLoadingAction";
 
@@ -29,18 +29,104 @@ type ContractModalState = {
   message: string;
 } | null;
 
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (cb: () => void) => void;
+      render: (
+        container: HTMLElement | string,
+        params: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+        }
+      ) => number;
+      reset: (widgetId?: number) => void;
+    };
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { runWithLoading, hide } = useGlobalLoadingAction();
   const inFlightRef = useRef(false);
+  const captchaRef = useRef<HTMLDivElement | null>(null);
+  const captchaWidgetIdRef = useRef<number | null>(null);
 
   const [tenantCode, setTenantCode] = useState("default");
   const [email, setEmail] = useState("admin@default.local");
   const [password, setPassword] = useState("admin123");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [captchaReady, setCaptchaReady] = useState(false);
 
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [contractModal, setContractModal] = useState<ContractModalState>(null);
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
+
+  useEffect(() => {
+    if (!recaptchaSiteKey || typeof window === "undefined") return;
+
+    let cancelled = false;
+
+    const renderCaptcha = () => {
+      if (cancelled || !captchaRef.current || !window.grecaptcha) return;
+      if (captchaWidgetIdRef.current !== null) return;
+
+      captchaWidgetIdRef.current = window.grecaptcha.render(captchaRef.current, {
+        sitekey: recaptchaSiteKey,
+        callback: (token: string) => {
+          setRecaptchaToken(token);
+          setErr(null);
+        },
+        "expired-callback": () => {
+          setRecaptchaToken(null);
+        },
+        "error-callback": () => {
+          setRecaptchaToken(null);
+          setErr("Captcha verification failed. Please try again.");
+        },
+      });
+
+      setCaptchaReady(true);
+    };
+
+    const handleLoad = () => {
+      if (!window.grecaptcha) return;
+      window.grecaptcha.ready(renderCaptcha);
+    };
+
+    const existingScript = document.getElementById("google-recaptcha-script");
+
+    if (window.grecaptcha) {
+      window.grecaptcha.ready(renderCaptcha);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = "google-recaptcha-script";
+      script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      script.addEventListener("load", handleLoad);
+      document.head.appendChild(script);
+
+      return () => {
+        cancelled = true;
+        script.removeEventListener("load", handleLoad);
+      };
+    }
+
+    existingScript.addEventListener("load", handleLoad);
+    return () => {
+      cancelled = true;
+      existingScript.removeEventListener("load", handleLoad);
+    };
+  }, [recaptchaSiteKey]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -72,6 +158,18 @@ export default function LoginPage() {
       return;
     }
 
+    if (!recaptchaSiteKey) {
+      setErr("Captcha site key belum dikonfigurasi.");
+      inFlightRef.current = false;
+      return;
+    }
+
+    if (!recaptchaToken) {
+      setErr("Captcha verification is required");
+      inFlightRef.current = false;
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -81,6 +179,7 @@ export default function LoginPage() {
             tenant_code: tenantCodeTrimmed,
             email: emailTrimmed,
             password,
+            recaptcha_token: recaptchaToken,
           });
         },
         "Signing in..."
@@ -115,6 +214,12 @@ export default function LoginPage() {
         });
       } else {
         setErr(message);
+        if (code === "AUTH_CAPTCHA_INVALID" || code === "AUTH_CAPTCHA_REQUIRED") {
+          setRecaptchaToken(null);
+          if (captchaWidgetIdRef.current !== null && window.grecaptcha) {
+            window.grecaptcha.reset(captchaWidgetIdRef.current);
+          }
+        }
       }
     } finally {
       inFlightRef.current = false;
@@ -285,6 +390,13 @@ export default function LoginPage() {
                   </div>
 
                   {err && <div className="error-message">{err}</div>}
+
+                  <div className="captcha-wrapper">
+                    <div className="captcha-host" ref={captchaRef} />
+                    {!captchaReady ? (
+                      <p className="captcha-hint">Loading captcha...</p>
+                    ) : null}
+                  </div>
 
                   <button
                     type="submit"
@@ -693,6 +805,30 @@ export default function LoginPage() {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-5px); }
           75% { transform: translateX(5px); }
+        }
+
+        .captcha-wrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 4px;
+          align-items: center;
+          width: 100%;
+        }
+
+        .captcha-host {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+        }
+
+        .captcha-hint {
+          font-size: 0.8rem;
+          line-height: 1.4;
+          color: #64748b;
+          text-align: center;
         }
 
         /* Submit Button */

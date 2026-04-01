@@ -641,7 +641,7 @@ export default function SoftwareEntitlementsPanel({
           <button
             type="button"
             onClick={() => void openCreateModal()}
-            className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="itam-primary-action"
             disabled={loading}
           >
             Add Entitlement
@@ -1099,7 +1099,7 @@ export default function SoftwareEntitlementsPanel({
 
                 <button
                   type="submit"
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="itam-primary-action"
                   disabled={saving || !form.software_product_id || !form.entitlement_code}
                 >
                   {saving

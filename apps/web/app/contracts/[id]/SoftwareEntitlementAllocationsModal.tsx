@@ -1120,7 +1120,7 @@ export default function SoftwareEntitlementAllocationsModal({
                     <button
                       type="submit"
                       disabled={!canSubmit}
-                      className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="itam-primary-action"
                     >
                       {saving ? "Saving..." : "Create Allocation"}
                     </button>

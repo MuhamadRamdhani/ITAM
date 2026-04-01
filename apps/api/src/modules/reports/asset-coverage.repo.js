@@ -175,17 +175,45 @@ function buildOuterFilters(filters, params) {
 
 function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
   return `
-    WITH base_asset AS (
+    WITH primary_contract AS (
+      SELECT
+        ca.tenant_id,
+        ca.asset_id,
+        c.id AS contract_id,
+        c.contract_code,
+        c.contract_type,
+        c.start_date,
+        c.end_date,
+        c.renewal_notice_days
+      FROM public.contract_assets ca
+      INNER JOIN public.contracts c
+        ON c.tenant_id = ca.tenant_id
+       AND c.id = ca.contract_id
+      INNER JOIN (
+        SELECT tenant_id, asset_id
+        FROM public.contract_assets
+        GROUP BY tenant_id, asset_id
+        HAVING COUNT(DISTINCT contract_id) = 1
+      ) single_contract
+        ON single_contract.tenant_id = ca.tenant_id
+       AND single_contract.asset_id = ca.asset_id
+    ),
+    base_asset AS (
       SELECT
         a.id AS asset_id,
         a.asset_tag,
         a.name,
         a.status,
+        at.code AS asset_type_code,
         jsonb_build_object('code', at.code, 'label', at.display_name) AS asset_type,
         CASE
           WHEN ls.id IS NULL THEN NULL
           ELSE jsonb_build_object('code', ls.code, 'label', ls.display_name)
         END AS state,
+        pc.contract_code AS primary_contract_code,
+        pc.contract_type AS primary_contract_type,
+        pc.start_date AS primary_contract_start_date,
+        pc.end_date AS primary_contract_end_date,
 
         a.warranty_start_date,
         a.warranty_end_date,
@@ -198,6 +226,9 @@ function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
         ON at.id = a.asset_type_id
       LEFT JOIN public.lifecycle_states ls
         ON ls.id = a.current_state_id
+      LEFT JOIN primary_contract pc
+        ON pc.tenant_id = a.tenant_id
+       AND pc.asset_id = a.id
       WHERE ${baseWhereSql}
     ),
     contract_relation_rollup AS (
@@ -285,13 +316,33 @@ function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
         b.asset_tag,
         b.name,
         b.status,
+        b.asset_type_code,
         b.asset_type,
         b.state,
         'WARRANTY'::text AS coverage_kind,
-        b.warranty_start_date AS start_date,
-        b.warranty_end_date AS end_date
+        CASE
+          WHEN b.asset_type_code IN ('HARDWARE', 'NETWORK')
+            AND b.primary_contract_start_date IS NOT NULL
+            AND b.primary_contract_end_date IS NOT NULL
+          THEN b.primary_contract_start_date
+          ELSE b.warranty_start_date
+        END AS start_date,
+        CASE
+          WHEN b.asset_type_code IN ('HARDWARE', 'NETWORK')
+            AND b.primary_contract_start_date IS NOT NULL
+            AND b.primary_contract_end_date IS NOT NULL
+          THEN b.primary_contract_end_date
+          ELSE b.warranty_end_date
+        END AS end_date
       FROM base_asset b
-      WHERE b.warranty_start_date IS NOT NULL OR b.warranty_end_date IS NOT NULL
+      WHERE
+        b.warranty_start_date IS NOT NULL
+        OR b.warranty_end_date IS NOT NULL
+        OR (
+          b.asset_type_code IN ('HARDWARE', 'NETWORK')
+          AND b.primary_contract_start_date IS NOT NULL
+          AND b.primary_contract_end_date IS NOT NULL
+        )
 
       UNION ALL
 
@@ -300,6 +351,7 @@ function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
         b.asset_tag,
         b.name,
         b.status,
+        b.asset_type_code,
         b.asset_type,
         b.state,
         'SUPPORT'::text AS coverage_kind,
@@ -315,13 +367,33 @@ function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
         b.asset_tag,
         b.name,
         b.status,
+        b.asset_type_code,
         b.asset_type,
         b.state,
         'SUBSCRIPTION'::text AS coverage_kind,
-        b.subscription_start_date AS start_date,
-        b.subscription_end_date AS end_date
+        CASE
+          WHEN b.asset_type_code IN ('SOFTWARE', 'SAAS', 'CLOUD', 'VM_CONTAINER')
+            AND b.primary_contract_start_date IS NOT NULL
+            AND b.primary_contract_end_date IS NOT NULL
+          THEN b.primary_contract_start_date
+          ELSE b.subscription_start_date
+        END AS start_date,
+        CASE
+          WHEN b.asset_type_code IN ('SOFTWARE', 'SAAS', 'CLOUD', 'VM_CONTAINER')
+            AND b.primary_contract_start_date IS NOT NULL
+            AND b.primary_contract_end_date IS NOT NULL
+          THEN b.primary_contract_end_date
+          ELSE b.subscription_end_date
+        END AS end_date
       FROM base_asset b
-      WHERE b.subscription_start_date IS NOT NULL OR b.subscription_end_date IS NOT NULL
+      WHERE
+        b.subscription_start_date IS NOT NULL
+        OR b.subscription_end_date IS NOT NULL
+        OR (
+          b.asset_type_code IN ('SOFTWARE', 'SAAS', 'CLOUD', 'VM_CONTAINER')
+          AND b.primary_contract_start_date IS NOT NULL
+          AND b.primary_contract_end_date IS NOT NULL
+        )
 
       UNION ALL
 
@@ -330,6 +402,7 @@ function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
         b.asset_tag,
         b.name,
         b.status,
+        b.asset_type_code,
         b.asset_type,
         b.state,
         'NONE'::text AS coverage_kind,
@@ -343,6 +416,18 @@ function buildCoverageCte(baseWhereSql, thresholdDaysParamIndex) {
         AND b.support_end_date IS NULL
         AND b.subscription_start_date IS NULL
         AND b.subscription_end_date IS NULL
+        AND NOT (
+          (
+            b.asset_type_code IN ('HARDWARE', 'NETWORK')
+            AND b.primary_contract_start_date IS NOT NULL
+            AND b.primary_contract_end_date IS NOT NULL
+          )
+          OR (
+            b.asset_type_code IN ('SOFTWARE', 'SAAS', 'CLOUD', 'VM_CONTAINER')
+            AND b.primary_contract_start_date IS NOT NULL
+            AND b.primary_contract_end_date IS NOT NULL
+          )
+        )
     ),
     coverage_enriched AS (
       SELECT

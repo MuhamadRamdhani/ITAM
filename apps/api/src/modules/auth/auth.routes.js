@@ -13,6 +13,8 @@ import {
 
 const ACCESS_COOKIE = process.env.AUTH_ACCESS_COOKIE || "itam_at";
 const REFRESH_COOKIE = process.env.AUTH_REFRESH_COOKIE || "itam_rt";
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY || "";
+const RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
 function isProd() {
   return String(process.env.NODE_ENV || "").toLowerCase() === "production";
@@ -24,6 +26,65 @@ function cookieBase() {
     secure: isProd(),
     sameSite: "lax",
   };
+}
+
+async function verifyRecaptchaToken({ token, ip }) {
+  if (!RECAPTCHA_SECRET_KEY) {
+    return;
+  }
+
+  const recaptchaToken = sanitizeString(token, 4096);
+  if (!recaptchaToken) {
+    const e = new Error("Captcha verification is required");
+    e.statusCode = 400;
+    e.code = "AUTH_CAPTCHA_REQUIRED";
+    throw e;
+  }
+
+  const params = new URLSearchParams();
+  params.set("secret", RECAPTCHA_SECRET_KEY);
+  params.set("response", recaptchaToken);
+  if (ip) {
+    params.set("remoteip", ip);
+  }
+
+  let data;
+  try {
+    const response = await fetch(RECAPTCHA_VERIFY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params,
+    });
+
+    if (!response.ok) {
+      const e = new Error("Captcha verification service unavailable");
+      e.statusCode = 502;
+      e.code = "AUTH_CAPTCHA_SERVICE_ERROR";
+      throw e;
+    }
+
+    data = await response.json();
+  } catch (cause) {
+    if (cause && cause.code === "AUTH_CAPTCHA_SERVICE_ERROR") {
+      throw cause;
+    }
+
+    const e = new Error("Captcha verification service unavailable");
+    e.statusCode = 502;
+    e.code = "AUTH_CAPTCHA_SERVICE_ERROR";
+    e.cause = cause;
+    throw e;
+  }
+
+  if (!data?.success) {
+    const e = new Error("Captcha verification failed");
+    e.statusCode = 403;
+    e.code = "AUTH_CAPTCHA_INVALID";
+    e.details = { errorCodes: data?.["error-codes"] || [] };
+    throw e;
+  }
 }
 
 function mustAccessPayload(app, req) {
@@ -54,6 +115,7 @@ export default async function authRoutes(app) {
           tenant_code: Type.String(),
           email: Type.String(),
           password: Type.String(),
+          recaptcha_token: Type.Optional(Type.String()),
         }),
       },
     },
@@ -86,6 +148,11 @@ export default async function authRoutes(app) {
         e.code = "BAD_REQUEST";
         throw e;
       }
+
+      await verifyRecaptchaToken({
+        token: req.body.recaptcha_token,
+        ip,
+      });
 
       const out = await loginService(app, {
         tenantCode,

@@ -32,8 +32,8 @@ function hasAdminRole(roles: string[]) {
 
 function activePill(active: boolean) {
   return active
-    ? "rounded-full bg-green-50 px-2 py-1 text-xs text-green-800"
-    : "rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
+    ? "inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-800 ring-1 ring-inset ring-green-200"
+    : "inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200";
 }
 
 export default function AdminAssetTypesClient() {
@@ -156,7 +156,7 @@ export default function AdminAssetTypesClient() {
 
   if (meLoading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         Loading asset types...
       </div>
     );
@@ -164,9 +164,9 @@ export default function AdminAssetTypesClient() {
 
   if (!canAccess) {
     return (
-      <div className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
-        <div className="text-lg font-semibold text-gray-900">Forbidden</div>
-        <div className="mt-1 text-sm text-gray-600">
+      <div className="rounded-3xl border border-red-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="text-lg font-semibold text-slate-900">Forbidden</div>
+        <div className="mt-1 text-sm text-slate-600">
           Halaman ini hanya bisa diakses oleh role SUPERADMIN atau TENANT_ADMIN.
         </div>
       </div>
@@ -178,12 +178,12 @@ export default function AdminAssetTypesClient() {
       {(err || ok) && (
         <div className="space-y-2">
           {err ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {err}
             </div>
           ) : null}
           {ok ? (
-            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
               {ok}
             </div>
           ) : null}
@@ -191,21 +191,21 @@ export default function AdminAssetTypesClient() {
       )}
 
       {editId ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div>
-            <div className="text-base font-semibold text-gray-900">Edit Asset Type Label</div>
-            <div className="mt-1 text-sm text-gray-600">
+            <div className="text-base font-semibold text-slate-900">Edit Asset Type Label</div>
+            <div className="mt-1 text-sm text-slate-600">
               Hanya <b>display_name</b> yang boleh diubah. <b>code</b> tetap stabil.
             </div>
           </div>
 
-          <form onSubmit={onSaveEdit} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <form onSubmit={onSaveEdit} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Display Name</label>
+              <label className="block text-sm font-medium text-slate-700">Display Name</label>
               <input
                 value={editDisplayName}
                 onChange={(e) => setEditDisplayName(e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 required
               />
             </div>
@@ -213,7 +213,7 @@ export default function AdminAssetTypesClient() {
             <div className="md:col-span-2 flex gap-2">
               <button
                 disabled={editLoading}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                className="itam-primary-action"
               >
                 {editLoading ? "Saving..." : "Save Changes"}
               </button>
@@ -221,7 +221,7 @@ export default function AdminAssetTypesClient() {
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action"
               >
                 Cancel
               </button>
@@ -230,17 +230,18 @@ export default function AdminAssetTypesClient() {
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="text-sm text-gray-500">Total: {items.length}</div>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="text-sm text-slate-500">Total: {items.length}</div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-gray-500">
+        <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+          <table className="min-w-[760px] w-full text-[13px] leading-6">
+            <thead className="text-left text-slate-500">
               <tr>
-                <th className="py-2 pr-4">Code</th>
-                <th className="py-2 pr-4">Display Name</th>
-                <th className="py-2 pr-4">Active</th>
-                <th className="py-2 pr-4 text-right">Action</th>
+                <th className="px-4 py-4 pr-6">Code</th>
+                <th className="px-4 py-4 pr-6">Display Name</th>
+                <th className="px-4 py-4 pr-6">Active</th>
+                <th className="px-4 py-4 pr-6 text-right">Action</th>
               </tr>
             </thead>
 
@@ -255,26 +256,26 @@ export default function AdminAssetTypesClient() {
                   <SkeletonTableRow cols={4} />
                 </>
               ) : items.length === 0 ? (
-                <tr className="border-t">
-                  <td colSpan={4} className="py-6 text-gray-600">
+                <tr className="border-t border-slate-100">
+                  <td colSpan={4} className="px-4 py-8 text-slate-600">
                     Tidak ada asset types.
                   </td>
                 </tr>
               ) : (
                 items.map((a) => (
-                  <tr key={String(a.id)} className="border-t">
-                    <td className="py-3 pr-4 font-mono text-xs">{a.code}</td>
-                    <td className="py-3 pr-4">{a.display_name}</td>
-                    <td className="py-3 pr-4">
+                  <tr key={String(a.id)} className="border-t border-slate-100 align-top">
+                    <td className="px-4 py-4 pr-6 font-mono text-xs text-slate-700">{a.code}</td>
+                    <td className="px-4 py-4 pr-6 text-slate-900">{a.display_name}</td>
+                    <td className="px-4 py-4 pr-6">
                       <span className={activePill(Boolean(a.active))}>
                         {a.active ? "ACTIVE" : "INACTIVE"}
                       </span>
                     </td>
-                    <td className="py-3 pr-4 text-right whitespace-nowrap">
+                    <td className="px-4 py-4 pr-6 text-right whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => startEdit(a)}
-                        className="text-blue-700 hover:underline"
+                        className="itam-secondary-action-sm"
                       >
                         Edit Label
                       </button>
@@ -286,9 +287,10 @@ export default function AdminAssetTypesClient() {
           </table>
         </div>
 
-        <div className="mt-3 text-xs text-gray-500">
+        <div className="mt-4 text-xs text-slate-500">
           Tip: <b>code</b> dipakai oleh logic sistem, jadi yang editable hanya <b>display_name</b>.
         </div>
+          </div>
       </div>
     </div>
   );

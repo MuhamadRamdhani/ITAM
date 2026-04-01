@@ -208,7 +208,9 @@ function buildReportHref(params: {
   }
 
   const qs = p.toString();
-  return qs ? `/reports/asset-coverage?${qs}` : "/reports/asset-coverage";
+  return qs
+    ? `/reports/asset-coverage?view=coverage&${qs}`
+    : "/reports/asset-coverage?view=coverage";
 }
 
 function buildExportQuery(params: {
@@ -1040,6 +1042,17 @@ export default function AssetCoverageReportClient() {
               Monitoring coverage warranty, support, dan subscription per asset
               dengan konteks contract dan vendor.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
+                Coverage
+              </span>
+              <Link
+                href="/reports/asset-coverage?view=mapping"
+                className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Mapping
+              </Link>
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -1269,7 +1282,7 @@ export default function AssetCoverageReportClient() {
 
               <button
                 type="submit"
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="itam-primary-action"
               >
                 Search
               </button>

@@ -92,7 +92,7 @@ export default function DocumentActionsPanel(props: {
         </button>
 
         <button
-          className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+          className="itam-primary-action-sm"
           disabled={!canPublish || loading}
           onClick={() => call("publish")}
         >

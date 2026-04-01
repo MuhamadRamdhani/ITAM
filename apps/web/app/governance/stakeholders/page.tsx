@@ -3,8 +3,12 @@ import StakeholdersRegisterPageClient from "./StakeholdersRegisterPageClient";
 
 export default function GovernanceStakeholdersPage() {
   return (
-    <Suspense>
-      <StakeholdersRegisterPageClient />
-    </Suspense>
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <Suspense>
+          <StakeholdersRegisterPageClient />
+        </Suspense>
+      </div>
+    </main>
   );
 }

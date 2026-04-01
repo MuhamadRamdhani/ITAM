@@ -37,6 +37,8 @@ import softwareInstallationsRoutes from "./modules/software-installations/routes
 import softwareAssignmentsRoutes from "./modules/software-assignments/routes.js";
 import softwareEntitlementsRoutes from "./modules/software-entitlements/routes.js";
 import softwareEntitlementAllocationsRoutes from "./modules/software-entitlement-allocations/routes.js";
+import assetTransferRoutes from "./modules/asset-transfer/asset-transfer.routes.js";
+import kpiRoutes from "./modules/kpi/kpi.routes.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -108,6 +110,8 @@ export async function buildApp() {
   await app.register(softwareAssignmentsRoutes, { prefix: "/api/v1/assets" });
   await app.register(softwareEntitlementsRoutes, { prefix: "/api/v1/contracts" });
   await app.register(softwareEntitlementAllocationsRoutes, { prefix: "/api/v1/software-entitlements" });
+  await app.register(assetTransferRoutes, { prefix: "/api/v1/asset-transfer-requests" });
+  await app.register(kpiRoutes, { prefix: "/api/v1/kpis" });
 
   await app.register(governanceScopeRoutes, {
     prefix: "/api/v1/governance/scope/versions",

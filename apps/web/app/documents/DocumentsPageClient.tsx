@@ -225,41 +225,53 @@ export default function DocumentsPageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Documents</h1>
-            <p className="mt-1 text-sm text-gray-600">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)] pointer-events-none" />
+
+      <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
+        <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Operational Workspace
+            </div>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+              Documents
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
               MVP1.4 — versioning + workflow (draft → review → approve → publish).
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <Link
-              href="/"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back
-            </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Back
+          </Link>
+        </div>
 
+        <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mb-4 flex justify-end">
             <Link
               href="/documents/new"
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="itam-primary-action"
             >
               New Document
             </Link>
           </div>
-        </div>
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-semibold text-slate-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {STATUSES.map((s) => (
                 <Link
                   key={s}
                   href={buildDocsHref({ status: s, type, q, page: 1, pageSize })}
-                  className={status === s ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "pb-1 hover:text-gray-900"}
+                  className={
+                    status === s
+                      ? "rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-cyan-700"
+                      : "rounded-full border border-transparent px-3 py-1.5 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                  }
                 >
                   {s}
                 </Link>
@@ -273,7 +285,7 @@ export default function DocumentsPageClient() {
               <select
                 value={String(pageSize)}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="rounded-md border px-3 py-2 text-sm"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               >
                 {pageSizeOptions.map((n) => (
                   <option key={n} value={String(n)}>
@@ -286,24 +298,29 @@ export default function DocumentsPageClient() {
                 value={searchType}
                 onChange={(e) => setSearchType(e.target.value)}
                 placeholder="Type (e.g. POLICY/SOP/CONTRACT)"
-                className="w-full rounded-md border px-3 py-2 text-sm sm:w-56"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 sm:w-56"
               />
 
               <input
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="Search title/type..."
-                className="w-full rounded-md border px-3 py-2 text-sm sm:w-64 lg:w-72"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 sm:w-64 lg:w-72"
               />
 
-              <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+              <button className="itam-primary-action">
                 Search
               </button>
             </form>
           </div>
 
-          <div className="mt-4 text-sm text-gray-500">
-            Total: {total} <span className="ml-2">{total === 0 ? "(0)" : `(showing ${startIdx}–${endIdx})`}</span>
+          <div className="mt-5 flex items-start justify-between gap-4">
+            <div className="text-sm text-slate-600">
+              Total: {total} <span className="ml-2">{total === 0 ? "(0)" : `(showing ${startIdx}–${endIdx})`}</span>
+            </div>
+            <div className="text-xs text-slate-500">
+              Tip: tambah version hanya boleh saat <b>DRAFT</b> atau <b>IN_REVIEW</b>.
+            </div>
           </div>
 
           {err ? (
@@ -319,14 +336,14 @@ export default function DocumentsPageClient() {
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-gray-500">
+              <thead className="text-left text-slate-500">
                 <tr>
-                  <th className="py-2 pr-4">Updated</th>
-                  <th className="py-2 pr-4">Type</th>
-                  <th className="py-2 pr-4">Title</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Version</th>
-                  <th className="py-2 pr-4 text-right">Action</th>
+                  <th className="py-3 pr-4">Updated</th>
+                  <th className="py-3 pr-4">Type</th>
+                  <th className="py-3 pr-4">Title</th>
+                  <th className="py-3 pr-4">Status</th>
+                  <th className="py-3 pr-4">Version</th>
+                  <th className="py-3 pr-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,8 +357,8 @@ export default function DocumentsPageClient() {
                     <SkeletonTableRow cols={6} />
                   </>
                 ) : items.length === 0 ? (
-                  <tr className="border-t">
-                    <td colSpan={6} className="py-6 text-gray-600">
+                  <tr className="border-t border-slate-100">
+                    <td colSpan={6} className="py-8 text-slate-600">
                       Tidak ada documents.
                     </td>
                   </tr>
@@ -351,11 +368,11 @@ export default function DocumentsPageClient() {
                     const canEdit = s === "DRAFT" || s === "IN_REVIEW";
 
                     return (
-                      <tr key={String(d.id)} className="border-t">
-                        <td className="whitespace-nowrap py-2 pr-4">{fmtDateTime(d.updated_at)}</td>
-                        <td className="py-2 pr-4 font-mono text-xs">{d.doc_type_code}</td>
+                      <tr key={String(d.id)} className="border-t border-slate-100">
+                        <td className="whitespace-nowrap py-4 pr-4 text-slate-700">{fmtDateTime(d.updated_at)}</td>
+                        <td className="py-4 pr-4 font-mono text-xs text-slate-500">{d.doc_type_code}</td>
                         <td className="py-2 pr-4">
-                          <Link className="text-blue-700 hover:underline" href={`/documents/${d.id}`}>
+                          <Link className="text-cyan-700 hover:underline" href={`/documents/${d.id}`}>
                             {d.title}
                           </Link>
                         </td>
@@ -364,13 +381,13 @@ export default function DocumentsPageClient() {
                         </td>
                         <td className="py-2 pr-4">v{Number(d.current_version ?? 1)}</td>
                         <td className="whitespace-nowrap py-2 pr-4 text-right">
-                          <Link className="text-blue-700 hover:underline" href={`/documents/${d.id}`}>
+                          <Link className="text-cyan-700 hover:underline" href={`/documents/${d.id}`}>
                             View
                           </Link>
                           {canEdit ? (
                             <>
-                              <span className="mx-2 text-gray-300">|</span>
-                              <Link className="text-blue-700 hover:underline" href={`/documents/${d.id}`}>
+                              <span className="mx-2 text-slate-300">|</span>
+                              <Link className="text-cyan-700 hover:underline" href={`/documents/${d.id}`}>
                                 Edit
                               </Link>
                             </>
@@ -385,41 +402,39 @@ export default function DocumentsPageClient() {
           </div>
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-slate-500">
               Page {pageFromUrl} / {totalPages} (page_size: {pageSize})
             </div>
 
             <div className="flex gap-2">
               {canPrev ? (
                 <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   href={buildDocsHref({ status, type, q, page: pageFromUrl - 1, pageSize })}
                 >
                   Prev
                 </Link>
               ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
                   Prev
                 </span>
               )}
 
               {canNext ? (
                 <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   href={buildDocsHref({ status, type, q, page: pageFromUrl + 1, pageSize })}
                 >
                   Next
                 </Link>
               ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
                   Next
                 </span>
               )}
             </div>
           </div>
 
-          <div className="mt-3 text-xs text-gray-500">
-            Tip: tambah version hanya boleh saat <b>DRAFT</b> atau <b>IN_REVIEW</b>.
           </div>
         </div>
       </div>

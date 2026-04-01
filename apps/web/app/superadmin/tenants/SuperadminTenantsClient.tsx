@@ -589,7 +589,7 @@ export default function SuperadminTenantsClient() {
             <button
               type="submit"
               disabled={createLoading}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="itam-primary-action"
             >
               {createLoading ? "Creating..." : "Create Tenant"}
             </button>
@@ -718,7 +718,7 @@ export default function SuperadminTenantsClient() {
 
             <button
               type="submit"
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+              className="itam-primary-action-sm"
             >
               Search
             </button>

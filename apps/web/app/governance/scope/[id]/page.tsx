@@ -10,5 +10,11 @@ export default async function GovernanceScopeDetailPage(props: {
     notFound();
   }
 
-  return <ScopeVersionDetailClient scopeVersionId={Number(id)} />;
+  return (
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <ScopeVersionDetailClient scopeVersionId={Number(id)} />
+      </div>
+    </main>
+  );
 }

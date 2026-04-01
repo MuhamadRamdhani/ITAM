@@ -37,6 +37,16 @@ function normalizeNullableText(v) {
   return s === "" ? null : s;
 }
 
+function normalizePhoneNumber(v) {
+  const s = normalizeNullableText(v);
+  if (!s) return null;
+
+  const digits = s.replace(/\D+/g, "");
+  if (!digits) return null;
+
+  return digits;
+}
+
 function validateVendorCode(v) {
   const code = toUpperOrNull(v);
   if (!code) {
@@ -206,7 +216,7 @@ export async function createVendorService(app, req, body) {
     status,
     primary_contact_name: normalizeNullableText(body.primary_contact_name),
     primary_contact_email: validateEmailIfPresent(body.primary_contact_email),
-    primary_contact_phone: normalizeNullableText(body.primary_contact_phone),
+    primary_contact_phone: normalizePhoneNumber(body.primary_contact_phone),
     notes: normalizeNullableText(body.notes),
   };
 
@@ -284,7 +294,7 @@ export async function patchVendorService(app, req, vendorId, body) {
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "primary_contact_phone")) {
-    patch.primary_contact_phone = normalizeNullableText(body.primary_contact_phone);
+    patch.primary_contact_phone = normalizePhoneNumber(body.primary_contact_phone);
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "notes")) {

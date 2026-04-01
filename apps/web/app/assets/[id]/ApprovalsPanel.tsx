@@ -196,13 +196,13 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-sm font-semibold text-gray-900">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Approvals terkait asset ini
             </div>
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-sm text-slate-500">
               Approvals muncul saat lifecycle transition membutuhkan approval.
               Buka detail approval untuk Approve/Reject.
             </div>
@@ -210,8 +210,10 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              className={`rounded-md border px-3 py-1 text-sm ${
-                status === "ALL" ? "bg-gray-900 text-white" : "bg-white"
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                status === "ALL"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               }`}
               onClick={() => setStatus("ALL")}
             >
@@ -219,8 +221,10 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
             </button>
 
             <button
-              className={`rounded-md border px-3 py-1 text-sm ${
-                status === "PENDING" ? "bg-gray-900 text-white" : "bg-white"
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                status === "PENDING"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               }`}
               onClick={() => setStatus("PENDING")}
             >
@@ -228,8 +232,10 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
             </button>
 
             <button
-              className={`rounded-md border px-3 py-1 text-sm ${
-                status === "APPROVED" ? "bg-gray-900 text-white" : "bg-white"
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                status === "APPROVED"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               }`}
               onClick={() => setStatus("APPROVED")}
             >
@@ -237,8 +243,10 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
             </button>
 
             <button
-              className={`rounded-md border px-3 py-1 text-sm ${
-                status === "REJECTED" ? "bg-gray-900 text-white" : "bg-white"
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                status === "REJECTED"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               }`}
               onClick={() => setStatus("REJECTED")}
             >
@@ -248,24 +256,24 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="border-b p-4 text-sm font-semibold text-gray-900">
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+        <div className="border-b border-slate-200 p-6 text-sm font-semibold text-slate-900">
           Approval List
         </div>
 
-        {loading && <div className="p-4 text-sm text-gray-600">Loading...</div>}
+        {loading && <div className="p-6 text-sm text-slate-600">Loading...</div>}
 
         {err && (
-          <div className="p-4 text-sm text-rose-700">
+          <div className="p-6 text-sm text-rose-700">
             Error: {err}
-            <div className="mt-2 text-xs text-gray-500">
+            <div className="mt-2 text-xs text-slate-500">
               Endpoint: <span className="font-mono">{path}</span>
             </div>
           </div>
         )}
 
         {!loading && !err && items.length === 0 && (
-          <div className="p-4 text-sm text-gray-600">
+          <div className="p-6 text-sm text-slate-600">
             Tidak ada approvals untuk asset ini.
           </div>
         )}
@@ -284,44 +292,44 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
                 </tr>
               </thead>
 
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {items.map((a) => {
                   const { from, to, reason } = extractFromToReason(a);
                   return (
-                    <tr key={a.id} className="hover:bg-gray-50">
+                    <tr key={a.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <span className={badge(a.status)}>{a.status}</span>
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                        <td className="px-4 py-3 text-slate-700">
                         {fmtDate(a.requested_at || a.created_at)}
                       </td>
 
-                      <td className="px-4 py-3 font-mono text-xs text-gray-800">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-800">
                         {a.action_code}
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                        <td className="px-4 py-3 text-slate-700">
                         {from && to ? (
                           <span>
                             <span className="font-medium">{from}</span> →{" "}
                             <span className="font-medium">{to}</span>
                           </span>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                            <span className="text-slate-400">-</span>
                         )}
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
-                        {reason ? reason : <span className="text-gray-400">-</span>}
-                      </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {reason ? reason : <span className="text-slate-400">-</span>}
+                        </td>
 
                       <td className="px-4 py-3">
                         <Link
                           href={`/approvals/${a.id}?returnTo=${encodeURIComponent(
                             `/assets/${assetId}?tab=approvals`
                           )}`}
-                          className="text-blue-600 hover:underline"
+                          className="font-semibold text-blue-700 hover:underline"
                         >
                           Open
                         </Link>
@@ -332,7 +340,7 @@ export default function ApprovalsPanel({ assetId }: { assetId: number }) {
               </tbody>
             </table>
 
-            <div className="border-t p-3 text-xs text-gray-500">
+            <div className="border-t border-slate-200 p-4 text-xs text-slate-500">
               Tip: buka detail untuk Approve/Reject agar konsisten dengan queue yang sudah ada.
             </div>
           </div>

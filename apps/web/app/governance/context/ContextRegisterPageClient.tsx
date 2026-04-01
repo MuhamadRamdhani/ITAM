@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPatchJson, apiPostJson } from "../../lib/api";
-import { SkeletonTableRow, ErrorState } from "../../lib/loadingComponents";
+import { SkeletonTableRow } from "../../lib/loadingComponents";
 
 type ContextRow = {
   id: number | string;
@@ -59,7 +59,8 @@ function fmtDateTime(value?: string | null) {
 function statusPill(status: string) {
   const s = String(status || "").toUpperCase();
   if (s === "OPEN") return "rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-800";
-  if (s === "MONITORING") return "rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800";
+  if (s === "MONITORING")
+    return "rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800";
   if (s === "CLOSED") return "rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-700";
   return "rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
 }
@@ -89,9 +90,7 @@ function normalizeUiConfig(res: any): UiConfigNormalized {
 
   const safeOptions = pageSizeOptions.length > 0 ? pageSizeOptions : [10, 20, 50];
   const defaultRaw = Number(
-    raw?.documents_page_size_default ??
-      raw?.ui?.documents?.page_size?.default ??
-      safeOptions[0]
+    raw?.documents_page_size_default ?? raw?.ui?.documents?.page_size?.default ?? safeOptions[0]
   );
   const pageSizeDefault = safeOptions.includes(defaultRaw) ? defaultRaw : safeOptions[0];
 
@@ -116,11 +115,7 @@ function normalizeIdentities(res: any): IdentityItem[] {
     .map((row: any) => ({
       id: Number(row?.id),
       display_name: String(
-        row?.display_name ??
-          row?.full_name ??
-          row?.name ??
-          row?.email ??
-          `Identity #${row?.id ?? ""}`
+        row?.display_name ?? row?.full_name ?? row?.name ?? row?.email ?? `Identity #${row?.id ?? ""}`
       ).trim(),
     }))
     .filter((row: IdentityItem) => Number.isFinite(row.id) && row.id > 0 && row.display_name);
@@ -350,365 +345,402 @@ export default function ContextRegisterPageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="relative z-10">
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Governance Context</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              MVP1.6 — context register for internal and external ITAM drivers.
-            </p>
-          </div>
+        <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Governance Context</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                MVP1.6 - context register for internal and external ITAM drivers.
+              </p>
+            </div>
 
-          <div className="flex gap-2">
-            <Link
-              href="/governance/scope"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Scope
-            </Link>
-            <Link
-              href="/"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
+            <Link href="/" className="itam-secondary-action">
               Back
             </Link>
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-base font-semibold text-gray-900">
-                  {editingId ? "Edit Context Entry" : "New Context Entry"}
-                </div>
-                <div className="mt-1 text-sm text-gray-600">
-                  Catat isu internal / eksternal yang mempengaruhi ITAM.
-                </div>
-              </div>
+        <div className="mt-8 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="flex justify-end">
+            <Link href="/governance/scope" className="itam-secondary-action">
+              Scope
+            </Link>
+          </div>
 
-              {editingId ? (
-                <button
-                  type="button"
-                  onClick={startCreate}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel Edit
-                </button>
-              ) : null}
-            </div>
-
-            <div className="mt-4 space-y-4">
-              <div>
-                <div className="text-sm font-medium text-gray-700">Title</div>
-                <input
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                  disabled={saving}
-                  placeholder="e.g. Cloud migration strategy"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="mt-6 space-y-6">
+            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-gray-700">Category</div>
-                  <select
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.category_code}
-                    onChange={(e) => setForm((prev) => ({ ...prev, category_code: e.target.value }))}
-                    disabled={saving}
-                  >
-                    {CATEGORY_OPTIONS.filter((x) => x !== "ALL").map((x) => (
-                      <option key={x} value={x}>
-                        {x}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="text-base font-semibold text-gray-900">
+                    {editingId ? "Edit Context Entry" : "New Context Entry"}
+                  </div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    Catat isu internal / eksternal yang mempengaruhi ITAM.
+                  </div>
                 </div>
 
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Priority</div>
-                  <select
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.priority_code}
-                    onChange={(e) => setForm((prev) => ({ ...prev, priority_code: e.target.value }))}
-                    disabled={saving}
-                  >
-                    {PRIORITY_OPTIONS.map((x) => (
-                      <option key={x} value={x}>
-                        {x}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Status</div>
-                  <select
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.status_code}
-                    onChange={(e) => setForm((prev) => ({ ...prev, status_code: e.target.value }))}
-                    disabled={saving}
-                  >
-                    {STATUS_OPTIONS.filter((x) => x !== "ALL").map((x) => (
-                      <option key={x} value={x}>
-                        {x}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Owner Identity</div>
-                  <select
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.owner_identity_id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, owner_identity_id: e.target.value }))}
-                    disabled={saving}
-                  >
-                    <option value="">- Unassigned -</option>
-                    {identities.map((row) => (
-                      <option key={row.id} value={String(row.id)}>
-                        {row.display_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Review Date</div>
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.review_date}
-                    onChange={(e) => setForm((prev) => ({ ...prev, review_date: e.target.value }))}
-                    disabled={saving}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="text-sm font-medium text-gray-700">Description</div>
-                <textarea
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                  rows={8}
-                  value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                  disabled={saving}
-                  placeholder="Describe the internal or external issue impacting ITAM..."
-                />
-              </div>
-
-              {saveErr ? (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {saveErr}
-                </div>
-              ) : null}
-
-              <div className="flex justify-end gap-2">
                 {editingId ? (
                   <button
                     type="button"
                     onClick={startCreate}
-                    disabled={saving}
-                    className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="itam-secondary-action-sm"
                   >
-                    Reset
+                    Cancel Edit
                   </button>
                 ) : null}
-
-                <button
-                  type="button"
-                  onClick={saveForm}
-                  disabled={saving}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : editingId ? "Save Changes" : "Create Context Entry"}
-                </button>
               </div>
-            </div>
-          </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {STATUS_OPTIONS.map((s) => (
-                  <Link
-                    key={s}
-                    href={buildHref({ status: s, category, q, page: 1, pageSize })}
-                    className={status === s ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "pb-1 hover:text-gray-900"}
+              <div className="mt-4 space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Title</div>
+                  <input
+                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                    value={form.title}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, title: e.target.value }))
+                    }
+                    disabled={saving}
+                    placeholder="e.g. Cloud migration strategy"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Category</div>
+                    <select
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      value={form.category_code}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, category_code: e.target.value }))
+                      }
+                      disabled={saving}
+                    >
+                      {CATEGORY_OPTIONS.filter((x) => x !== "ALL").map((x) => (
+                        <option key={x} value={x}>
+                          {x}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Priority</div>
+                    <select
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      value={form.priority_code}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, priority_code: e.target.value }))
+                      }
+                      disabled={saving}
+                    >
+                      {PRIORITY_OPTIONS.map((x) => (
+                        <option key={x} value={x}>
+                          {x}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Status</div>
+                    <select
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      value={form.status_code}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, status_code: e.target.value }))
+                      }
+                      disabled={saving}
+                    >
+                      {STATUS_OPTIONS.filter((x) => x !== "ALL").map((x) => (
+                        <option key={x} value={x}>
+                          {x}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Owner Identity</div>
+                    <select
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      value={form.owner_identity_id}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          owner_identity_id: e.target.value,
+                        }))
+                      }
+                      disabled={saving}
+                    >
+                      <option value="">- Unassigned -</option>
+                      {identities.map((row) => (
+                        <option key={row.id} value={String(row.id)}>
+                          {row.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Review Date</div>
+                    <input
+                      type="date"
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      value={form.review_date}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, review_date: e.target.value }))
+                      }
+                      disabled={saving}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium text-gray-700">Description</div>
+                  <textarea
+                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                    rows={8}
+                    value={form.description}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    disabled={saving}
+                    placeholder="Describe the internal or external issue impacting ITAM..."
+                  />
+                </div>
+
+                {saveErr ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {saveErr}
+                  </div>
+                ) : null}
+
+                <div className="flex justify-end gap-2">
+                  {editingId ? (
+                    <button
+                      type="button"
+                      onClick={startCreate}
+                      disabled={saving}
+                      className="itam-secondary-action"
+                    >
+                      Reset
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={saveForm}
+                    disabled={saving}
+                    className="itam-primary-action disabled:opacity-50"
                   >
-                    {s}
-                  </Link>
-                ))}
+                    {saving ? "Saving..." : editingId ? "Save Changes" : "Create Context Entry"}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {STATUS_OPTIONS.map((s) => (
+                    <Link
+                      key={s}
+                      href={buildHref({ status: s, category, q, page: 1, pageSize })}
+                      className={
+                        status === s
+                          ? "border-b-2 border-blue-600 pb-1 text-blue-700"
+                          : "pb-1 hover:text-gray-900"
+                      }
+                    >
+                      {s}
+                    </Link>
+                  ))}
+                </div>
+
+                <form
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                  onSubmit={onSearchSubmit}
+                >
+                  <select
+                    value={category}
+                    onChange={(e) =>
+                      router.push(
+                        buildHref({
+                          status,
+                          category: e.target.value,
+                          q,
+                          page: 1,
+                          pageSize,
+                        })
+                      )
+                    }
+                    className="rounded-md border px-3 py-2 text-sm"
+                  >
+                    {CATEGORY_OPTIONS.map((x) => (
+                      <option key={x} value={x}>
+                        {x === "ALL" ? "All categories" : x}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={String(pageSize)}
+                    onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                    className="rounded-md border px-3 py-2 text-sm"
+                  >
+                    {pageSizeOptions.map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n} / page
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="Search title/description..."
+                    className="w-full rounded-md border px-3 py-2 text-sm sm:w-64"
+                  />
+
+                  <button className="itam-primary-action-sm">Search</button>
+                </form>
               </div>
 
-              <form
-                className="flex flex-col gap-2 sm:flex-row sm:items-center"
-                onSubmit={onSearchSubmit}
-              >
-                <select
-                  value={category}
-                  onChange={(e) =>
-                    router.push(
-                      buildHref({
-                        status,
-                        category: e.target.value,
-                        q,
-                        page: 1,
-                        pageSize,
-                      })
-                    )
-                  }
-                  className="rounded-md border px-3 py-2 text-sm"
-                >
-                  {CATEGORY_OPTIONS.map((x) => (
-                    <option key={x} value={x}>
-                      {x === "ALL" ? "All categories" : x}
-                    </option>
-                  ))}
-                </select>
+              <div className="mt-4 text-sm text-gray-500">Total: {total}</div>
 
-                <select
-                  value={String(pageSize)}
-                  onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                  className="rounded-md border px-3 py-2 text-sm"
-                >
-                  {pageSizeOptions.map((n) => (
-                    <option key={n} value={String(n)}>
-                      {n} / page
-                    </option>
-                  ))}
-                </select>
+              {err ? (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {err}
+                </div>
+              ) : null}
 
-                <input
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  placeholder="Search title/description..."
-                  className="w-full rounded-md border px-3 py-2 text-sm sm:w-64"
-                />
-
-                <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
-                  Search
-                </button>
-              </form>
-            </div>
-
-            <div className="mt-4 text-sm text-gray-500">Total: {total}</div>
-
-            {err ? (
-              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {err}
-              </div>
-            ) : null}
-
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-gray-500">
-                  <tr>
-                    <th className="py-2 pr-4">Updated</th>
-                    <th className="py-2 pr-4">Title</th>
-                    <th className="py-2 pr-4">Category</th>
-                    <th className="py-2 pr-4">Priority</th>
-                    <th className="py-2 pr-4">Owner</th>
-                    <th className="py-2 pr-4">Review Date</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 pr-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <>
-                      <SkeletonTableRow cols={8} />
-                      <SkeletonTableRow cols={8} />
-                      <SkeletonTableRow cols={8} />
-                      <SkeletonTableRow cols={8} />
-                      <SkeletonTableRow cols={8} />
-                    </>
-                  ) : items.length === 0 ? (
-                    <tr className="border-t">
-                      <td colSpan={8} className="py-6 text-gray-600">
-                        Tidak ada context entries.
-                      </td>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-gray-500">
+                    <tr>
+                      <th className="py-2 pr-4">Updated</th>
+                      <th className="py-2 pr-4">Title</th>
+                      <th className="py-2 pr-4">Category</th>
+                      <th className="py-2 pr-4">Priority</th>
+                      <th className="py-2 pr-4">Owner</th>
+                      <th className="py-2 pr-4">Review Date</th>
+                      <th className="py-2 pr-4">Status</th>
+                      <th className="py-2 pr-4 text-right">Action</th>
                     </tr>
-                  ) : (
-                    items.map((row) => (
-                      <tr key={String(row.id)} className="border-t align-top">
-                        <td className="whitespace-nowrap py-2 pr-4">{fmtDateTime(row.updated_at)}</td>
-                        <td className="py-2 pr-4">
-                          <div className="font-medium text-gray-900">{row.title}</div>
-                          <div className="mt-1 line-clamp-2 text-xs text-gray-600">
-                            {row.description || "-"}
-                          </div>
-                        </td>
-                        <td className="py-2 pr-4">{row.category_code}</td>
-                        <td className="py-2 pr-4">
-                          <span className={priorityPill(row.priority_code)}>{row.priority_code}</span>
-                        </td>
-                        <td className="py-2 pr-4">
-                          {row.owner_identity_id
-                            ? identityMap.get(Number(row.owner_identity_id)) || `Identity #${row.owner_identity_id}`
-                            : "-"}
-                        </td>
-                        <td className="py-2 pr-4 whitespace-nowrap">
-                          {row.review_date ? String(row.review_date).slice(0, 10) : "-"}
-                        </td>
-                        <td className="py-2 pr-4">
-                          <span className={statusPill(row.status_code)}>{row.status_code}</span>
-                        </td>
-                        <td className="py-2 pr-4 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(row)}
-                            className="text-blue-700 hover:underline"
-                          >
-                            Edit
-                          </button>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <>
+                        <SkeletonTableRow cols={8} />
+                        <SkeletonTableRow cols={8} />
+                        <SkeletonTableRow cols={8} />
+                        <SkeletonTableRow cols={8} />
+                        <SkeletonTableRow cols={8} />
+                      </>
+                    ) : items.length === 0 ? (
+                      <tr className="border-t">
+                        <td colSpan={8} className="py-6 text-gray-600">
+                          Tidak ada context entries.
                         </td>
                       </tr>
-                    ))
+                    ) : (
+                      items.map((row) => (
+                        <tr key={String(row.id)} className="border-t align-top">
+                          <td className="whitespace-nowrap py-2 pr-4">
+                            {fmtDateTime(row.updated_at)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            <div className="font-medium text-gray-900">{row.title}</div>
+                            <div className="mt-1 line-clamp-2 text-xs text-gray-600">
+                              {row.description || "-"}
+                            </div>
+                          </td>
+                          <td className="py-2 pr-4">{row.category_code}</td>
+                          <td className="py-2 pr-4">
+                            <span className={priorityPill(row.priority_code)}>
+                              {row.priority_code}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.owner_identity_id
+                              ? identityMap.get(Number(row.owner_identity_id)) ||
+                                `Identity #${row.owner_identity_id}`
+                              : "-"}
+                          </td>
+                          <td className="py-2 pr-4 whitespace-nowrap">
+                            {row.review_date ? String(row.review_date).slice(0, 10) : "-"}
+                          </td>
+                          <td className="py-2 pr-4">
+                            <span className={statusPill(row.status_code)}>
+                              {row.status_code}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(row)}
+                              className="text-blue-700 hover:underline"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-gray-500">
+                  Page {pageFromUrl} / {totalPages} (page_size: {pageSize})
+                </div>
+
+                <div className="flex gap-2">
+                  {canPrev ? (
+                    <Link
+                      className="itam-secondary-action-sm"
+                      href={buildHref({
+                        status,
+                        category,
+                        q,
+                        page: pageFromUrl - 1,
+                        pageSize,
+                      })}
+                    >
+                      Prev
+                    </Link>
+                  ) : (
+                    <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                      Prev
+                    </span>
                   )}
-                </tbody>
-              </table>
-            </div>
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-gray-500">
-                Page {pageFromUrl} / {totalPages} (page_size: {pageSize})
+                  {canNext ? (
+                    <Link
+                      className="itam-secondary-action-sm"
+                      href={buildHref({
+                        status,
+                        category,
+                        q,
+                        page: pageFromUrl + 1,
+                        pageSize,
+                      })}
+                    >
+                      Next
+                    </Link>
+                  ) : (
+                    <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                      Next
+                    </span>
+                  )}
+                </div>
               </div>
-
-              <div className="flex gap-2">
-                {canPrev ? (
-                  <Link
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    href={buildHref({ status, category, q, page: pageFromUrl - 1, pageSize })}
-                  >
-                    Prev
-                  </Link>
-                ) : (
-                  <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
-                    Prev
-                  </span>
-                )}
-
-                {canNext ? (
-                  <Link
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    href={buildHref({ status, category, q, page: pageFromUrl + 1, pageSize })}
-                  >
-                    Next
-                  </Link>
-                ) : (
-                  <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
-                    Next
-                  </span>
-                )}
-              </div>
-            </div>
+            </section>
           </div>
         </div>
       </div>

@@ -3,6 +3,8 @@ import {
   getContractDetailService,
   getContractSoftwareComplianceSummaryService,
   getContractSoftwareConsumptionSummaryService,
+  getContractSoftwareOptimizationSummaryService,
+  getContractSoftwareRenewalSummaryService,
   listContractsService,
   updateContractService,
 } from "./contracts.service.js";
@@ -67,6 +69,34 @@ export default async function contractsRoutes(app) {
     "/:id/software-consumption-summary",
     async function getContractSoftwareConsumptionSummaryHandler(req, reply) {
       const out = await getContractSoftwareConsumptionSummaryService(app, req);
+
+      return reply.send({
+        ok: true,
+        data: out,
+        meta: { request_id: req.id },
+      });
+    }
+  );
+
+  // GET /api/v1/contracts/:id/software-optimization-summary
+  app.get(
+    "/:id/software-optimization-summary",
+    async function getContractSoftwareOptimizationSummaryHandler(req, reply) {
+      const out = await getContractSoftwareOptimizationSummaryService(app, req);
+
+      return reply.send({
+        ok: true,
+        data: out,
+        meta: { request_id: req.id },
+      });
+    }
+  );
+
+  // GET /api/v1/contracts/:id/software-renewal-summary
+  app.get(
+    "/:id/software-renewal-summary",
+    async function getContractSoftwareRenewalSummaryHandler(req, reply) {
+      const out = await getContractSoftwareRenewalSummaryService(app, req);
 
       return reply.send({
         ok: true,

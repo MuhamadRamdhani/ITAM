@@ -41,15 +41,15 @@ function fmtDateTime(value?: string) {
 function statusPill(status: string) {
   const s = (status ?? "").toUpperCase();
   if (s === "PENDING") {
-    return "rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800";
+    return "rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200";
   }
   if (s === "APPROVED") {
-    return "rounded-full bg-green-50 px-2 py-1 text-xs text-green-800";
+    return "rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-inset ring-green-200";
   }
   if (s === "REJECTED") {
-    return "rounded-full bg-red-50 px-2 py-1 text-xs text-red-800";
+    return "rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-200";
   }
-  return "rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
+  return "rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200";
 }
 
 export default function ApprovalDetailPage() {
@@ -112,11 +112,12 @@ export default function ApprovalDetailPage() {
 
   if (!approvalId) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
-            <div className="text-lg font-semibold text-gray-900">Invalid route</div>
-            <div className="mt-1 text-sm text-gray-600">
+      <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+        <div className="absolute inset-x-0 top-0 h-64 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
+        <div className="relative mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
+          <div className="rounded-3xl border border-red-100 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="text-lg font-semibold text-slate-900">Invalid route</div>
+            <div className="mt-1 text-sm text-slate-600">
               Approval id tidak ditemukan dari URL.
             </div>
           </div>
@@ -127,9 +128,10 @@ export default function ApprovalDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+      <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+        <div className="absolute inset-x-0 top-0 h-64 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
+        <div className="relative mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
+          <div className="rounded-3xl border border-white bg-white/80 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             Loading approval detail...
           </div>
         </div>
@@ -139,23 +141,29 @@ export default function ApprovalDetailPage() {
 
   if (error || !data?.approval) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="flex items-start justify-between gap-4">
+      <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+        <div className="absolute inset-x-0 top-0 h-64 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
+        <div className="relative mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
+          <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Approval Detail</h1>
-              <p className="mt-1 text-sm text-gray-600">Detail approval.</p>
+              <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Approvals
+              </div>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+                Approval Detail
+              </h1>
+              <p className="mt-3 text-sm text-slate-600">Detail approval.</p>
             </div>
 
             <Link
               href={backHref}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
               Back
             </Link>
           </div>
 
-          <div className="mt-6 rounded-lg border border-red-200 bg-white p-4 shadow-sm">
+          <div className="mt-8 rounded-3xl border border-red-100 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <div className="text-sm text-red-700">
               {error || "Approval detail tidak ditemukan."}
             </div>
@@ -169,37 +177,42 @@ export default function ApprovalDetailPage() {
   const events = Array.isArray(data.events) ? data.events : [];
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+      <div className="absolute inset-x-0 top-0 h-64 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
+
+      <div className="relative mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
+        <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Approvals
+            </div>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
               Approval #{approval.id}
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              {approval.action_code} — {approval.subject_type} #{approval.subject_id}
+            <p className="mt-3 text-sm text-slate-600">
+              {approval.action_code} - {approval.subject_type} #{approval.subject_id}
             </p>
           </div>
 
           <Link
             href={backHref}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             Back
           </Link>
         </div>
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mt-8 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm">
               <span className={statusPill(approval.status_code)}>
                 {approval.status_code}
               </span>
-              <div className="mt-2 text-gray-600">
+              <div className="mt-3 text-slate-600">
                 Requested: {fmtDateTime(approval.requested_at)}
               </div>
               {approval.decided_at && (
-                <div className="mt-1 text-gray-600">
+                <div className="mt-1 text-slate-600">
                   Decided: {fmtDateTime(approval.decided_at)}
                 </div>
               )}
@@ -208,31 +221,33 @@ export default function ApprovalDetailPage() {
             {approval.subject_type === "ASSET" && (
               <Link
                 href={`/assets/${approval.subject_id}?tab=lifecycle`}
-                className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+                className="itam-primary-action-sm"
               >
                 Open Asset
               </Link>
             )}
           </div>
 
-          <div className="mt-4 rounded-md border bg-gray-50 p-3 text-sm text-gray-800">
-            <div className="mb-2 font-semibold">Transition</div>
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Transition
+            </div>
             <div>
               {approval.payload?.from_label
                 ? `${approval.payload.from_label} (${approval.payload.from_code ?? "-"})`
                 : "-"}
-              {"  →  "}
+              {"  ->  "}
               {approval.payload?.to_label
                 ? `${approval.payload.to_label} (${approval.payload.to_code ?? "-"})`
                 : "-"}
             </div>
             <div className="mt-2">
-              <span className="text-gray-600">Reason:</span>{" "}
+              <span className="text-slate-600">Reason:</span>{" "}
               {approval.payload?.reason ?? "-"}
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-6">
             <ApprovalDecisionPanel
               approvalId={Number(approval.id)}
               status={approval.status_code}
@@ -240,29 +255,29 @@ export default function ApprovalDetailPage() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="border-b p-4">
-            <div className="text-base font-semibold">Approval events</div>
-            <div className="text-sm text-gray-500">Append-only timeline</div>
+        <div className="mt-8 rounded-3xl border border-white bg-white/85 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="border-b border-slate-200 p-6">
+            <div className="text-base font-semibold text-slate-900">Approval events</div>
+            <div className="text-sm text-slate-500">Append-only timeline</div>
           </div>
 
-          <div className="p-4">
+          <div className="p-6">
             {events.length === 0 ? (
-              <div className="text-sm text-gray-600">No events.</div>
+              <div className="text-sm text-slate-600">No events.</div>
             ) : (
               <div className="space-y-3">
                 {events.map((e) => (
                   <div
                     key={String(e.id)}
-                    className="rounded-md border p-3 text-sm"
+                    className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="font-semibold">{e.event_type}</div>
-                      <div className="text-gray-500">
+                      <div className="font-semibold text-slate-900">{e.event_type}</div>
+                      <div className="text-slate-500">
                         {fmtDateTime(e.created_at)}
                       </div>
                     </div>
-                    {e.note && <div className="mt-1 text-gray-700">{e.note}</div>}
+                    {e.note && <div className="mt-1 text-slate-700">{e.note}</div>}
                   </div>
                 ))}
               </div>

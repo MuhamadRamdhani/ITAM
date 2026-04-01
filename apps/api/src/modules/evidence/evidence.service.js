@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
+import sharp from "sharp";
 
 import { getUiConfig } from "../config/config.repo.js";
 import { requireExistsById } from "../../lib/refIntegrity.js";
@@ -78,6 +79,62 @@ function actorFromIdentityId(identityId) {
   return "SYSTEM";
 }
 
+const COMPRESSIBLE_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const MAX_IMAGE_EDGE = 2560;
+const JPEG_QUALITY = 82;
+const WEBP_QUALITY = 82;
+
+function safeUnlink(filePath) {
+  return fs.promises.unlink(filePath).catch(() => {});
+}
+
+function isCompressibleImageMimeType(mimeType) {
+  return COMPRESSIBLE_IMAGE_MIME_TYPES.has(String(mimeType || "").toLowerCase());
+}
+
+async function compressEvidenceImage(inputPath, mimeType) {
+  const image = sharp(inputPath, { failOn: "none" })
+    .rotate()
+    .resize({
+      width: MAX_IMAGE_EDGE,
+      height: MAX_IMAGE_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+
+  if (mimeType === "image/jpeg") {
+    const { data, info } = await image
+      .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+      .toBuffer({ resolveWithObject: true });
+    return { buffer: data, sizeBytes: info.size };
+  }
+
+  if (mimeType === "image/png") {
+    const { data, info } = await image
+      .png({
+        compressionLevel: 9,
+        palette: true,
+        adaptiveFiltering: true,
+      })
+      .toBuffer({ resolveWithObject: true });
+    return { buffer: data, sizeBytes: info.size };
+  }
+
+  if (mimeType === "image/webp") {
+    const { data, info } = await image
+      .webp({ quality: WEBP_QUALITY, effort: 4 })
+      .toBuffer({ resolveWithObject: true });
+    return { buffer: data, sizeBytes: info.size };
+  }
+
+  return null;
+}
+
 export async function uploadEvidenceFileService(app, { tenantId, actorId, part }) {
   if (!part) {
     const e = new Error("Missing file");
@@ -102,18 +159,20 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
 
   const rand = crypto.randomUUID();
   const storagePath = `tenant-${tenantId}/${yyyy}/${mm}/${rand}${ext || ""}`;
+  const tempStoragePath = `${storagePath}.uploading`;
 
   const uploadsRoot = path.join(process.cwd(), "uploads");
-  const fullPath = path.join(uploadsRoot, storagePath);
+  const tempFullPath = path.join(uploadsRoot, tempStoragePath);
+  const finalFullPath = path.join(uploadsRoot, storagePath);
 
-  if (!isSafeFilePath(uploadsRoot, fullPath)) {
+  if (!isSafeFilePath(uploadsRoot, tempFullPath) || !isSafeFilePath(uploadsRoot, finalFullPath)) {
     const e = new Error("Invalid file path (directory traversal detected)");
     e.statusCode = 400;
     e.code = "INVALID_FILE_PATH";
     throw e;
   }
 
-  await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
+  await fs.promises.mkdir(path.dirname(tempFullPath), { recursive: true });
 
   const hash = crypto.createHash("sha256");
   let sizeBytes = 0;
@@ -132,7 +191,7 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
     },
   });
 
-  await pipeline(part.file, tap, fs.createWriteStream(fullPath));
+  await pipeline(part.file, tap, fs.createWriteStream(tempFullPath));
 
   const sha256 = hash.digest("hex");
   const clientMimeType = part.mimetype || "application/octet-stream";
@@ -148,7 +207,7 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
 
   if (!validation.valid) {
     try {
-      await fs.promises.unlink(fullPath);
+      await safeUnlink(tempFullPath);
     } catch {
       // ignore
     }
@@ -162,7 +221,7 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
   const suspiciousCheck = checkFileSuspicious(firstChunk);
   if (suspiciousCheck.suspicious) {
     try {
-      await fs.promises.unlink(fullPath);
+      await safeUnlink(tempFullPath);
     } catch {
       // ignore
     }
@@ -173,13 +232,38 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
     throw e;
   }
 
+  let storedSizeBytes = sizeBytes;
+  let storedSha256 = sha256;
+  let compressionApplied = false;
+
+  if (isCompressibleImageMimeType(actualMimeType)) {
+    try {
+      const compressed = await compressEvidenceImage(tempFullPath, actualMimeType);
+      if (compressed && compressed.sizeBytes < sizeBytes) {
+        await fs.promises.writeFile(finalFullPath, compressed.buffer);
+        storedSizeBytes = compressed.sizeBytes;
+        storedSha256 = crypto.createHash("sha256").update(compressed.buffer).digest("hex");
+        compressionApplied = true;
+      }
+    } catch {
+      // Compression is an optimization only; fall back to the original file.
+      compressionApplied = false;
+    }
+  }
+
+  if (!compressionApplied) {
+    await fs.promises.rename(tempFullPath, finalFullPath);
+  } else {
+    await safeUnlink(tempFullPath);
+  }
+
   const row = await insertEvidenceFile(app, {
     tenant_id: tenantId,
     storage_path: storagePath,
     original_name: originalName,
     mime_type: actualMimeType,
-    size_bytes: sizeBytes,
-    sha256,
+    size_bytes: storedSizeBytes,
+    sha256: storedSha256,
     uploaded_by_identity_id: actorId ?? null,
   });
 
@@ -192,9 +276,13 @@ export async function uploadEvidenceFileService(app, { tenantId, actorId, part }
     payload: {
       original_name: row?.original_name ?? originalName,
       mime_type: row?.mime_type ?? actualMimeType,
-      size_bytes: row?.size_bytes ?? sizeBytes,
-      sha256: row?.sha256 ?? sha256,
+      size_bytes: row?.size_bytes ?? storedSizeBytes,
+      sha256: row?.sha256 ?? storedSha256,
       mime_detected: detectedMimeType ? true : false,
+      compressed: compressionApplied,
+      original_size_bytes: sizeBytes,
+      stored_size_bytes: storedSizeBytes,
+      compression_ratio: sizeBytes > 0 ? storedSizeBytes / sizeBytes : null,
     },
   });
 

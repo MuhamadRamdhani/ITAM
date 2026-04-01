@@ -306,7 +306,7 @@ export default function AdminLocationsClient() {
 
   if (meLoading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
         Loading locations...
       </div>
     );
@@ -314,9 +314,9 @@ export default function AdminLocationsClient() {
 
   if (!canAccess) {
     return (
-      <div className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
-        <div className="text-lg font-semibold text-gray-900">Forbidden</div>
-        <div className="mt-1 text-sm text-gray-600">
+      <div className="rounded-3xl border border-rose-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+        <div className="text-lg font-semibold text-slate-900">Forbidden</div>
+        <div className="mt-1 text-sm text-slate-600">
           Halaman ini hanya bisa diakses oleh role SUPERADMIN atau TENANT_ADMIN.
         </div>
       </div>
@@ -328,44 +328,46 @@ export default function AdminLocationsClient() {
       {(err || ok) && (
         <div className="space-y-2">
           {err ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
               {err}
             </div>
           ) : null}
 
           {ok ? (
-            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
               {ok}
             </div>
           ) : null}
         </div>
       )}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-3xl border border-white bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
         <div>
-          <div className="text-base font-semibold text-gray-900">Create Location</div>
-          <div className="mt-1 text-sm text-gray-600">
+          <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            Create Location
+          </div>
+          <div className="mt-2 text-sm text-slate-600">
             Tambahkan location master untuk tenant ini.
           </div>
         </div>
 
-        <form onSubmit={onCreateLocation} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <form onSubmit={onCreateLocation} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Code</label>
+            <label className="block text-sm font-medium text-slate-700">Code</label>
             <input
               value={createCode}
               onChange={(e) => setCreateCode(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               placeholder="JKT-HQ / WH / DC"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <label className="block text-sm font-medium text-slate-700">Name</label>
             <input
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               placeholder="HQ - Jakarta"
               required
             />
@@ -374,7 +376,7 @@ export default function AdminLocationsClient() {
           <div className="md:col-span-3">
             <button
               disabled={createLoading}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="itam-primary-action"
             >
               {createLoading ? "Creating..." : "Create Location"}
             </button>
@@ -383,30 +385,32 @@ export default function AdminLocationsClient() {
       </div>
 
       {editId ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="rounded-3xl border border-white bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
           <div>
-            <div className="text-base font-semibold text-gray-900">Edit Location</div>
-            <div className="mt-1 text-sm text-gray-600">
+            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">
+              Edit Location
+            </div>
+            <div className="mt-2 text-sm text-slate-600">
               Update code dan name location.
             </div>
           </div>
 
-          <form onSubmit={onSaveEdit} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <form onSubmit={onSaveEdit} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Code</label>
+              <label className="block text-sm font-medium text-slate-700">Code</label>
               <input
                 value={editCode}
                 onChange={(e) => setEditCode(e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <label className="block text-sm font-medium text-slate-700">Name</label>
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                 required
               />
             </div>
@@ -414,7 +418,7 @@ export default function AdminLocationsClient() {
             <div className="md:col-span-3 flex gap-2">
               <button
                 disabled={editLoading}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                className="itam-primary-action"
               >
                 {editLoading ? "Saving..." : "Save Changes"}
               </button>
@@ -422,7 +426,7 @@ export default function AdminLocationsClient() {
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Cancel
               </button>
@@ -431,15 +435,15 @@ export default function AdminLocationsClient() {
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="rounded-3xl border border-white bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               setPage(1);
               setQ(qInput.trim());
             }}
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+            className="flex flex-col gap-3 sm:flex-row sm:items-center"
           >
             <select
               value={String(pageSize)}
@@ -447,7 +451,7 @@ export default function AdminLocationsClient() {
                 setPage(1);
                 setPageSize(Number(e.target.value));
               }}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
             >
               {pageSizeOptions.map((n) => (
                 <option key={n} value={String(n)}>
@@ -460,24 +464,34 @@ export default function AdminLocationsClient() {
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
               placeholder="Search code/name..."
-              className="w-full sm:w-72 rounded-md border px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 sm:w-72"
             />
 
-            <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+            <button className="itam-primary-action">
               Search
             </button>
           </form>
         </div>
 
-        <div className="mt-4 text-sm text-gray-500">Total: {total}</div>
+        <div className="mt-5 flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Locations Table
+            </div>
+            <div className="mt-1 text-sm text-slate-600">Total: {total} items</div>
+          </div>
+          <div className="text-xs text-slate-500">
+            Tip: location pada model ownership Anda bersifat optional, tetapi tetap penting untuk traceability.
+          </div>
+        </div>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-gray-500">
+            <thead className="text-left text-slate-500">
               <tr>
-                <th className="py-2 pr-4">Code</th>
-                <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4 text-right">Action</th>
+                <th className="py-3 pr-4">Code</th>
+                <th className="py-3 pr-4">Name</th>
+                <th className="py-3 pr-4 text-right">Action</th>
               </tr>
             </thead>
 
@@ -491,21 +505,21 @@ export default function AdminLocationsClient() {
                   <SkeletonTableRow cols={3} />
                 </>
               ) : data.items.length === 0 ? (
-                <tr className="border-t">
-                  <td colSpan={3} className="py-6 text-gray-600">
+                <tr className="border-t border-slate-100">
+                  <td colSpan={3} className="py-8 text-slate-600">
                     Tidak ada locations.
                   </td>
                 </tr>
               ) : (
                 data.items.map((l) => (
-                  <tr key={String(l.id)} className="border-t">
-                    <td className="py-3 pr-4 font-mono text-xs">{l.code || "-"}</td>
-                    <td className="py-3 pr-4">{l.name}</td>
+                  <tr key={String(l.id)} className="border-t border-slate-100">
+                    <td className="py-4 pr-4 font-mono text-xs text-slate-500">{l.code || "-"}</td>
+                    <td className="py-4 pr-4 text-slate-800">{l.name}</td>
                     <td className="py-3 pr-4 text-right whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => startEdit(l)}
-                        className="text-blue-700 hover:underline"
+                        className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100 hover:text-cyan-800"
                       >
                         Edit
                       </button>
@@ -518,7 +532,7 @@ export default function AdminLocationsClient() {
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500">
             Page {page} / {totalPages} (page_size: {pageSize})
           </div>
 
@@ -526,12 +540,12 @@ export default function AdminLocationsClient() {
             {canPrev ? (
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Prev
               </button>
             ) : (
-              <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
                 Prev
               </span>
             )}
@@ -539,20 +553,16 @@ export default function AdminLocationsClient() {
             {canNext ? (
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Next
               </button>
             ) : (
-              <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
                 Next
               </span>
             )}
           </div>
-        </div>
-
-        <div className="mt-3 text-xs text-gray-500">
-          Tip: location pada model ownership Anda bersifat optional, tetapi tetap penting untuk traceability.
         </div>
       </div>
     </div>

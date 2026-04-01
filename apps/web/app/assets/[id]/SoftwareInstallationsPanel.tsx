@@ -472,13 +472,13 @@ export default function SoftwareInstallationsPanel({
 
   return (
     <>
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 md:flex-row md:items-center md:justify-between">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               Software Installations
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-500">
               Mapping software products installed on this asset.
             </p>
           </div>
@@ -487,7 +487,7 @@ export default function SoftwareInstallationsPanel({
             <button
               type="button"
               onClick={() => void openCreateModal()}
-              className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="itam-primary-action"
               disabled={loading}
             >
               Add Installation
@@ -496,41 +496,41 @@ export default function SoftwareInstallationsPanel({
         </div>
 
         {err ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {err}
           </div>
         ) : null}
 
         {loading ? (
-          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
             Loading software installations...
           </div>
         ) : items.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center">
-            <p className="text-sm font-medium text-gray-700">
+          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+            <p className="text-sm font-medium text-slate-700">
               No software installations found for this asset.
             </p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-500">
               Add the first installed software product to start tracking.
             </p>
           </div>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-gray-600">
+          <div className="mt-4 overflow-x-auto rounded-3xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Product</th>
-                  <th className="px-4 py-3 font-medium">Publisher</th>
-                  <th className="px-4 py-3 font-medium">Version</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Install Date</th>
-                  <th className="px-4 py-3 font-medium">Discovery</th>
-                  <th className="px-4 py-3 font-medium">Assignments</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Product</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Publisher</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Version</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Install Date</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Discovery</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Assignments</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Updated</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em]">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {items.map((item) => {
                   const rowAssignments = assignmentMap.get(Number(item.id)) || [];
                   const activeAssignments = rowAssignments.filter(
@@ -540,58 +540,58 @@ export default function SoftwareInstallationsPanel({
                   return (
                     <tr key={item.id} className="align-top">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-slate-900">
                           <Link
                             href={`/software-products/${item.software_product_id}`}
-                            className="hover:underline"
+                            className="text-blue-700 hover:underline"
                           >
                             {item.software_product_name || "-"}
                           </Link>
                         </div>
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-slate-500">
                           {item.software_product_code || "-"}
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.publisher_vendor_name || "-"}
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.installed_version || "-"}
                       </td>
 
                       <td className="px-4 py-3">
-                        <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                        <span className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">
                           {item.installation_status}
                         </span>
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-slate-700">
                         <div>{formatDate(item.installation_date)}</div>
                         {item.uninstalled_date ? (
-                          <div className="mt-1 text-xs text-gray-500">
+                          <div className="mt-1 text-xs text-slate-500">
                             Uninstalled: {formatDate(item.uninstalled_date)}
                           </div>
                         ) : null}
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-slate-700">
                         <div>{item.discovery_source || "-"}</div>
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-slate-500">
                           {item.discovered_by || "-"}
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-slate-700">
                         {rowAssignments.length === 0 ? (
-                          <span className="text-sm text-gray-400">No assignments</span>
+                          <span className="text-sm text-slate-400">No assignments</span>
                         ) : (
                           <div className="space-y-1">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-slate-900">
                               {activeAssignments.length} active / {rowAssignments.length} total
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-slate-500">
                               {rowAssignments
                                 .slice(0, 2)
                                 .map((a) => a.identity_display_name)
@@ -602,7 +602,7 @@ export default function SoftwareInstallationsPanel({
                         )}
                       </td>
 
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.updated_at
                           ? new Date(item.updated_at).toLocaleString()
                           : "-"}
@@ -613,7 +613,7 @@ export default function SoftwareInstallationsPanel({
                           <button
                             type="button"
                             onClick={() => openAssignmentsModal(item)}
-                            className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                           >
                             Manage Assignments
                           </button>
@@ -622,7 +622,7 @@ export default function SoftwareInstallationsPanel({
                             <button
                               type="button"
                               onClick={() => void openEditModal(item)}
-                              className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                             >
                               Edit
                             </button>
@@ -632,7 +632,7 @@ export default function SoftwareInstallationsPanel({
                             <button
                               type="button"
                               onClick={() => void handleMarkUninstalled(item)}
-                              className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={quickActionId === item.id}
                             >
                               {quickActionId === item.id
@@ -651,16 +651,16 @@ export default function SoftwareInstallationsPanel({
         )}
 
         {isOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
+            <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-slate-900">
                     {mode === "create"
                       ? "Add Software Installation"
                       : "Edit Software Installation"}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     {mode === "create"
                       ? "Attach a software product to this asset."
                       : "Update the installation details for this asset."}
@@ -670,7 +670,7 @@ export default function SoftwareInstallationsPanel({
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                   disabled={saving}
                 >
                   Close
@@ -679,21 +679,21 @@ export default function SoftwareInstallationsPanel({
 
               <form onSubmit={handleSubmit} className="px-6 py-5">
                 {modalErr ? (
-                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {modalErr}
                   </div>
                 ) : null}
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Software Product
                     </label>
                     <select
                       value={form.software_product_id}
                       onChange={(e) => setField("software_product_id", e.target.value)}
                       disabled={mode === "edit" || loadingProducts || saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     >
                       <option value="">
                         {loadingProducts
@@ -712,7 +712,7 @@ export default function SoftwareInstallationsPanel({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Installation Status
                     </label>
                     <select
@@ -730,7 +730,7 @@ export default function SoftwareInstallationsPanel({
   }));
 }}
                       disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     >
                       <option value="INSTALLED">INSTALLED</option>
                       <option value="DETECTED">DETECTED</option>
@@ -739,7 +739,7 @@ export default function SoftwareInstallationsPanel({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Installed Version
                     </label>
                     <input
@@ -748,12 +748,12 @@ export default function SoftwareInstallationsPanel({
                       onChange={(e) => setField("installed_version", e.target.value)}
                       disabled={saving}
                       placeholder="e.g. 16.0"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Installation Date
                     </label>
                     <input
@@ -761,12 +761,12 @@ export default function SoftwareInstallationsPanel({
                       value={form.installation_date}
                       onChange={(e) => setField("installation_date", e.target.value)}
                       disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Uninstalled Date
                     </label>
                     <input
@@ -774,12 +774,12 @@ export default function SoftwareInstallationsPanel({
                       value={form.uninstalled_date}
                       onChange={(e) => setField("uninstalled_date", e.target.value)}
                       disabled={saving || form.installation_status !== "UNINSTALLED"}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 disabled:bg-gray-50"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Discovered By
                     </label>
                     <input
@@ -788,12 +788,12 @@ export default function SoftwareInstallationsPanel({
                       onChange={(e) => setField("discovered_by", e.target.value)}
                       disabled={saving}
                       placeholder="e.g. ADMIN"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Discovery Source
                     </label>
                     <input
@@ -802,12 +802,12 @@ export default function SoftwareInstallationsPanel({
                       onChange={(e) => setField("discovery_source", e.target.value)}
                       disabled={saving}
                       placeholder="e.g. MANUAL"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       Notes
                     </label>
                     <textarea
@@ -815,16 +815,16 @@ export default function SoftwareInstallationsPanel({
                       onChange={(e) => setField("notes", e.target.value)}
                       disabled={saving}
                       rows={4}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     />
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
+                <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                     disabled={saving}
                   >
                     Cancel
@@ -832,7 +832,7 @@ export default function SoftwareInstallationsPanel({
 
                   <button
                     type="submit"
-                    className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="itam-primary-action"
                     disabled={
                       saving ||
                       (mode === "create" && !form.software_product_id) ||

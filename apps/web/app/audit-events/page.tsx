@@ -3,8 +3,12 @@ import AuditEventsPageClient from "./AuditEventsPageClient";
 
 export default function AuditEventsPage() {
   return (
-    <Suspense>
-      <AuditEventsPageClient />
-    </Suspense>
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <Suspense>
+          <AuditEventsPageClient />
+        </Suspense>
+      </div>
+    </main>
   );
 }

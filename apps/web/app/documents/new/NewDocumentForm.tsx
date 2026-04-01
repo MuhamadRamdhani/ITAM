@@ -1,19 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPostJson } from "../../lib/api";
 
 const TYPES = ["POLICY", "SOP", "EVIDENCE", "CONTRACT", "OTHER"] as const;
-
-function safeJsonParse(s: string) {
-  try {
-    const parsed = JSON.parse(s);
-    return { ok: true as const, value: parsed };
-  } catch (e: any) {
-    return { ok: false as const, message: e?.message ?? "Invalid JSON" };
-  }
-}
 
 function getErrorMessage(error: unknown, fallback = "Failed to create document") {
   if (!error) return fallback;
@@ -28,20 +19,10 @@ export default function NewDocumentForm() {
 
   const [docType, setDocType] = useState<(typeof TYPES)[number]>("POLICY");
   const [title, setTitle] = useState("");
-  const [mode, setMode] = useState<"TEXT" | "JSON">("TEXT");
   const [text, setText] = useState("Hello. This is a draft.");
-  const [jsonStr, setJsonStr] = useState(
-    JSON.stringify({ text: "Hello. This is a draft." }, null, 2)
-  );
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const contentJson = useMemo(() => {
-    if (mode === "TEXT") return { text };
-    const parsed = safeJsonParse(jsonStr);
-    return parsed.ok ? parsed.value : null;
-  }, [mode, text, jsonStr]);
 
   async function submit() {
     setLoading(true);
@@ -50,15 +31,10 @@ export default function NewDocumentForm() {
     try {
       if (!title.trim()) throw new Error("Title wajib diisi.");
 
-      if (mode === "JSON") {
-        const parsed = safeJsonParse(jsonStr);
-        if (!parsed.ok) throw new Error(`Invalid JSON: ${parsed.message}`);
-      }
-
       const body = {
         doc_type_code: docType,
         title: title.trim(),
-        content_json: contentJson ?? {},
+        content_json: { text: text.trim() },
       };
 
       const res = await apiPostJson<any>("/api/v1/documents", body);
@@ -83,13 +59,16 @@ export default function NewDocumentForm() {
     }
   }
 
+  const inputClass =
+    "mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100";
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div>
-          <div className="text-sm font-medium text-gray-700">Type</div>
+          <div className="text-sm font-medium text-slate-700">Type</div>
           <select
-            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            className={inputClass}
             value={docType}
             onChange={(e) => setDocType(e.target.value as any)}
             disabled={loading}
@@ -103,9 +82,9 @@ export default function NewDocumentForm() {
         </div>
 
         <div className="md:col-span-2">
-          <div className="text-sm font-medium text-gray-700">Title</div>
+          <div className="text-sm font-medium text-slate-700">Title</div>
           <input
-            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            className={inputClass}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. ITAM Policy v1"
@@ -114,58 +93,25 @@ export default function NewDocumentForm() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-gray-50 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-semibold text-gray-900">Content</div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`rounded-md border px-3 py-1 text-sm ${
-                mode === "TEXT" ? "bg-gray-900 text-white" : "bg-white"
-              }`}
-              onClick={() => setMode("TEXT")}
-              disabled={loading}
-            >
-              Text
-            </button>
-            <button
-              type="button"
-              className={`rounded-md border px-3 py-1 text-sm ${
-                mode === "JSON" ? "bg-gray-900 text-white" : "bg-white"
-              }`}
-              onClick={() => setMode("JSON")}
-              disabled={loading}
-            >
-              JSON
-            </button>
-          </div>
-        </div>
+      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+        <div className="text-sm font-semibold text-slate-900">Content</div>
 
-        {mode === "TEXT" ? (
-          <textarea
-            className="mt-2 w-full rounded-md border px-3 py-2 text-sm"
-            rows={8}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={loading}
-          />
-        ) : (
-          <textarea
-            className="mt-2 w-full rounded-md border px-3 py-2 font-mono text-xs"
-            rows={10}
-            value={jsonStr}
-            onChange={(e) => setJsonStr(e.target.value)}
-            disabled={loading}
-          />
-        )}
+        <textarea
+          className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+          rows={8}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={loading}
+          placeholder="Tulis isi dokumen di sini..."
+        />
 
-        <div className="mt-2 text-xs text-gray-500">
-          MVP1.4: konten disimpan sebagai <span className="font-mono">content_json</span> di version.
+        <div className="mt-2 text-xs text-slate-500">
+          MVP1.4: editor text disimpan ke version.
         </div>
       </div>
 
       {err && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
           {err}
         </div>
       )}
@@ -175,7 +121,7 @@ export default function NewDocumentForm() {
           type="button"
           onClick={submit}
           disabled={loading}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="itam-primary-action"
         >
           {loading ? "Saving..." : "Create Document"}
         </button>

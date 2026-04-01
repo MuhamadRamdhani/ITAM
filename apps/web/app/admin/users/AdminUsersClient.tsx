@@ -96,16 +96,16 @@ function fmtDateTime(value?: string | null) {
 
 function statusPill(status: string) {
   const s = String(status || "").toUpperCase();
-  if (s === "ACTIVE") return "rounded-full bg-green-50 px-2 py-1 text-xs text-green-800";
-  if (s === "DISABLED") return "rounded-full bg-red-50 px-2 py-1 text-xs text-red-800";
-  return "rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
+  if (s === "ACTIVE") return "inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200";
+  if (s === "DISABLED") return "inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200";
+  return "inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200";
 }
 
 function tenantStatusPill(status: string) {
   const s = String(status || "").toUpperCase();
-  if (s === "ACTIVE") return "rounded-full bg-green-50 px-2 py-1 text-xs text-green-800";
-  if (s === "SUSPENDED") return "rounded-full bg-red-50 px-2 py-1 text-xs text-red-800";
-  return "rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
+  if (s === "ACTIVE") return "inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200";
+  if (s === "SUSPENDED") return "inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-200";
+  return "inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200";
 }
 
 function buildUsersListUrl(
@@ -623,7 +623,7 @@ export default function AdminUsersClient() {
 
   if (meLoading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         Loading admin users...
       </div>
     );
@@ -631,9 +631,9 @@ export default function AdminUsersClient() {
 
   if (!canAccess) {
     return (
-      <div className="rounded-lg border border-red-200 bg-white p-4 shadow-sm">
-        <div className="text-lg font-semibold text-gray-900">Forbidden</div>
-        <div className="mt-1 text-sm text-gray-600">
+      <div className="rounded-3xl border border-rose-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="text-lg font-semibold text-slate-900">Forbidden</div>
+        <div className="mt-1 text-sm text-slate-600">
           Halaman ini hanya bisa diakses oleh role SUPERADMIN atau TENANT_ADMIN.
         </div>
       </div>
@@ -642,7 +642,7 @@ export default function AdminUsersClient() {
 
   if (isSuperadmin && tenantsLoading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         Loading tenants...
       </div>
     );
@@ -650,9 +650,9 @@ export default function AdminUsersClient() {
 
   if (isSuperadmin && tenants.length === 0) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
-        <div className="text-lg font-semibold text-gray-900">No tenant available</div>
-        <div className="mt-1 text-sm text-gray-600">
+      <div className="rounded-3xl border border-amber-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="text-lg font-semibold text-slate-900">No tenant available</div>
+        <div className="mt-1 text-sm text-slate-600">
           Belum ada tenant yang tersedia untuk dikelola oleh SUPERADMIN.
         </div>
       </div>
@@ -664,13 +664,13 @@ export default function AdminUsersClient() {
       {(err || ok) && (
         <div className="space-y-2">
           {err ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
               {err}
             </div>
           ) : null}
 
           {ok ? (
-            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
               {ok}
             </div>
           ) : null}
@@ -678,25 +678,25 @@ export default function AdminUsersClient() {
       )}
 
       {isSuperadmin ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex-1">
-              <div className="text-base font-semibold text-gray-900">SUPERADMIN Target Tenant</div>
-              <div className="mt-1 text-sm text-gray-600">
+              <div className="text-base font-semibold text-slate-900">SUPERADMIN Target Tenant</div>
+              <div className="mt-1 text-sm leading-6 text-slate-600">
                 Pilih tenant target. Semua list user, create user, enable/disable, dan assign role
                 akan mengikuti tenant yang dipilih.
               </div>
             </div>
 
             <div className="w-full lg:w-[380px]">
-              <label className="block text-sm font-medium text-gray-700">Target Tenant</label>
+              <label className="block text-sm font-medium text-slate-700">Target Tenant</label>
               <select
                 value={selectedTenantId != null ? String(selectedTenantId) : ""}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   setSelectedTenantId(Number.isFinite(v) && v > 0 ? v : null);
                 }}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 {tenants.map((t) => (
                   <option key={t.id} value={String(t.id)}>
@@ -708,18 +708,18 @@ export default function AdminUsersClient() {
           </div>
 
           {selectedTenant ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-700">
-              <span className="rounded-full bg-white px-2 py-1 font-medium">
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-700">
+              <span className="rounded-full bg-slate-50 px-3 py-1 font-medium ring-1 ring-inset ring-slate-200">
                 Tenant ID: {selectedTenant.id}
               </span>
-              <span className="rounded-full bg-white px-2 py-1 font-medium">
+              <span className="rounded-full bg-slate-50 px-3 py-1 font-medium ring-1 ring-inset ring-slate-200">
                 Code: {selectedTenant.code}
               </span>
               <span className={tenantStatusPill(selectedTenant.status_code)}>
                 {selectedTenant.status_code}
               </span>
               {selectedTenant.contract_health ? (
-                <span className="rounded-full bg-white px-2 py-1 font-medium">
+                <span className="rounded-full bg-slate-50 px-3 py-1 font-medium ring-1 ring-inset ring-slate-200">
                   Subscription: {selectedTenant.contract_health}
                 </span>
               ) : null}
@@ -728,24 +728,24 @@ export default function AdminUsersClient() {
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         <div>
-          <div className="text-base font-semibold text-gray-900">Create User</div>
-          <div className="mt-1 text-sm text-gray-600">
+          <div className="text-base font-semibold text-slate-900">Create User</div>
+          <div className="mt-1 text-sm leading-6 text-slate-600">
             {isSuperadmin && selectedTenant
               ? `Buat user baru untuk tenant ${selectedTenant.code} (${selectedTenant.name}), lalu assign role dari tabel di bawah.`
               : "Buat user tenant baru, lalu assign role dari tabel di bawah."}
           </div>
         </div>
 
-        <form onSubmit={onCreateUser} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <form onSubmit={onCreateUser} className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-slate-700">Email</label>
             <input
               value={createEmail}
               onChange={(e) => setCreateEmail(e.target.value)}
               type="email"
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               placeholder={
                 isSuperadmin && selectedTenant
                   ? `user@${selectedTenant.code}.local`
@@ -756,23 +756,23 @@ export default function AdminUsersClient() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <label className="block text-sm font-medium text-slate-700">Password</label>
             <input
               value={createPassword}
               onChange={(e) => setCreatePassword(e.target.value)}
               type="password"
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               placeholder="Min 6 chars"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Status</label>
+            <label className="block text-sm font-medium text-slate-700">Status</label>
             <select
               value={createStatus}
               onChange={(e) => setCreateStatus(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             >
               <option value="ACTIVE">ACTIVE</option>
               <option value="DISABLED">DISABLED</option>
@@ -782,7 +782,7 @@ export default function AdminUsersClient() {
           <div className="md:col-span-4">
             <button
               disabled={createLoading || (isSuperadmin && !selectedTenantId)}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="itam-primary-action"
             >
               {createLoading ? "Creating..." : "Create User"}
             </button>
@@ -790,7 +790,7 @@ export default function AdminUsersClient() {
         </form>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <form
             onSubmit={(e) => {
@@ -798,7 +798,7 @@ export default function AdminUsersClient() {
               setPage(1);
               setQ(qInput.trim());
             }}
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+            className="flex flex-col gap-3 sm:flex-row sm:items-center"
           >
             {!isSuperadmin ? (
               <select
@@ -807,7 +807,7 @@ export default function AdminUsersClient() {
                   setPage(1);
                   setPageSize(Number(e.target.value));
                 }}
-                className="rounded-md border px-3 py-2 text-sm"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 {pageSizeOptions.map((n) => (
                   <option key={n} value={String(n)}>
@@ -821,21 +821,21 @@ export default function AdminUsersClient() {
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
               placeholder="Search email..."
-              className="w-full sm:w-72 rounded-md border px-3 py-2 text-sm"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 sm:w-80"
             />
 
-            <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+            <button className="itam-primary-action-sm">
               Search
             </button>
           </form>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500">
             Roles loaded: {rolesLoading ? "loading..." : roles.length}
             {isSuperadmin && selectedTenant ? ` • Target: ${selectedTenant.code}` : ""}
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+        <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-slate-500">
           <div>Total: {total}</div>
           {isSuperadmin ? (
             <div>
@@ -844,19 +844,20 @@ export default function AdminUsersClient() {
           ) : null}
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-gray-500">
+        <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="min-w-[980px] w-full text-[13px] leading-6">
+            <thead className="text-left text-slate-500">
               <tr>
-                <th className="py-2 pr-4">Email</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Roles</th>
-                <th className="py-2 pr-4">Last Login</th>
-                <th className="py-2 pr-4 text-right">Action</th>
+                <th className="px-4 py-4 pr-6 font-medium">Email</th>
+                <th className="px-4 py-4 pr-6 font-medium">Status</th>
+                <th className="px-4 py-4 pr-6 font-medium">Roles</th>
+                <th className="px-4 py-4 pr-6 font-medium">Last Login</th>
+                <th className="px-4 py-4 pr-6 text-right font-medium">Action</th>
               </tr>
             </thead>
 
-            <tbody>
+              <tbody>
               {listLoading ? (
                 <>
                   <SkeletonTableRow cols={5} />
@@ -866,8 +867,8 @@ export default function AdminUsersClient() {
                   <SkeletonTableRow cols={5} />
                 </>
               ) : usersData.items.length === 0 ? (
-                <tr className="border-t">
-                  <td colSpan={5} className="py-6 text-gray-600">
+                <tr className="border-t border-slate-100">
+                  <td colSpan={5} className="px-4 py-10 text-slate-600">
                     Tidak ada users.
                   </td>
                 </tr>
@@ -883,27 +884,27 @@ export default function AdminUsersClient() {
                   return (
                     <tr
                       key={String(u.id)}
-                      className={`border-t align-top ${
+                      className={`border-t border-slate-100 align-top ${
                         isPlatformManaged ? "bg-amber-50/40" : ""
                       }`}
                     >
-                      <td className="py-3 pr-4">
-                        <div className="font-medium text-gray-900">{u.email}</div>
-                        <div className="mt-1 text-xs text-gray-500">ID: {u.id}</div>
+                      <td className="px-4 py-5 pr-6">
+                        <div className="font-medium text-slate-900">{u.email}</div>
+                        <div className="mt-1 text-xs text-slate-500">ID: {u.id}</div>
                         {isPlatformManaged ? (
                           <div className="mt-2">
-                            <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800">
+                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
                               Platform-managed
                             </span>
                           </div>
                         ) : null}
                       </td>
 
-                      <td className="py-3 pr-4">
+                      <td className="px-4 py-5 pr-6">
                         <span className={statusPill(u.status_code)}>{u.status_code}</span>
                       </td>
 
-                      <td className="py-3 pr-4">
+                      <td className="px-4 py-5 pr-6">
                         <div className="flex flex-wrap gap-2">
                           {currentRoles.length > 0 ? (
                             currentRoles.map((roleCode) => {
@@ -914,7 +915,7 @@ export default function AdminUsersClient() {
                               return (
                                 <span
                                   key={roleCode}
-                                  className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                                  className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200"
                                 >
                                   <span>{label}</span>
                                   {canRemoveRole ? (
@@ -922,7 +923,7 @@ export default function AdminUsersClient() {
                                       type="button"
                                       disabled={isBusy}
                                       onClick={() => onChangeRole(u, "REMOVE", roleCode)}
-                                      className="font-semibold text-gray-500 hover:text-red-600 disabled:opacity-50"
+                                      className="font-semibold text-slate-500 hover:text-rose-600 disabled:opacity-50"
                                       title={`Remove ${label}`}
                                     >
                                       ×
@@ -932,12 +933,12 @@ export default function AdminUsersClient() {
                               );
                             })
                           ) : (
-                            <span className="text-xs text-amber-700">No role</span>
+                            <span className="text-xs font-medium text-amber-700">No role</span>
                           )}
                         </div>
 
                         {isPlatformManaged ? (
-                          <div className="mt-3 text-xs text-amber-800">
+                          <div className="mt-3 text-xs leading-5 text-amber-800">
                             Role user ini hanya bisa dikelola oleh SUPERADMIN.
                           </div>
                         ) : (
@@ -951,7 +952,7 @@ export default function AdminUsersClient() {
                                 }))
                               }
                               disabled={addableRoles.length === 0 || isBusy}
-                              className="rounded-md border px-3 py-2 text-sm"
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 sm:w-60"
                             >
                               {addableRoles.length === 0 ? (
                                 <option value="">All roles assigned</option>
@@ -968,7 +969,7 @@ export default function AdminUsersClient() {
                               type="button"
                               disabled={!selectedRole || addableRoles.length === 0 || isBusy}
                               onClick={() => onChangeRole(u, "ADD", selectedRole)}
-                              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                              className="itam-secondary-action-sm"
                             >
                               Add Role
                             </button>
@@ -976,11 +977,11 @@ export default function AdminUsersClient() {
                         )}
                       </td>
 
-                      <td className="py-3 pr-4 whitespace-nowrap">{fmtDateTime(u.last_login_at)}</td>
+                      <td className="px-4 py-5 pr-6 whitespace-nowrap">{fmtDateTime(u.last_login_at)}</td>
 
-                      <td className="py-3 pr-4 text-right whitespace-nowrap">
+                      <td className="px-4 py-5 pr-6 text-right whitespace-nowrap">
                         {isPlatformManaged ? (
-                          <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                          <span className="itam-secondary-action-sm opacity-60">
                             Restricted
                           </span>
                         ) : (
@@ -988,7 +989,7 @@ export default function AdminUsersClient() {
                             type="button"
                             disabled={isBusy}
                             onClick={() => onToggleStatus(u)}
-                            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                            className="itam-secondary-action-sm"
                           >
                             {String(u.status_code).toUpperCase() === "ACTIVE"
                               ? "Disable"
@@ -1001,11 +1002,12 @@ export default function AdminUsersClient() {
                 })
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500">
             Page {page} / {totalPages} (page_size: {effectivePageSize})
           </div>
 
@@ -1013,12 +1015,12 @@ export default function AdminUsersClient() {
             {canPrev ? (
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action-sm"
               >
                 Prev
               </button>
             ) : (
-              <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+              <span className="itam-secondary-action-sm cursor-not-allowed opacity-50">
                 Prev
               </span>
             )}
@@ -1026,19 +1028,19 @@ export default function AdminUsersClient() {
             {canNext ? (
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action-sm"
               >
                 Next
               </button>
             ) : (
-              <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+              <span className="itam-secondary-action-sm cursor-not-allowed opacity-50">
                 Next
               </span>
             )}
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-gray-500">
+        <div className="mt-3 text-xs text-slate-500">
           Tip: display role memakai <b>roles.display_name</b>, bukan hardcoded label.
         </div>
       </div>

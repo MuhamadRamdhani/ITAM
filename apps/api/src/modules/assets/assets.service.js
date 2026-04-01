@@ -127,6 +127,70 @@ function validateDateRange(startDate, endDate, startField, endField) {
   }
 }
 
+const HARDWARE_TYPE_CODES = new Set(["HARDWARE", "NETWORK"]);
+const SUBSCRIPTION_TYPE_CODES = new Set(["SAAS", "CLOUD", "VM_CONTAINER"]);
+
+function normalizeAssetTypeCode(value) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function hasAnyDate(...values) {
+  return values.some((value) => String(value ?? "").trim() !== "");
+}
+
+function requireCoverageDates(assetTypeCode, coverage, contextLabel) {
+  const normalizedType = normalizeAssetTypeCode(assetTypeCode);
+  const hasWarranty = hasAnyDate(coverage.warrantyStartDate, coverage.warrantyEndDate);
+  const hasSupport = hasAnyDate(coverage.supportStartDate, coverage.supportEndDate);
+  const hasSubscription = hasAnyDate(
+    coverage.subscriptionStartDate,
+    coverage.subscriptionEndDate
+  );
+
+  if (HARDWARE_TYPE_CODES.has(normalizedType)) {
+    if (!coverage.warrantyStartDate || !coverage.warrantyEndDate) {
+      throw makeBadRequest(
+        "WARRANTY_REQUIRED",
+        `Hardware assets require warranty_start_date and warranty_end_date during ${contextLabel}.`,
+        {
+          asset_type_code: normalizedType,
+          required_fields: ["warranty_start_date", "warranty_end_date"],
+        }
+      );
+    }
+
+    if (hasSubscription && !hasSupport) {
+      throw makeBadRequest(
+        "INVALID_COVERAGE_FIELDS",
+        `Hardware assets should not use subscription dates. Use warranty/support dates instead during ${contextLabel}.`,
+        {
+          asset_type_code: normalizedType,
+          allowed_fields: ["warranty_start_date", "warranty_end_date", "support_start_date", "support_end_date"],
+        }
+      );
+    }
+  }
+
+  if (SUBSCRIPTION_TYPE_CODES.has(normalizedType)) {
+    if (!coverage.subscription_start_date || !coverage.subscription_end_date) {
+      throw makeBadRequest(
+        "SUBSCRIPTION_REQUIRED",
+        `Subscription-based assets require subscription_start_date and subscription_end_date during ${contextLabel}.`,
+        {
+          asset_type_code: normalizedType,
+          required_fields: ["subscription_start_date", "subscription_end_date"],
+        }
+      );
+    }
+  }
+
+  if (normalizedType === "SOFTWARE") {
+    if (!hasSubscription && !hasSupport && !hasWarranty) {
+      return;
+    }
+  }
+}
+
 function pickCreateDate(body, fieldName) {
   return normalizeDateInput(body?.[fieldName], fieldName) ?? null;
 }
@@ -189,6 +253,19 @@ export async function createAsset(app, req, body) {
     subscriptionEndDate,
     "subscription_start_date",
     "subscription_end_date"
+  );
+
+  requireCoverageDates(
+    body.asset_type_code,
+    {
+      warrantyStartDate,
+      warrantyEndDate,
+      supportStartDate,
+      supportEndDate,
+      subscriptionStartDate,
+      subscriptionEndDate,
+    },
+    "asset creation"
   );
 
   const id = await insertAsset(app, {
@@ -304,6 +381,19 @@ export async function patchAsset(app, req, assetId, body) {
     nextSubscriptionEnd,
     "subscription_start_date",
     "subscription_end_date"
+  );
+
+  requireCoverageDates(
+    current.asset_type?.code,
+    {
+      warrantyStartDate: nextWarrantyStart,
+      warrantyEndDate: nextWarrantyEnd,
+      supportStartDate: nextSupportStart,
+      supportEndDate: nextSupportEnd,
+      subscriptionStartDate: nextSubscriptionStart,
+      subscriptionEndDate: nextSubscriptionEnd,
+    },
+    "asset update"
   );
 
   const patch = {};

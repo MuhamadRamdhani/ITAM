@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -771,8 +771,11 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
   if (!Number.isInteger(contractIdNum) || contractIdNum <= 0) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-6xl px-6 py-8">
+      <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.10),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(14,165,233,0.08),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.06),_transparent_22%)]" />
+        <div className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-cyan-300/12 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-72 w-72 rounded-full bg-sky-300/8 blur-3xl" />
+        <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
           <div className="mt-4">
             <ErrorState error="Invalid contract id." />
           </div>
@@ -799,12 +802,20 @@ export default function ContractDetailClient(props: { contractId: string }) {
   );
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.10),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(14,165,233,0.08),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.06),_transparent_22%)]" />
+      <div className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-cyan-300/12 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-0 left-0 h-72 w-72 rounded-full bg-sky-300/8 blur-3xl" />
+      <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Contract Detail</h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Contracts
+            </div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+              Contract Detail
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-700">
               Lihat, ubah, dan kelola relasi dokumen, asset, dan evidence untuk contract.
             </p>
           </div>
@@ -812,7 +823,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
           <div className="flex gap-2">
             <Link
               href="/contracts"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="itam-secondary-action"
             >
               Back
             </Link>
@@ -837,18 +848,18 @@ export default function ContractDetailClient(props: { contractId: string }) {
         ) : null}
 
         {loading ? (
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-sm text-gray-600">Loading contract...</div>
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <div className="text-sm text-slate-600">Loading contract...</div>
           </div>
         ) : !detail ? (
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-sm text-gray-600">Contract not found.</div>
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <div className="text-sm text-slate-600">Contract not found.</div>
           </div>
         ) : (
           <>
             <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Status
                 </div>
                 <div className="mt-2">
@@ -856,8 +867,8 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Health
                 </div>
                 <div className="mt-2">
@@ -867,29 +878,29 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Vendor
                 </div>
-                <div className="mt-2 text-sm font-medium text-gray-900">
+                <div className="mt-2 text-sm font-medium text-slate-900">
                   {detail.vendor_name || "-"}
                 </div>
-                <div className="mt-1 text-xs text-gray-500">
+                <div className="mt-1 text-xs text-slate-500">
                   {detail.vendor_code || "-"}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Updated
                 </div>
-                <div className="mt-2 text-sm font-medium text-gray-900">
+                <div className="mt-2 text-sm font-medium text-slate-900">
                   {fmtDateTime(detail.updated_at)}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
               <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onSave}>
                 <div>
                   <div className="mb-1 text-sm font-medium text-gray-700">Vendor</div>
@@ -898,7 +909,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, vendor_id: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving || loadingVendors}
                     required
                   >
@@ -920,7 +931,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, contract_code: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                     required
                   />
@@ -933,7 +944,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, contract_name: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                     required
                   />
@@ -946,7 +957,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, contract_type: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   >
                     {CONTRACT_TYPES.map((t) => (
@@ -964,7 +975,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, status: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   >
                     {CONTRACT_STATUSES.map((s) => (
@@ -983,7 +994,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, start_date: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   />
                 </div>
@@ -996,7 +1007,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, end_date: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   />
                 </div>
@@ -1013,7 +1024,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         renewal_notice_days: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   />
                 </div>
@@ -1032,7 +1043,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         owner_identity_id: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   />
                 </div>
@@ -1045,7 +1056,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, notes: e.target.value }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={saving}
                   />
                 </div>
@@ -1053,7 +1064,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <div className="md:col-span-2 flex justify-end gap-2">
                   <Link
                     href="/contracts"
-                    className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="itam-secondary-action"
                   >
                     Back to Contracts
                   </Link>
@@ -1067,17 +1078,17 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </div>
               </form>
 
-              <div className="mt-4 text-xs text-gray-500">
+              <div className="mt-4 text-xs text-slate-500">
                 Created: {fmtDateTime(detail.created_at)} · Updated: {fmtDateTime(detail.updated_at)} · End Date:{" "}
                 {fmtDate(detail.end_date)}
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Related Documents</h2>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <h2 className="text-lg font-semibold text-slate-900">Related Documents</h2>
+                  <p className="mt-1 text-sm text-slate-600">
                     Attach document existing ke contract ini untuk audit dan referensi.
                   </p>
                 </div>
@@ -1085,7 +1096,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <button
                   type="button"
                   onClick={() => setShowCreateDocument((v) => !v)}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="itam-secondary-action"
                   disabled={creatingDocument}
                 >
                   {showCreateDocument ? "Close Create" : "Create New Document"}
@@ -1103,7 +1114,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         document_id: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={linkingDocument || loadingRelations}
                     required
                   >
@@ -1128,7 +1139,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         note: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     placeholder="Attachment note..."
                     disabled={linkingDocument}
                   />
@@ -1160,12 +1171,12 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           doc_type_code: e.target.value,
                         }))
                       }
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                       placeholder="CONTRACT"
                       disabled={creatingDocument}
                       required
                     />
-                    <div className="mt-1 text-xs text-gray-500">
+                    <div className="mt-1 text-xs text-slate-500">
                       Document akan dibuat di modul Documents lalu otomatis dihubungkan ke contract ini.
                     </div>
                   </div>
@@ -1180,7 +1191,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           title: e.target.value,
                         }))
                       }
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                       placeholder="Agreement Supporting Document"
                       disabled={creatingDocument}
                       required
@@ -1197,7 +1208,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           relation_note: e.target.value,
                         }))
                       }
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                       placeholder="Attachment note..."
                       disabled={creatingDocument}
                     />
@@ -1214,7 +1225,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           relation_note: "",
                         });
                       }}
-                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className="itam-secondary-action"
                       disabled={creatingDocument}
                     >
                       Cancel
@@ -1236,7 +1247,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-gray-500">
+                  <thead className="text-left text-slate-500">
                     <tr>
                       <th className="py-2 pr-4">Type</th>
                       <th className="py-2 pr-4">Title</th>
@@ -1249,13 +1260,13 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   <tbody>
                     {loadingRelations ? (
                       <tr className="border-t">
-                        <td colSpan={6} className="py-6 text-gray-600">
+                        <td colSpan={6} className="py-6 text-slate-600">
                           Loading related documents...
                         </td>
                       </tr>
                     ) : relatedDocuments.length === 0 ? (
                       <tr className="border-t">
-                        <td colSpan={6} className="py-6 text-gray-600">
+                        <td colSpan={6} className="py-6 text-slate-600">
                           Tidak ada document yang terhubung.
                         </td>
                       </tr>
@@ -1268,7 +1279,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           <td className="py-2 pr-4">
                             <Link
                               href={`/documents/${item.document.id}`}
-                              className="text-blue-700 hover:underline"
+                              className="text-cyan-700 hover:text-cyan-800 hover:underline"
                             >
                               {item.document.title}
                             </Link>
@@ -1284,7 +1295,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                             <button
                               type="button"
                               onClick={() => onDetachDocument(item.document_id)}
-                              className="text-rose-700 hover:underline disabled:opacity-60"
+                              className="text-rose-700 hover:text-rose-800 hover:underline disabled:opacity-60"
                               disabled={unlinkingDocumentId === item.document_id}
                             >
                               {unlinkingDocumentId === item.document_id ? "Removing..." : "Unlink"}
@@ -1298,11 +1309,11 @@ export default function ContractDetailClient(props: { contractId: string }) {
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Related Assets</h2>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <h2 className="text-lg font-semibold text-slate-900">Related Assets</h2>
+                  <p className="mt-1 text-sm text-slate-600">
                     Hubungkan asset existing ke contract ini. Gunakan pencarian berdasarkan asset tag atau nama asset.
                   </p>
                 </div>
@@ -1314,7 +1325,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   <input
                     value={assetSearch}
                     onChange={(e) => setAssetSearch(e.target.value)}
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     placeholder="Contoh: AST-001 atau Laptop Finance"
                     disabled={loadingAssetsCatalog}
                   />
@@ -1353,7 +1364,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         asset_id: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={linkingAsset || loadingAssetsCatalog || loadingRelations}
                     required
                   >
@@ -1370,7 +1381,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                       </option>
                     ))}
                   </select>
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-xs text-slate-500">
                     Hasil mengikuti page size config tenant dan kata kunci pencarian saat ini.
                   </div>
                 </div>
@@ -1385,7 +1396,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         note: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     placeholder="Coverage note..."
                     disabled={linkingAsset}
                   />
@@ -1404,7 +1415,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-gray-500">
+                  <thead className="text-left text-slate-500">
                     <tr>
                       <th className="py-2 pr-4">Asset Tag</th>
                       <th className="py-2 pr-4">Name</th>
@@ -1418,13 +1429,13 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   <tbody>
                     {loadingRelations ? (
                       <tr className="border-t">
-                        <td colSpan={7} className="py-6 text-gray-600">
+                        <td colSpan={7} className="py-6 text-slate-600">
                           Loading related assets...
                         </td>
                       </tr>
                     ) : relatedAssets.length === 0 ? (
                       <tr className="border-t">
-                        <td colSpan={7} className="py-6 text-gray-600">
+                        <td colSpan={7} className="py-6 text-slate-600">
                           Tidak ada asset yang terhubung.
                         </td>
                       </tr>
@@ -1437,7 +1448,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           <td className="py-2 pr-4">
                             <Link
                               href={`/assets/${item.asset.id}`}
-                              className="text-blue-700 hover:underline"
+                              className="text-cyan-700 hover:text-cyan-800 hover:underline"
                             >
                               {item.asset.name}
                             </Link>
@@ -1454,7 +1465,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                             <button
                               type="button"
                               onClick={() => onDetachAsset(item.asset_id)}
-                              className="text-rose-700 hover:underline disabled:opacity-60"
+                              className="text-rose-700 hover:text-rose-800 hover:underline disabled:opacity-60"
                               disabled={unlinkingAssetId === item.asset_id}
                             >
                               {unlinkingAssetId === item.asset_id ? "Removing..." : "Unlink"}
@@ -1468,11 +1479,11 @@ export default function ContractDetailClient(props: { contractId: string }) {
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Related Evidence</h2>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <h2 className="text-lg font-semibold text-slate-900">Related Evidence</h2>
+                  <p className="mt-1 text-sm text-slate-600">
                     Attach evidence existing ke contract ini sebagai bukti pendukung.
                   </p>
                 </div>
@@ -1480,7 +1491,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <button
                   type="button"
                   onClick={() => setShowUploadEvidence((v) => !v)}
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="itam-secondary-action"
                   disabled={uploadingEvidenceFile}
                 >
                   {showUploadEvidence ? "Close Upload" : "Upload New Evidence"}
@@ -1498,7 +1509,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         evidence_file_id: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     disabled={linkingEvidence || loadingRelations}
                     required
                   >
@@ -1523,7 +1534,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         note: e.target.value,
                       }))
                     }
-                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     placeholder="Attachment note..."
                     disabled={linkingEvidence}
                   />
@@ -1556,11 +1567,11 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           file: e.target.files?.[0] ?? null,
                         }))
                       }
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                       disabled={uploadingEvidenceFile}
                       required
                     />
-                    <div className="mt-1 text-xs text-gray-500">
+                    <div className="mt-1 text-xs text-slate-500">
                       File akan di-upload ke Evidence library lalu otomatis dihubungkan ke contract ini.
                     </div>
                   </div>
@@ -1575,7 +1586,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                           note: e.target.value,
                         }))
                       }
-                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                       placeholder="Attachment note..."
                       disabled={uploadingEvidenceFile}
                     />
@@ -1589,7 +1600,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                         setUploadEvidenceForm({ file: null, note: "" });
                         setUploadEvidenceInputKey((v) => v + 1);
                       }}
-                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      className="itam-secondary-action"
                       disabled={uploadingEvidenceFile}
                     >
                       Cancel
@@ -1607,7 +1618,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-gray-500">
+                  <thead className="text-left text-slate-500">
                     <tr>
                       <th className="py-2 pr-4">File</th>
                       <th className="py-2 pr-4">Type</th>
@@ -1619,20 +1630,20 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   <tbody>
                     {loadingRelations ? (
                       <tr className="border-t">
-                        <td colSpan={5} className="py-6 text-gray-600">
+                        <td colSpan={5} className="py-6 text-slate-600">
                           Loading related evidence...
                         </td>
                       </tr>
                     ) : relatedEvidence.length === 0 ? (
                       <tr className="border-t">
-                        <td colSpan={5} className="py-6 text-gray-600">
+                        <td colSpan={5} className="py-6 text-slate-600">
                           Tidak ada evidence yang terhubung.
                         </td>
                       </tr>
                     ) : (
                       relatedEvidence.map((item) => (
                         <tr key={String(item.id)} className="border-t">
-                          <td className="py-2 pr-4 font-medium text-gray-900">
+                          <td className="py-2 pr-4 font-medium text-slate-900">
                             {item.file.original_name}
                           </td>
                           <td className="py-2 pr-4">{item.file.mime_type}</td>
@@ -1642,7 +1653,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                             <button
                               type="button"
                               onClick={() => onDetachEvidence(item.id)}
-                              className="text-rose-700 hover:underline disabled:opacity-60"
+                              className="text-rose-700 hover:text-rose-800 hover:underline disabled:opacity-60"
                               disabled={unlinkingEvidenceLinkId === item.id}
                             >
                               {unlinkingEvidenceLinkId === item.id ? "Removing..." : "Unlink"}
@@ -1665,3 +1676,6 @@ export default function ContractDetailClient(props: { contractId: string }) {
     </main>
   );
 }
+
+
+

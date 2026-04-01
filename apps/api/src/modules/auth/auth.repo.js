@@ -71,6 +71,31 @@ export async function getUserByEmail(app, tenantId, email) {
   return rows[0] || null;
 }
 
+export async function getUserById(app, tenantId, userId) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      id,
+      tenant_id,
+      email_norm,
+      password_hash,
+      status_code,
+      identity_id,
+      created_at,
+      last_login_at,
+      disabled_at,
+      updated_at
+    FROM public.users
+    WHERE tenant_id = $1
+      AND id = $2
+    LIMIT 1
+    `,
+    [tenantId, userId]
+  );
+
+  return rows[0] || null;
+}
+
 export async function listRoleCodesByUser(app, tenantId, userId) {
   const { rows } = await app.pg.query(
     `

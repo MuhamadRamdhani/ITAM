@@ -104,6 +104,7 @@ const MAGIC_BYTES = {
   jpeg: [0xff, 0xd8, 0xff],
   png: [0x89, 0x50, 0x4e, 0x47],
   gif: [0x47, 0x49, 0x46], // GIF
+  webp: [0x52, 0x49, 0x46, 0x46], // RIFF....WEBP
   zip: [0x50, 0x4b, 0x03, 0x04], // PK
   rar: [0x52, 0x61, 0x72, 0x21], // Rar!
   gzip: [0x1f, 0x8b],
@@ -155,6 +156,21 @@ export function detectFileTypeFromMagicBytes(buffer) {
     buffer[2] === 0x46
   ) {
     return "image/gif";
+  }
+
+  // WEBP (RIFF container with WEBP signature at offset 8)
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return "image/webp";
   }
 
   // ZIP (includes DOCX, XLSX, PPTX)
@@ -257,6 +273,8 @@ export function checkFileSuspicious(buffer) {
       "application/pdf",
       "image/jpeg",
       "image/png",
+      "image/gif",
+      "image/webp",
       "application/zip",
     ];
     if (!allowedBinary.includes(mimeDetected)) {

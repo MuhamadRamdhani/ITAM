@@ -428,7 +428,7 @@ export default function LifecyclePanel(props: {
             <button
               type="button"
               onClick={openModal}
-              className="rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-black/90 disabled:opacity-50"
+              className="itam-primary-action-sm"
               disabled={loading || !hasAnyOptions}
               title={!hasAnyOptions ? "Tidak ada transition config untuk state ini" : ""}
             >
@@ -635,7 +635,7 @@ export default function LifecyclePanel(props: {
               <button
                 type="button"
                 onClick={submitTransition}
-                className="rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-black/90 disabled:opacity-50"
+                className="itam-primary-action-sm"
                 disabled={submitting || !selectedOption || Boolean(selectedOption?.blocked)}
                 title={selectedOption?.blocked ? "Blocked: lengkapi requirement dulu" : ""}
               >

@@ -145,10 +145,12 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-3xl font-semibold text-gray-900">Vendor Detail</div>
-          <div className="mt-1 text-sm text-gray-600">
+          <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">Vendor Detail</div>
+          <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Vendor Detail</div>
+          <div className="mt-3 text-sm leading-6 text-slate-700">
             Detail dan update vendor tenant-scoped.
           </div>
         </div>
@@ -156,28 +158,29 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
         <button
           type="button"
           onClick={() => router.push("/vendors")}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="itam-secondary-action"
         >
           Back
         </button>
+      </div>
       </div>
 
       {(loadErr || saveErr || saveOk) && (
         <div className="space-y-2">
           {loadErr ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {loadErr}
             </div>
           ) : null}
 
           {saveErr ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {saveErr}
             </div>
           ) : null}
 
           {saveOk ? (
-            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
               {saveOk}
             </div>
           ) : null}
@@ -185,7 +188,7 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
       )}
 
       {loading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           Loading vendor detail...
         </div>
       ) : null}
@@ -193,61 +196,61 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
       {!loading && vendor && form ? (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="text-xs font-semibold uppercase text-gray-500">Vendor Code</div>
-              <div className="mt-2 text-lg font-semibold text-gray-900">{vendor.vendor_code}</div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Vendor Code</div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">{vendor.vendor_code}</div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="text-xs font-semibold uppercase text-gray-500">Vendor Name</div>
-              <div className="mt-2 text-lg font-semibold text-gray-900">{vendor.vendor_name}</div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Vendor Name</div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">{vendor.vendor_name}</div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="text-xs font-semibold uppercase text-gray-500">Status</div>
-              <div className="mt-2 text-lg font-semibold text-gray-900">{vendor.status}</div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Status</div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">{vendor.status}</div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             <div>
-              <div className="text-base font-semibold text-gray-900">Edit Vendor</div>
-              <div className="mt-1 text-sm text-gray-600">
+              <div className="text-lg font-semibold tracking-tight text-slate-900">Edit Vendor</div>
+              <div className="mt-1 text-sm text-slate-700">
                 Update code, name, type, contact, dan notes vendor.
               </div>
             </div>
 
-            <form onSubmit={submitSave} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <form onSubmit={submitSave} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Vendor Code</label>
+                <label className="block text-sm font-medium text-slate-700">Vendor Code</label>
                 <input
                   value={form.vendor_code}
                   onChange={(e) => updateForm("vendor_code", e.target.value.toUpperCase())}
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Vendor Name</label>
+                <label className="block text-sm font-medium text-slate-700">Vendor Name</label>
                 <input
                   value={form.vendor_name}
                   onChange={(e) => updateForm("vendor_name", e.target.value)}
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Vendor Type</label>
+                <label className="block text-sm font-medium text-slate-700">Vendor Type</label>
                 <select
                   value={form.vendor_type}
                   onChange={(e) =>
                     updateForm("vendor_type", e.target.value as VendorForm["vendor_type"])
                   }
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   {VENDOR_TYPE_OPTIONS.map((opt) => (
@@ -259,13 +262,13 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <label className="block text-sm font-medium text-slate-700">Status</label>
                 <select
                   value={form.status}
                   onChange={(e) =>
                     updateForm("status", e.target.value as "ACTIVE" | "INACTIVE")
                   }
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   <option value="ACTIVE">ACTIVE</option>
@@ -274,42 +277,42 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Primary Contact Name</label>
+                <label className="block text-sm font-medium text-slate-700">Primary Contact Name</label>
                 <input
                   value={form.primary_contact_name}
                   onChange={(e) => updateForm("primary_contact_name", e.target.value)}
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Primary Contact Email</label>
+                <label className="block text-sm font-medium text-slate-700">Primary Contact Email</label>
                 <input
                   type="email"
                   value={form.primary_contact_email}
                   onChange={(e) => updateForm("primary_contact_email", e.target.value)}
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Primary Contact Phone</label>
+                <label className="block text-sm font-medium text-slate-700">Primary Contact Phone</label>
                 <input
                   value={form.primary_contact_phone}
                   onChange={(e) => updateForm("primary_contact_phone", e.target.value)}
-                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
 
               <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-gray-700">Notes</label>
+                <label className="block text-sm font-medium text-slate-700">Notes</label>
                 <textarea
                   value={form.notes}
                   onChange={(e) => updateForm("notes", e.target.value)}
-                  className="mt-1 min-h-[120px] w-full rounded-md border px-3 py-2 text-sm"
+                  className="mt-1 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
@@ -318,7 +321,7 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="itam-primary-action"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
@@ -327,7 +330,7 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
                   type="button"
                   onClick={loadDetail}
                   disabled={saving || loading}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  className="itam-secondary-action"
                 >
                   Refresh
                 </button>
@@ -335,7 +338,7 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
             </form>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-600">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             <div>
               Created:{" "}
               {vendor.created_at ? new Date(vendor.created_at).toLocaleString() : "-"}

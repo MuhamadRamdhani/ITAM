@@ -208,33 +208,42 @@ export default function EvidencePageClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Evidence Library</h1>
-            <p className="mt-1 text-sm text-gray-600">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)] pointer-events-none" />
+
+      <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
+        <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Operational Workspace
+            </div>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+              Evidence Library
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
               MVP1.5 — upload files & attach to Asset/Document/Approval.
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <Link
-              href="/"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back
-            </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Back
+          </Link>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mb-4 flex justify-end">
             <Link
               href="/evidence/upload"
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="itam-primary-action"
             >
               Upload
             </Link>
           </div>
-        </div>
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
           <form
             className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
             onSubmit={onSearchSubmit}
@@ -243,7 +252,7 @@ export default function EvidencePageClient() {
               <select
                 value={String(pageSize)}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="rounded-md border px-3 py-2 text-sm"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               >
                 {pageSizeOptions.map((n) => (
                   <option key={n} value={String(n)}>
@@ -256,15 +265,15 @@ export default function EvidencePageClient() {
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
                 placeholder="Search filename/mime/sha..."
-                className="w-full rounded-md border px-3 py-2 text-sm sm:w-80"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 sm:w-80"
               />
 
-              <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+              <button className="itam-primary-action">
                 Search
               </button>
             </div>
 
-            <div className="text-sm text-gray-500">Total: {total}</div>
+            <div className="text-sm text-slate-600">Total: {total}</div>
           </form>
 
           {err ? (
@@ -280,14 +289,14 @@ export default function EvidencePageClient() {
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-gray-500">
+              <thead className="text-left text-slate-500">
                 <tr>
-                  <th className="py-2 pr-4">Created</th>
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Mime</th>
-                  <th className="py-2 pr-4">Size</th>
-                  <th className="py-2 pr-4">SHA256</th>
-                  <th className="py-2 pr-4">Download</th>
+                  <th className="py-3 pr-4">Created</th>
+                  <th className="py-3 pr-4">Name</th>
+                  <th className="py-3 pr-4">Mime</th>
+                  <th className="py-3 pr-4">Size</th>
+                  <th className="py-3 pr-4">SHA256</th>
+                  <th className="py-3 pr-4">Download</th>
                 </tr>
               </thead>
               <tbody>
@@ -301,22 +310,22 @@ export default function EvidencePageClient() {
                     <SkeletonTableRow cols={6} />
                   </>
                 ) : items.length === 0 ? (
-                  <tr className="border-t">
-                    <td colSpan={6} className="py-6 text-gray-600">
+                  <tr className="border-t border-slate-100">
+                    <td colSpan={6} className="py-8 text-slate-600">
                       Tidak ada evidence files.
                     </td>
                   </tr>
                 ) : (
                   items.map((f) => (
-                    <tr key={String(f.id)} className="border-t">
-                      <td className="whitespace-nowrap py-2 pr-4">{fmtDateTime(f.created_at)}</td>
-                      <td className="py-2 pr-4 font-mono text-xs">{f.original_name}</td>
-                      <td className="py-2 pr-4">{f.mime_type}</td>
-                      <td className="whitespace-nowrap py-2 pr-4">{fmtBytes(f.size_bytes)}</td>
-                      <td className="py-2 pr-4 font-mono text-xs">{f.sha256 ?? "-"}</td>
+                    <tr key={String(f.id)} className="border-t border-slate-100">
+                      <td className="whitespace-nowrap py-4 pr-4 text-slate-700">{fmtDateTime(f.created_at)}</td>
+                      <td className="py-4 pr-4 font-mono text-xs text-slate-500">{f.original_name}</td>
+                      <td className="py-4 pr-4 text-slate-700">{f.mime_type}</td>
+                      <td className="whitespace-nowrap py-4 pr-4 text-slate-700">{fmtBytes(f.size_bytes)}</td>
+                      <td className="py-4 pr-4 font-mono text-xs text-slate-500">{f.sha256 ?? "-"}</td>
                       <td className="py-2 pr-4">
                         <a
-                          className="text-blue-700 hover:underline"
+                          className="text-cyan-700 hover:underline"
                           href={`${apiBase}/api/v1/evidence/files/${f.id}/download`}
                           target="_blank"
                           rel="noreferrer"
@@ -332,41 +341,39 @@ export default function EvidencePageClient() {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-slate-500">
               Page {pageFromUrl} / {totalPages} (page_size: {pageSize})
             </div>
 
             <div className="flex gap-2">
               {canPrev ? (
                 <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   href={buildEvidenceHref({ q, page: pageFromUrl - 1, pageSize })}
                 >
                   Prev
                 </Link>
               ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
                   Prev
                 </span>
               )}
 
               {canNext ? (
                 <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                   href={buildEvidenceHref({ q, page: pageFromUrl + 1, pageSize })}
                 >
                   Next
                 </Link>
               ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
                   Next
                 </span>
               )}
             </div>
           </div>
 
-          <div className="mt-3 text-xs text-gray-500">
-            Tip: file upload max 10MB (sesuai limit multipart).
           </div>
         </div>
       </div>

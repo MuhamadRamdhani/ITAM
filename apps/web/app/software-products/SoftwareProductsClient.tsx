@@ -331,20 +331,33 @@ export default function SoftwareProductsClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="space-y-12">
+      <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
+              Software Registry
+            </div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
               Software Products
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
               Registry software product per tenant untuk kebutuhan software
               operations berikutnya.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="itam-secondary-action"
+          >
+            Back
+          </Link>
+        </div>
+      </div>
+
+        <div className="mt-16 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => {
@@ -352,41 +365,33 @@ export default function SoftwareProductsClient() {
                 setCreateErr(null);
                 setCreateOk(null);
               }}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="itam-primary-action"
             >
               {showCreate ? "Tutup Form" : "Create Software Product"}
             </button>
-
-            <Link
-              href="/"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back
-            </Link>
           </div>
-        </div>
 
-        {showCreate ? (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          {showCreate ? (
+          <div className="mt-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">
               Create Software Product
             </h2>
 
             {createErr ? (
-              <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {createErr}
               </div>
             ) : null}
 
             {createOk ? (
-              <div className="mb-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              <div className="mb-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                 {createOk}
               </div>
             ) : null}
 
             <form onSubmit={submitCreate} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Product Code
                 </label>
                 <input
@@ -395,13 +400,13 @@ export default function SoftwareProductsClient() {
                     updateCreateForm("product_code", e.target.value.toUpperCase())
                   }
                   placeholder="e.g. M365-E3"
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Product Name
                 </label>
                 <input
@@ -410,13 +415,13 @@ export default function SoftwareProductsClient() {
                     updateCreateForm("product_name", e.target.value)
                   }
                   placeholder="e.g. Microsoft 365 E3"
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Publisher Vendor
                 </label>
                 <select
@@ -424,7 +429,7 @@ export default function SoftwareProductsClient() {
                   onChange={(e) =>
                     updateCreateForm("publisher_vendor_id", e.target.value)
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting || loadingVendors}
                 >
                   <option value="">No publisher vendor</option>
@@ -437,13 +442,13 @@ export default function SoftwareProductsClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Category
                 </label>
                 <select
                   value={createForm.category}
                   onChange={(e) => updateCreateForm("category", e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 >
                   {CATEGORY_OPTIONS.map((item) => (
@@ -455,7 +460,7 @@ export default function SoftwareProductsClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Deployment Model
                 </label>
                 <select
@@ -463,7 +468,7 @@ export default function SoftwareProductsClient() {
                   onChange={(e) =>
                     updateCreateForm("deployment_model", e.target.value)
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 >
                   {DEPLOYMENT_MODEL_OPTIONS.map((item) => (
@@ -475,7 +480,7 @@ export default function SoftwareProductsClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Licensing Metric
                 </label>
                 <select
@@ -483,7 +488,7 @@ export default function SoftwareProductsClient() {
                   onChange={(e) =>
                     updateCreateForm("licensing_metric", e.target.value)
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 >
                   {LICENSING_METRIC_OPTIONS.map((item) => (
@@ -495,7 +500,7 @@ export default function SoftwareProductsClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Status
                 </label>
                 <select
@@ -506,7 +511,7 @@ export default function SoftwareProductsClient() {
                       e.target.value as CreateSoftwareProductForm["status"]
                     )
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 >
                   <option value="ACTIVE">ACTIVE</option>
@@ -515,7 +520,7 @@ export default function SoftwareProductsClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Version Policy
                 </label>
                 <select
@@ -526,7 +531,7 @@ export default function SoftwareProductsClient() {
                       e.target.value as CreateSoftwareProductForm["version_policy"]
                     )
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 >
                   <option value="VERSIONLESS">VERSIONLESS</option>
@@ -535,14 +540,14 @@ export default function SoftwareProductsClient() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Notes
                 </label>
                 <textarea
                   value={createForm.notes}
                   onChange={(e) => updateCreateForm("notes", e.target.value)}
                   placeholder="Optional notes"
-                  className="min-h-[100px] w-full rounded-md border px-3 py-2 text-sm"
+                  className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={submitting}
                 />
               </div>
@@ -556,7 +561,7 @@ export default function SoftwareProductsClient() {
                     setCreateOk(null);
                     setCreateForm(emptyCreateForm());
                   }}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="itam-secondary-action"
                   disabled={submitting}
                 >
                   Cancel
@@ -564,7 +569,7 @@ export default function SoftwareProductsClient() {
 
                 <button
                   type="submit"
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="itam-primary-action"
                   disabled={submitting}
                 >
                   {submitting ? "Saving..." : "Save"}
@@ -572,27 +577,27 @@ export default function SoftwareProductsClient() {
               </div>
             </form>
           </div>
-        ) : null}
+          ) : null}
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <form
             onSubmit={submitFilter}
             className="grid grid-cols-1 gap-4 md:grid-cols-5"
           >
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Search
               </label>
               <input
                 value={qInput}
                 onChange={(e) => setQInput(e.target.value)}
                 placeholder="Search code / name"
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Status
               </label>
               <select
@@ -601,7 +606,7 @@ export default function SoftwareProductsClient() {
                   setPage(1);
                   setStatus(e.target.value);
                 }}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 <option value="">All status</option>
                 <option value="ACTIVE">ACTIVE</option>
@@ -610,7 +615,7 @@ export default function SoftwareProductsClient() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Category
               </label>
               <select
@@ -619,7 +624,7 @@ export default function SoftwareProductsClient() {
                   setPage(1);
                   setCategory(e.target.value);
                 }}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 <option value="">All category</option>
                 {CATEGORY_OPTIONS.map((item) => (
@@ -631,7 +636,7 @@ export default function SoftwareProductsClient() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Deployment
               </label>
               <select
@@ -640,7 +645,7 @@ export default function SoftwareProductsClient() {
                   setPage(1);
                   setDeploymentModel(e.target.value);
                 }}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               >
                 <option value="">All deployment</option>
                 {DEPLOYMENT_MODEL_OPTIONS.map((item) => (
@@ -652,7 +657,7 @@ export default function SoftwareProductsClient() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Publisher Vendor
               </label>
               <select
@@ -661,7 +666,7 @@ export default function SoftwareProductsClient() {
                   setPage(1);
                   setPublisherVendorId(e.target.value);
                 }}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={loadingVendors}
               >
                 <option value="">All vendors</option>
@@ -673,25 +678,25 @@ export default function SoftwareProductsClient() {
               </select>
             </div>
 
-            <div className="md:col-span-5 flex justify-end gap-2">
+            <div className="md:col-span-5 flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={resetFilter}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action"
               >
                 Reset
               </button>
 
               <button
                 type="submit"
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="itam-primary-action"
               >
                 Search
               </button>
             </div>
           </form>
 
-          <div className="mt-4 text-sm text-gray-500">Total: {total}</div>
+          <div className="mt-4 text-sm text-slate-500">Total: {total}</div>
 
           {loadErr ? (
             <div className="mt-4">
@@ -699,20 +704,21 @@ export default function SoftwareProductsClient() {
             </div>
           ) : null}
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-gray-500">
+          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+            <table className="min-w-[960px] w-full text-[13px] leading-6">
+              <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
-                  <th className="py-2 pr-4">Code</th>
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Publisher</th>
-                  <th className="py-2 pr-4">Category</th>
-                  <th className="py-2 pr-4">Deployment</th>
-                  <th className="py-2 pr-4">Metric</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Version Policy</th>
-                  <th className="py-2 pr-4">Updated</th>
-                  <th className="py-2 pr-4 text-right">Action</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Code</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Name</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Publisher</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Category</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Deployment</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Metric</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Status</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Version Policy</th>
+                  <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Updated</th>
+                  <th className="px-4 py-4 pr-6 text-right font-semibold uppercase tracking-[0.16em]">Action</th>
                 </tr>
               </thead>
 
@@ -726,45 +732,45 @@ export default function SoftwareProductsClient() {
                     <SkeletonTableRow cols={10} />
                   </>
                 ) : items.length === 0 ? (
-                  <tr className="border-t">
-                    <td colSpan={10} className="py-6 text-gray-600">
+                  <tr className="border-t border-slate-200">
+                    <td colSpan={10} className="px-4 py-8 text-slate-600">
                       Belum ada software product.
                     </td>
                   </tr>
                 ) : (
                   items.map((item) => (
-                    <tr key={item.id} className="border-t">
-                      <td className="py-3 pr-4 font-medium">{item.product_code}</td>
-                      <td className="py-3 pr-4">{item.product_name}</td>
-                      <td className="py-3 pr-4">
-                        <div>{item.publisher_vendor_name || "-"}</div>
-                        <div className="text-xs text-gray-500">
+                    <tr key={item.id} className="border-t border-slate-200 align-top">
+                      <td className="px-4 py-5 pr-6 font-medium text-slate-900">{item.product_code}</td>
+                      <td className="px-4 py-5 pr-6 text-slate-900">{item.product_name}</td>
+                      <td className="px-4 py-5 pr-6">
+                        <div className="text-slate-900">{item.publisher_vendor_name || "-"}</div>
+                        <div className="text-xs text-slate-500">
                           {item.publisher_vendor_code || "-"}
                         </div>
                       </td>
-                      <td className="py-3 pr-4">{item.category}</td>
-                      <td className="py-3 pr-4">
+                      <td className="px-4 py-5 pr-6 text-slate-900">{item.category}</td>
+                      <td className="px-4 py-5 pr-6">
                         <span className={deploymentPillClass(item.deployment_model)}>
                           {item.deployment_model}
                         </span>
                       </td>
-                      <td className="py-3 pr-4">{item.licensing_metric}</td>
-                      <td className="py-3 pr-4">
+                      <td className="px-4 py-5 pr-6 text-slate-900">{item.licensing_metric}</td>
+                      <td className="px-4 py-5 pr-6">
                         <span className={statusPillClass(item.status)}>
                           {item.status}
                         </span>
                       </td>
-                      <td className="py-3 pr-4">{item.version_policy}</td>
-                      <td className="py-3 pr-4">
+                      <td className="px-4 py-5 pr-6 text-slate-900">{item.version_policy}</td>
+                      <td className="px-4 py-5 pr-6 text-slate-900">
                         {item.updated_at
                           ? new Date(item.updated_at).toLocaleString()
                           : "-"}
                       </td>
-                      <td className="py-3 pr-4 text-right whitespace-nowrap">
+                      <td className="px-4 py-5 pr-6 text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => goToDetail(item.id)}
-                          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                          className="itam-secondary-action-sm"
                         >
                           Detail
                         </button>
@@ -774,10 +780,11 @@ export default function SoftwareProductsClient() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-slate-500">
               Page {page} of {totalPages}
             </div>
 
@@ -786,7 +793,7 @@ export default function SoftwareProductsClient() {
                 type="button"
                 disabled={!canPrev}
                 onClick={() => setPage((prev) => prev - 1)}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Prev
               </button>
@@ -795,7 +802,7 @@ export default function SoftwareProductsClient() {
                 type="button"
                 disabled={!canNext}
                 onClick={() => setPage((prev) => prev + 1)}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
               </button>
@@ -803,6 +810,6 @@ export default function SoftwareProductsClient() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

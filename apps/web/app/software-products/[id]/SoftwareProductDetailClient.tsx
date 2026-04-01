@@ -292,48 +292,46 @@ export default function SoftwareProductDetailClient() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-5xl px-6 py-10">
-          <div className="rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-600 shadow-sm">
+      <div className="space-y-6">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             Loading software product detail...
           </div>
-        </div>
-      </main>
+      </div>
     );
   }
 
   if (err || !item) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-5xl px-6 py-10">
+      <div className="space-y-6">
           <ErrorState
             error={err || "Software product tidak ditemukan."}
             onRetry={loadDetail}
           />
           <div className="mt-4">
-            <Link
-              href="/software-products"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back to Software Products
-            </Link>
+          <Link
+            href="/software-products"
+            className="itam-secondary-action"
+          >
+            Back to Software Products
+          </Link>
           </div>
-        </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="space-y-6">
+      <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm text-gray-500">Software Product Detail</div>
-            <h1 className="mt-1 text-2xl font-semibold text-gray-900">
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
+              Software Product Detail
+            </div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
               {item.product_name}
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                 {item.product_code}
               </span>
               <span className={statusPillClass(item.status)}>{item.status}</span>
@@ -345,73 +343,73 @@ export default function SoftwareProductDetailClient() {
 
           <Link
             href="/software-products"
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="itam-secondary-action"
           >
             Back
           </Link>
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Overview</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">Overview</h2>
 
-            <dl className="grid grid-cols-1 gap-3 text-sm">
+            <dl className="grid grid-cols-1 gap-4 text-sm">
               <div>
-                <dt className="text-gray-500">Product Code</dt>
-                <dd className="font-medium text-gray-900">{item.product_code}</dd>
+                <dt className="text-slate-500">Product Code</dt>
+                <dd className="font-medium text-slate-900">{item.product_code}</dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Product Name</dt>
-                <dd className="font-medium text-gray-900">{item.product_name}</dd>
+                <dt className="text-slate-500">Product Name</dt>
+                <dd className="font-medium text-slate-900">{item.product_name}</dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Publisher Vendor</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Publisher Vendor</dt>
+                <dd className="font-medium text-slate-900">
                   {item.publisher_vendor_name || "-"}
                 </dd>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-slate-500">
                   {item.publisher_vendor_code || "-"}
                 </div>
               </div>
 
               <div>
-                <dt className="text-gray-500">Category</dt>
-                <dd className="font-medium text-gray-900">{item.category}</dd>
+                <dt className="text-slate-500">Category</dt>
+                <dd className="font-medium text-slate-900">{item.category}</dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Deployment Model</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Deployment Model</dt>
+                <dd className="font-medium text-slate-900">
                   {item.deployment_model}
                 </dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Licensing Metric</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Licensing Metric</dt>
+                <dd className="font-medium text-slate-900">
                   {item.licensing_metric}
                 </dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Version Policy</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Version Policy</dt>
+                <dd className="font-medium text-slate-900">
                   {item.version_policy}
                 </dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Notes</dt>
-                <dd className="font-medium text-gray-900 whitespace-pre-wrap">
+                <dt className="text-slate-500">Notes</dt>
+                <dd className="font-medium whitespace-pre-wrap text-slate-900">
                   {item.notes || "-"}
                 </dd>
               </div>
 
               <div>
-                <dt className="text-gray-500">Created At</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Created At</dt>
+                <dd className="font-medium text-slate-900">
                   {item.created_at
                     ? new Date(item.created_at).toLocaleString()
                     : "-"}
@@ -419,8 +417,8 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <dt className="text-gray-500">Updated At</dt>
-                <dd className="font-medium text-gray-900">
+                <dt className="text-slate-500">Updated At</dt>
+                <dd className="font-medium text-slate-900">
                   {item.updated_at
                     ? new Date(item.updated_at).toLocaleString()
                     : "-"}
@@ -429,26 +427,26 @@ export default function SoftwareProductDetailClient() {
             </dl>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">
               Edit Software Product
             </h2>
 
             {saveErr ? (
-              <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {saveErr}
               </div>
             ) : null}
 
             {saveOk ? (
-              <div className="mb-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              <div className="mb-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                 {saveOk}
               </div>
             ) : null}
 
             <form onSubmit={submitSave} className="grid grid-cols-1 gap-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Product Code
                 </label>
                 <input
@@ -456,25 +454,25 @@ export default function SoftwareProductDetailClient() {
                   onChange={(e) =>
                     updateForm("product_code", e.target.value.toUpperCase())
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Product Name
                 </label>
                 <input
                   value={editForm.product_name}
                   onChange={(e) => updateForm("product_name", e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Publisher Vendor
                 </label>
                 <select
@@ -482,7 +480,7 @@ export default function SoftwareProductDetailClient() {
                   onChange={(e) =>
                     updateForm("publisher_vendor_id", e.target.value)
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving || loadingVendors}
                 >
                   <option value="">No publisher vendor</option>
@@ -495,13 +493,13 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Category
                 </label>
                 <select
                   value={editForm.category}
                   onChange={(e) => updateForm("category", e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   {CATEGORY_OPTIONS.map((item) => (
@@ -513,7 +511,7 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Deployment Model
                 </label>
                 <select
@@ -521,7 +519,7 @@ export default function SoftwareProductDetailClient() {
                   onChange={(e) =>
                     updateForm("deployment_model", e.target.value)
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   {DEPLOYMENT_MODEL_OPTIONS.map((item) => (
@@ -533,7 +531,7 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Licensing Metric
                 </label>
                 <select
@@ -541,7 +539,7 @@ export default function SoftwareProductDetailClient() {
                   onChange={(e) =>
                     updateForm("licensing_metric", e.target.value)
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   {LICENSING_METRIC_OPTIONS.map((item) => (
@@ -553,7 +551,7 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Status
                 </label>
                 <select
@@ -561,7 +559,7 @@ export default function SoftwareProductDetailClient() {
                   onChange={(e) =>
                     updateForm("status", e.target.value as EditForm["status"])
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   <option value="ACTIVE">ACTIVE</option>
@@ -570,7 +568,7 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Version Policy
                 </label>
                 <select
@@ -581,7 +579,7 @@ export default function SoftwareProductDetailClient() {
                       e.target.value as EditForm["version_policy"]
                     )
                   }
-                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 >
                   <option value="VERSIONLESS">VERSIONLESS</option>
@@ -590,13 +588,13 @@ export default function SoftwareProductDetailClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
                   Notes
                 </label>
                 <textarea
                   value={editForm.notes}
                   onChange={(e) => updateForm("notes", e.target.value)}
-                  className="min-h-[120px] w-full rounded-md border px-3 py-2 text-sm"
+                  className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                   disabled={saving}
                 />
               </div>
@@ -604,7 +602,7 @@ export default function SoftwareProductDetailClient() {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="itam-primary-action"
                   disabled={saving}
                 >
                   {saving ? "Saving..." : "Save Changes"}
@@ -614,6 +612,6 @@ export default function SoftwareProductDetailClient() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

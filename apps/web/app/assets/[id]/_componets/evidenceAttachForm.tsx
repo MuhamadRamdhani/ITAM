@@ -177,7 +177,7 @@ export default function EvidenceAttachForm(props: {
 
         <button
           disabled={isPending || loadingCount || slotsLeft <= 0}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="itam-primary-action"
         >
           {isPending ? "Uploading..." : "Upload & Attach"}
         </button>

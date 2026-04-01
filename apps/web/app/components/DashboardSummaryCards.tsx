@@ -26,6 +26,12 @@ type DashboardSummaryData = {
   }>;
 };
 
+type ContractAlertSummaryData = {
+  expiring_contracts: number;
+  expired_contracts: number;
+  total_alerts: number;
+};
+
 type SummaryApiShape = {
   totals?: {
     assets?: unknown;
@@ -38,6 +44,10 @@ type SummaryApiShape = {
   };
   assets_by_state?: unknown;
   assets_by_type?: unknown;
+};
+
+type ContractListApiShape = {
+  total?: unknown;
 };
 
 function SummaryCard(props: {
@@ -80,6 +90,73 @@ function SummaryCard(props: {
   return inner;
 }
 
+function ContractAlertCard(props: {
+  data: ContractAlertSummaryData | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (props.loading) {
+    return (
+      <div className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+          Vendor Contract Alert
+        </div>
+        <div className="mt-3 text-sm text-slate-600">Loading contract alerts...</div>
+      </div>
+    );
+  }
+
+  if (props.error) {
+    return (
+      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">
+          Vendor Contract Alert
+        </div>
+        <div className="mt-3 text-sm text-rose-700">{props.error}</div>
+      </div>
+    );
+  }
+
+  const data = props.data ?? {
+    expiring_contracts: 0,
+    expired_contracts: 0,
+    total_alerts: 0,
+  };
+
+  return (
+    <Link
+      href="/contracts"
+      className="block rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_20px_60px_rgba(15,23,42,0.12)]"
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+            Vendor Contract Alert
+          </div>
+          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            {data.total_alerts.toLocaleString()} contracts need attention
+          </div>
+          <div className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
+            Contract vendor yang mendekati jatuh tempo atau sudah expired, dirangkum
+            dalam satu kartu khusus agar mudah dipantau dari dashboard.
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+            Expiring: {data.expiring_contracts.toLocaleString()}
+          </span>
+          <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800">
+            Expired: {data.expired_contracts.toLocaleString()}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-5 text-sm font-semibold text-amber-700">Open Contracts</div>
+    </Link>
+  );
+}
+
 function getErrorMessage(error: unknown) {
   const fallback = "Failed to load dashboard summary.";
   if (!error) return fallback;
@@ -108,8 +185,21 @@ function getErrorMessage(error: unknown) {
   return fallback;
 }
 
+function extractResponsePayload(res: unknown): unknown {
+  if (!res || typeof res !== "object") return {};
+
+  const response = res as { data?: unknown };
+  const firstLayer = response.data;
+
+  if (firstLayer && typeof firstLayer === "object" && "data" in firstLayer) {
+    return (firstLayer as { data?: unknown }).data ?? {};
+  }
+
+  return response.data ?? {};
+}
+
 function normalizeSummary(res: unknown): DashboardSummaryData {
-  const raw = extractSummaryPayload(res) as SummaryApiShape;
+  const raw = extractResponsePayload(res) as SummaryApiShape;
 
   return {
     totals: {
@@ -126,23 +216,25 @@ function normalizeSummary(res: unknown): DashboardSummaryData {
   };
 }
 
-function extractSummaryPayload(res: unknown): unknown {
-  if (!res || typeof res !== "object") return {};
+function normalizeContractAlerts(res: unknown): ContractAlertSummaryData {
+  const raw = extractResponsePayload(res) as ContractListApiShape;
 
-  const response = res as { data?: unknown };
-  const firstLayer = response.data;
-
-  if (firstLayer && typeof firstLayer === "object" && "data" in firstLayer) {
-    return (firstLayer as { data?: unknown }).data ?? {};
-  }
-
-  return response.data ?? {};
+  return {
+    expiring_contracts: Number(raw?.total ?? 0),
+    expired_contracts: 0,
+    total_alerts: Number(raw?.total ?? 0),
+  };
 }
 
 export default function DashboardSummaryCards() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<DashboardSummaryData | null>(null);
+  const [contractAlertsLoading, setContractAlertsLoading] = useState(true);
+  const [contractAlertsErr, setContractAlertsErr] = useState<string | null>(null);
+  const [contractAlerts, setContractAlerts] = useState<ContractAlertSummaryData | null>(
+    null
+  );
 
   useEffect(() => {
     let active = true;
@@ -172,6 +264,45 @@ export default function DashboardSummaryCards() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadContractAlerts() {
+      setContractAlertsLoading(true);
+      setContractAlertsErr(null);
+
+      try {
+        const [expiringRes, expiredRes] = await Promise.all([
+          apiGet<unknown>("/api/v1/contracts?page=1&page_size=1&health=EXPIRING"),
+          apiGet<unknown>("/api/v1/contracts?page=1&page_size=1&health=EXPIRED"),
+        ]);
+
+        if (!active) return;
+
+        const expiring = normalizeContractAlerts(expiringRes);
+        const expired = normalizeContractAlerts(expiredRes);
+
+        setContractAlerts({
+          expiring_contracts: expiring.expiring_contracts,
+          expired_contracts: expired.expiring_contracts,
+          total_alerts: expiring.expiring_contracts + expired.expiring_contracts,
+        });
+      } catch (error) {
+        if (!active) return;
+        setContractAlertsErr(getErrorMessage(error));
+        setContractAlerts(null);
+      } finally {
+        if (active) setContractAlertsLoading(false);
+      }
+    }
+
+    void loadContractAlerts();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
@@ -192,6 +323,12 @@ export default function DashboardSummaryCards() {
 
   return (
     <div className="mt-6 space-y-4">
+      <ContractAlertCard
+        data={contractAlerts}
+        loading={contractAlertsLoading}
+        error={contractAlertsErr}
+      />
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-7">
         <SummaryCard title="Assets" value={data.totals.assets} href="/assets" />
         <SummaryCard

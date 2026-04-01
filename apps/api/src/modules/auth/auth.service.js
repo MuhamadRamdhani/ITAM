@@ -5,6 +5,7 @@ import { insertAuditEvent } from "../../lib/audit.js";
 import {
   getTenantByCode,
   getTenantById,
+  getUserById,
   getUserByEmail,
   listRoleCodesByUser,
   touchLastLogin,
@@ -334,6 +335,7 @@ export async function meService(app, { tenantId, userId, identityId }) {
 
   const roles = await listRoleCodesByUser(app, tenantId, userId);
   const tenant = await getTenantById(app, tenantId);
+  const user = await getUserById(app, tenantId, userId);
 
   if (!tenant) {
     throw authError(401, "AUTH_UNAUTHORIZED", "Tenant not found");
@@ -344,6 +346,7 @@ export async function meService(app, { tenantId, userId, identityId }) {
   return {
     tenant_id: tenantId,
     user_id: userId,
+    email: user?.email_norm ?? null,
     roles,
     identity_id: identityId ?? null,
     tenant: {

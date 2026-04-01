@@ -79,11 +79,17 @@ export default function ApprovalDecisionPanel(props: {
     }
   }
 
+  const panelClass = "rounded-3xl border border-slate-200 bg-white p-6 shadow-sm";
+  const textareaClass =
+    "w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100";
+  const buttonClass =
+    "rounded-full px-4 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50";
+
   if (!canDecide) {
     return (
-      <div className="rounded-md border border-gray-200 bg-white p-4">
-        <div className="text-sm font-semibold text-gray-900">Decision</div>
-        <div className="mt-2 text-sm text-gray-600">
+      <div className={panelClass}>
+        <div className="text-sm font-semibold text-slate-900">Decision</div>
+        <div className="mt-2 text-sm text-slate-600">
           Approval sudah diputuskan. Status:{" "}
           <span className="font-semibold">{statusUpper}</span>
         </div>
@@ -92,15 +98,15 @@ export default function ApprovalDecisionPanel(props: {
   }
 
   return (
-    <div className="rounded-md border border-gray-200 bg-white p-4">
-      <div className="text-sm font-semibold text-gray-900">Decision</div>
-      <div className="mt-2 text-sm text-gray-600">
+    <div className={panelClass}>
+      <div className="text-sm font-semibold text-slate-900">Decision</div>
+      <div className="mt-2 text-sm text-slate-600">
         Approve / Reject approval ini.
       </div>
 
       <div className="mt-3 space-y-2">
         <textarea
-          className="w-full rounded-md border px-3 py-2 text-sm"
+          className={textareaClass}
           rows={2}
           placeholder="Decision note (optional)"
           value={reason}
@@ -113,7 +119,7 @@ export default function ApprovalDecisionPanel(props: {
         <div className="flex gap-2">
           <button
             type="button"
-            className="rounded-md bg-green-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+            className={`${buttonClass} bg-emerald-600 hover:bg-emerald-500`}
             disabled={loading}
             onClick={() => decide("APPROVE")}
           >
@@ -126,7 +132,7 @@ export default function ApprovalDecisionPanel(props: {
 
           <button
             type="button"
-            className="rounded-md bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+            className={`${buttonClass} bg-rose-600 hover:bg-rose-500`}
             disabled={loading}
             onClick={() => decide("REJECT")}
           >

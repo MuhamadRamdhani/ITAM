@@ -4,15 +4,6 @@ import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPostJson } from "../../lib/api";
 
-function safeJsonParse(s: string) {
-  try {
-    const parsed = JSON.parse(s);
-    return { ok: true as const, value: parsed };
-  } catch (e: any) {
-    return { ok: false as const, message: e?.message ?? "Invalid JSON" };
-  }
-}
-
 function getErrorMessage(error: unknown, fallback = "Failed to add version") {
   if (!error) return fallback;
   if (error instanceof Error && error.message) return error.message;
@@ -35,23 +26,11 @@ export default function AddVersionPanel(props: {
 
   const canAdd = status === "DRAFT" || status === "IN_REVIEW";
 
-  const [mode, setMode] = useState<"TEXT" | "JSON">("TEXT");
   const [note, setNote] = useState("");
-  const [text, setText] = useState("");
-  const [jsonStr, setJsonStr] = useState(
-    JSON.stringify({ text: "Update..." }, null, 2)
-  );
+  const [text, setText] = useState("Update...");
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const contentJson = useMemo(() => {
-    if (mode === "TEXT") {
-      return { text: text ?? "" };
-    }
-    const parsed = safeJsonParse(jsonStr);
-    return parsed.ok ? parsed.value : null;
-  }, [mode, text, jsonStr]);
 
   async function addVersion() {
     setLoading(true);
@@ -62,19 +41,13 @@ export default function AddVersionPanel(props: {
         throw new Error(`Tidak bisa tambah version saat status = ${status}`);
       }
 
-      if (mode === "JSON") {
-        const parsed = safeJsonParse(jsonStr);
-        if (!parsed.ok) throw new Error(`Invalid JSON: ${parsed.message}`);
-      }
-
       await apiPostJson(`/api/v1/documents/${props.documentId}/versions`, {
-        content_json: contentJson ?? {},
+        content_json: { text: text ?? "" },
         note: note.trim() ? note.trim() : undefined,
       });
 
       setNote("");
-      setText("");
-      setJsonStr(JSON.stringify({ text: "Update..." }, null, 2));
+      setText("Update...");
 
       if (props.onChanged) {
         await props.onChanged();
@@ -99,7 +72,7 @@ export default function AddVersionPanel(props: {
         </div>
 
         <button
-          className="rounded-md bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+          className="itam-primary-action-sm disabled:opacity-50"
           disabled={!canAdd || loading}
           onClick={addVersion}
         >
@@ -122,51 +95,17 @@ export default function AddVersionPanel(props: {
           disabled={!canAdd || loading}
         />
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className={`rounded-md border px-3 py-1 text-sm ${
-              mode === "TEXT" ? "bg-gray-900 text-white" : "bg-white"
-            }`}
-            onClick={() => setMode("TEXT")}
-            disabled={!canAdd || loading}
-          >
-            Text
-          </button>
-          <button
-            type="button"
-            className={`rounded-md border px-3 py-1 text-sm ${
-              mode === "JSON" ? "bg-gray-900 text-white" : "bg-white"
-            }`}
-            onClick={() => setMode("JSON")}
-            disabled={!canAdd || loading}
-          >
-            JSON
-          </button>
-        </div>
-
-        {mode === "TEXT" ? (
-          <textarea
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            rows={6}
-            placeholder="Ketik bebas di sini..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={!canAdd || loading}
-          />
-        ) : (
-          <textarea
-            className="w-full rounded-md border px-3 py-2 font-mono text-xs"
-            rows={8}
-            value={jsonStr}
-            onChange={(e) => setJsonStr(e.target.value)}
-            disabled={!canAdd || loading}
-          />
-        )}
+        <textarea
+          className="w-full rounded-md border px-3 py-2 text-sm"
+          rows={6}
+          placeholder="Ketik bebas di sini..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={!canAdd || loading}
+        />
 
         <div className="text-xs text-gray-500">
-          Mode <b>Text</b> akan disimpan otomatis sebagai{" "}
-          <span className="font-mono">{`{ "text": "..." }`}</span>.
+          Mode text akan disimpan otomatis sebagai konten version.
         </div>
 
         {err && (

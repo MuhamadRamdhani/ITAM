@@ -60,7 +60,16 @@ function getErrorMessage(err: unknown, fallback = "Terjadi kesalahan.") {
   if (!err) return fallback;
   if (typeof err === "string") return err;
 
-  const anyErr = err as any;
+  const anyErr = err as {
+    error?: { message?: string };
+    message?: string;
+    response?: {
+      data?: {
+        error?: { message?: string };
+        message?: string;
+      };
+    };
+  };
   return (
     anyErr?.error?.message ||
     anyErr?.message ||
@@ -81,6 +90,10 @@ function emptyCreateForm(): CreateVendorForm {
     primary_contact_phone: "",
     notes: "",
   };
+}
+
+function digitsOnly(value: string): string {
+  return String(value ?? "").replace(/\D+/g, "");
 }
 
 export default function VendorsClient() {
@@ -202,72 +215,82 @@ export default function VendorsClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-3xl font-semibold text-gray-900">Vendors</div>
-          <div className="mt-1 text-sm text-gray-600">
-            Registry vendor tenant-scoped untuk publisher, supplier, dan service provider.
+      <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
+              Vendor Registry
+            </div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+              Vendors
+            </div>
+            <div className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
+              Registry vendor tenant-scoped untuk publisher, supplier, dan service provider.
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Back
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowCreate((v) => !v)}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-            disabled={submitting}
-          >
-            {showCreate ? "Hide Form" : "New Vendor"}
-          </button>
+          <div className="flex items-center gap-2 self-start lg:self-auto">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="itam-secondary-action"
+            >
+              Back
+            </button>
+          </div>
         </div>
       </div>
 
       {(loadErr || createErr || createOk) && (
         <div className="space-y-2">
           {loadErr ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {loadErr}
             </div>
           ) : null}
 
           {createErr ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {createErr}
             </div>
           ) : null}
 
           {createOk ? (
-            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
               {createOk}
             </div>
           ) : null}
         </div>
       )}
 
-      {showCreate ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowCreate((v) => !v)}
+            className="itam-primary-action"
+            disabled={submitting}
+          >
+            {showCreate ? "Hide Form" : "New Vendor"}
+          </button>
+        </div>
+
+        {showCreate ? (
+          <div className="mt-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div>
-            <div className="text-base font-semibold text-gray-900">Create Vendor</div>
-            <div className="mt-1 text-sm text-gray-600">
+            <div className="text-lg font-semibold tracking-tight text-slate-900">Create Vendor</div>
+            <div className="mt-1 text-sm text-slate-700">
               Tambahkan vendor tenant untuk software, hardware, cloud, atau service.
             </div>
           </div>
 
-          <form onSubmit={submitCreate} className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <form onSubmit={submitCreate} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Vendor Code</label>
+              <label className="block text-sm font-medium text-slate-700">Vendor Code</label>
               <input
                 value={createForm.vendor_code}
                 onChange={(e) => updateCreateForm("vendor_code", e.target.value.toUpperCase())}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 placeholder="MICROSOFT"
                 disabled={submitting}
                 required
@@ -275,7 +298,7 @@ export default function VendorsClient() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Vendor Name</label>
+              <label className="block text-sm font-medium text-slate-700">Vendor Name</label>
               <input
                 value={createForm.vendor_name}
                 onChange={(e) => updateCreateForm("vendor_name", e.target.value)}
@@ -287,7 +310,7 @@ export default function VendorsClient() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Vendor Type</label>
+              <label className="block text-sm font-medium text-slate-700">Vendor Type</label>
               <select
                 value={createForm.vendor_type}
                 onChange={(e) =>
@@ -296,7 +319,7 @@ export default function VendorsClient() {
                     e.target.value as CreateVendorForm["vendor_type"]
                   )
                 }
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={submitting}
               >
                 {VENDOR_TYPE_OPTIONS.map((opt) => (
@@ -308,13 +331,13 @@ export default function VendorsClient() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Status</label>
+              <label className="block text-sm font-medium text-slate-700">Status</label>
               <select
                 value={createForm.status}
                 onChange={(e) =>
                   updateCreateForm("status", e.target.value as "ACTIVE" | "INACTIVE")
                 }
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={submitting}
               >
                 <option value="ACTIVE">ACTIVE</option>
@@ -323,42 +346,49 @@ export default function VendorsClient() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Primary Contact Name</label>
+              <label className="block text-sm font-medium text-slate-700">Primary Contact Name</label>
               <input
                 value={createForm.primary_contact_name}
                 onChange={(e) => updateCreateForm("primary_contact_name", e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={submitting}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Primary Contact Email</label>
+              <label className="block text-sm font-medium text-slate-700">Primary Contact Email</label>
               <input
                 type="email"
                 value={createForm.primary_contact_email}
                 onChange={(e) => updateCreateForm("primary_contact_email", e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={submitting}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Primary Contact Phone</label>
+              <label className="block text-sm font-medium text-slate-700">Primary Contact Phone</label>
               <input
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="tel"
                 value={createForm.primary_contact_phone}
-                onChange={(e) => updateCreateForm("primary_contact_phone", e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                onChange={(e) =>
+                  updateCreateForm("primary_contact_phone", digitsOnly(e.target.value))
+                }
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={submitting}
+                placeholder="081234567890"
               />
             </div>
 
             <div className="md:col-span-3">
-              <label className="block text-sm font-medium text-gray-700">Notes</label>
+              <label className="block text-sm font-medium text-slate-700">Notes</label>
               <textarea
                 value={createForm.notes}
                 onChange={(e) => updateCreateForm("notes", e.target.value)}
-                className="mt-1 min-h-[100px] w-full rounded-md border px-3 py-2 text-sm"
+                className="mt-1 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 disabled={submitting}
               />
             </div>
@@ -367,30 +397,30 @@ export default function VendorsClient() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                className="itam-primary-action"
               >
                 {submitting ? "Creating..." : "Create Vendor"}
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setCreateForm(emptyCreateForm());
-                  setCreateErr(null);
-                  setCreateOk(null);
-                  setShowCreate(false);
-                }}
-                disabled={submitting}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              >
-                Cancel
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateForm(emptyCreateForm());
+                    setCreateErr(null);
+                    setCreateOk(null);
+                    setShowCreate(false);
+                  }}
+                  disabled={submitting}
+                  className="itam-secondary-action"
+                >
+                  Cancel
+                </button>
             </div>
           </form>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <form
             onSubmit={submitFilter}
@@ -400,7 +430,7 @@ export default function VendorsClient() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search code/name/type/contact..."
-              className="w-full sm:w-72 rounded-md border px-3 py-2 text-sm"
+              className="w-full sm:w-72 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               disabled={loading}
             />
 
@@ -410,7 +440,7 @@ export default function VendorsClient() {
                 setPage(1);
                 setStatus(e.target.value);
               }}
-              className="rounded-md border px-3 py-2 text-sm"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
               disabled={loading}
             >
               <option value="">ALL</option>
@@ -418,25 +448,26 @@ export default function VendorsClient() {
               <option value="INACTIVE">INACTIVE</option>
             </select>
 
-            <button className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60">
+            <button className="itam-primary-action-sm">
               {loading ? "Loading..." : "Search"}
             </button>
           </form>
         </div>
 
-        <div className="mt-4 text-sm text-gray-500">Total: {total}</div>
+        <div className="mt-4 text-sm text-slate-500">Total: {total}</div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-gray-500">
+        <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+          <table className="min-w-[960px] w-full text-[13px] leading-6">
+            <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
-                <th className="py-2 pr-4">Code</th>
-                <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4">Type</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Primary Contact</th>
-                <th className="py-2 pr-4">Updated</th>
-                <th className="py-2 pr-4 text-right">Action</th>
+                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Code</th>
+                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Name</th>
+                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Type</th>
+                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Status</th>
+                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Primary Contact</th>
+                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Updated</th>
+                <th className="px-4 py-4 pr-6 text-right font-semibold uppercase tracking-[0.16em]">Action</th>
               </tr>
             </thead>
 
@@ -450,34 +481,34 @@ export default function VendorsClient() {
                   <SkeletonTableRow cols={7} />
                 </>
               ) : items.length === 0 ? (
-                <tr className="border-t">
-                  <td colSpan={7} className="py-6 text-gray-600">
+                <tr className="border-t border-slate-200">
+                  <td colSpan={7} className="px-4 py-8 text-slate-600">
                     Belum ada vendor.
                   </td>
                 </tr>
               ) : (
                 items.map((item) => (
-                  <tr key={item.id} className="border-t">
-                    <td className="py-3 pr-4">{item.vendor_code}</td>
-                    <td className="py-3 pr-4">{item.vendor_name}</td>
-                    <td className="py-3 pr-4">{item.vendor_type}</td>
-                    <td className="py-3 pr-4">{item.status}</td>
-                    <td className="py-3 pr-4">
-                      <div>{item.primary_contact_name || "-"}</div>
-                      <div className="text-xs text-gray-500">
+                  <tr key={item.id} className="border-t border-slate-200 align-top">
+                    <td className="px-4 py-5 pr-6 font-medium text-slate-900">{item.vendor_code}</td>
+                    <td className="px-4 py-5 pr-6 text-slate-900">{item.vendor_name}</td>
+                    <td className="px-4 py-5 pr-6 text-slate-900">{item.vendor_type}</td>
+                    <td className="px-4 py-5 pr-6 text-slate-900">{item.status}</td>
+                    <td className="px-4 py-5 pr-6">
+                      <div className="text-slate-900">{item.primary_contact_name || "-"}</div>
+                      <div className="text-xs text-slate-500">
                         {item.primary_contact_email || "-"}
                       </div>
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="px-4 py-5 pr-6 text-slate-900">
                       {item.updated_at
                         ? new Date(item.updated_at).toLocaleString()
                         : "-"}
                     </td>
-                    <td className="py-3 pr-4 text-right whitespace-nowrap">
+                    <td className="px-4 py-5 pr-6 text-right whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => goToDetail(item.id)}
-                        className="text-blue-700 hover:underline"
+                        className="itam-secondary-action-sm"
                       >
                         Open
                       </button>
@@ -487,10 +518,12 @@ export default function VendorsClient() {
               )}
             </tbody>
           </table>
+          </div>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-slate-500">
             Page {page} / {totalPages} (page_size: {pageSize})
           </div>
 
@@ -498,12 +531,12 @@ export default function VendorsClient() {
             {canPrev ? (
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action-sm"
               >
                 Prev
               </button>
             ) : (
-              <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
                 Prev
               </span>
             )}
@@ -511,19 +544,19 @@ export default function VendorsClient() {
             {canNext ? (
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="itam-secondary-action-sm"
               >
                 Next
               </button>
             ) : (
-              <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
                 Next
               </span>
             )}
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-gray-500">
+        <div className="mt-3 text-xs text-slate-500">
           Tip: vendor akan dipakai sebagai baseline untuk kontrak, software publisher, dan supplier.
         </div>
       </div>

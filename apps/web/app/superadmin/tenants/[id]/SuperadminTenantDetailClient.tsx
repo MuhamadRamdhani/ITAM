@@ -543,7 +543,7 @@ export default function SuperadminTenantDetailClient({
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="itam-primary-action"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>

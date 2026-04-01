@@ -178,6 +178,84 @@ function deriveConsumptionStatus({
   return "POTENTIAL_OVERUSE";
 }
 
+function deriveOptimizationStatus({
+  entitlementStatus,
+  isExpired,
+  allocatedActive,
+  consumedQuantityUsage,
+}) {
+  const normalizedStatus = normalizeEnum(entitlementStatus);
+
+  if (normalizedStatus === "INACTIVE") {
+    return "INACTIVE_ENTITLEMENT";
+  }
+
+  if (normalizedStatus === "EXPIRED" || isExpired) {
+    return "EXPIRED_ENTITLEMENT";
+  }
+
+  if (consumedQuantityUsage > allocatedActive) {
+    return "USAGE_GT_ALLOCATION";
+  }
+
+  if (allocatedActive > consumedQuantityUsage) {
+    return "RECLAIM_OPPORTUNITY";
+  }
+
+  return "OPTIMIZED";
+}
+
+function toDateOnly(value) {
+  const s = normalizeDate(value);
+  return s ? s.slice(0, 10) : null;
+}
+
+function calculateDaysToExpiry(endDate, today = todayIsoDate()) {
+  const end = toDateOnly(endDate);
+  if (!end) return null;
+
+  const todayMs = Date.parse(`${today}T00:00:00.000Z`);
+  const endMs = Date.parse(`${end}T00:00:00.000Z`);
+
+  if (Number.isNaN(todayMs) || Number.isNaN(endMs)) {
+    return null;
+  }
+
+  return Math.floor((endMs - todayMs) / 86400000);
+}
+
+function deriveRenewalStatus({
+  entitlementStatus,
+  isExpired,
+  endDate,
+  daysToExpiry,
+  renewalNoticeDays,
+}) {
+  const normalizedStatus = normalizeEnum(entitlementStatus);
+
+  if (normalizedStatus === "INACTIVE") {
+    return "INACTIVE_ENTITLEMENT";
+  }
+
+  if (normalizedStatus === "EXPIRED" || isExpired) {
+    return "EXPIRED_ENTITLEMENT";
+  }
+
+  if (!toDateOnly(endDate)) {
+    return "NO_END_DATE";
+  }
+
+  if (
+    Number.isInteger(daysToExpiry) &&
+    daysToExpiry >= 0 &&
+    daysToExpiry <= Number(renewalNoticeDays ?? 30)
+  ) {
+    return "EXPIRING_SOON";
+  }
+
+  return "ACTIVE";
+}
+
 function createEmptyComplianceStatusCounts() {
   return {
     OK: 0,
@@ -194,6 +272,26 @@ function createEmptyConsumptionStatusCounts() {
     UNDER_CONSUMED: 0,
     BALANCED: 0,
     POTENTIAL_OVERUSE: 0,
+    INACTIVE_ENTITLEMENT: 0,
+    EXPIRED_ENTITLEMENT: 0,
+  };
+}
+
+function createEmptyOptimizationStatusCounts() {
+  return {
+    OPTIMIZED: 0,
+    RECLAIM_OPPORTUNITY: 0,
+    USAGE_GT_ALLOCATION: 0,
+    INACTIVE_ENTITLEMENT: 0,
+    EXPIRED_ENTITLEMENT: 0,
+  };
+}
+
+function createEmptyRenewalStatusCounts() {
+  return {
+    ACTIVE: 0,
+    EXPIRING_SOON: 0,
+    NO_END_DATE: 0,
     INACTIVE_ENTITLEMENT: 0,
     EXPIRED_ENTITLEMENT: 0,
   };
@@ -600,6 +698,346 @@ export async function getContractSoftwareConsumptionSummaryService(app, req) {
     },
     totals: {
       ...totals,
+      status_counts: statusCounts,
+    },
+    items,
+    total: items.length,
+  };
+}
+
+export async function getContractSoftwareOptimizationSummaryService(app, req) {
+  const tenantId = mustTenantId(req);
+  const contractId = mustPositiveInt(req.params?.id, "contract id");
+
+  const contract = await getContractById(app, tenantId, contractId);
+  if (!contract) {
+    throw httpError(404, "Contract not found");
+  }
+
+  const entitlements = await listSoftwareEntitlementsByContract(app, tenantId, contractId);
+
+  if (entitlements.length === 0) {
+    return {
+      contract: {
+        id: Number(contract.id),
+        contract_code: contract.contract_code,
+        contract_name: contract.contract_name,
+        contract_type: contract.contract_type,
+        status: contract.status,
+        vendor_id: contract.vendor_id == null ? null : Number(contract.vendor_id),
+        vendor_code: contract.vendor_code ?? null,
+        vendor_name: contract.vendor_name ?? null,
+      },
+      totals: {
+        entitlements_count: 0,
+        quantity_purchased: 0,
+        allocated_active: 0,
+        consumed_quantity_usage: 0,
+        unused_allocated_quantity: 0,
+        reclaim_candidate_count: 0,
+        status_counts: createEmptyOptimizationStatusCounts(),
+      },
+      items: [],
+      total: 0,
+    };
+  }
+
+  const entitlementIds = [
+    ...new Set(
+      entitlements
+        .map((item) => Number(item.id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ),
+  ];
+
+  const softwareProductIds = [
+    ...new Set(
+      entitlements
+        .map((item) => Number(item.software_product_id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ),
+  ];
+
+  const [
+    allocatedByEntitlementId,
+    installationsBySoftwareProductId,
+    assignmentsBySoftwareProductId,
+  ] = await Promise.all([
+    getActiveAllocatedQuantitiesByEntitlementIds(app, tenantId, entitlementIds),
+    countActiveInstallationsBySoftwareProductIds(app, tenantId, softwareProductIds),
+    countActiveAssignmentsBySoftwareProductIds(app, tenantId, softwareProductIds),
+  ]);
+
+  const statusCounts = createEmptyOptimizationStatusCounts();
+
+  const items = entitlements.map((entitlement) => {
+    const entitlementId = Number(entitlement.id);
+    const softwareProductId = Number(entitlement.software_product_id);
+    const quantityPurchased = Number(entitlement.quantity_purchased ?? 0);
+    const allocatedActive = Number(allocatedByEntitlementId.get(entitlementId) ?? 0);
+    const activeInstallationCount = Number(
+      installationsBySoftwareProductId.get(softwareProductId) ?? 0
+    );
+    const activeAssignmentCount = Number(
+      assignmentsBySoftwareProductId.get(softwareProductId) ?? 0
+    );
+
+    const consumptionBasis = deriveConsumptionBasis(entitlement.licensing_metric);
+    const consumedQuantityUsage =
+      consumptionBasis === "ASSIGNMENT"
+        ? activeAssignmentCount
+        : activeInstallationCount;
+
+    const unusedAllocatedQuantityRaw = allocatedActive - consumedQuantityUsage;
+    const unusedAllocatedQuantity = Math.max(unusedAllocatedQuantityRaw, 0);
+    const reclaimCandidateCount = Math.max(unusedAllocatedQuantityRaw, 0);
+    const allocationUsageVariance = consumedQuantityUsage - allocatedActive;
+    const expired = isEntitlementExpired(entitlement);
+
+    const optimizationStatus = deriveOptimizationStatus({
+      entitlementStatus: entitlement.status,
+      isExpired: expired,
+      allocatedActive,
+      consumedQuantityUsage,
+    });
+
+    statusCounts[optimizationStatus] =
+      Number(statusCounts[optimizationStatus] ?? 0) + 1;
+
+    return {
+      entitlement_id: entitlementId,
+      contract_id: Number(entitlement.contract_id),
+      entitlement_code: entitlement.entitlement_code,
+      entitlement_name: entitlement.entitlement_name,
+      entitlement_status: entitlement.status,
+      software_product_id: softwareProductId,
+      software_product_code: entitlement.software_product_code,
+      software_product_name: entitlement.software_product_name,
+      licensing_metric: entitlement.licensing_metric,
+      quantity_purchased: quantityPurchased,
+      allocated_active: allocatedActive,
+      active_installation_count: activeInstallationCount,
+      active_assignment_count: activeAssignmentCount,
+      consumption_basis: consumptionBasis,
+      consumed_quantity_usage: consumedQuantityUsage,
+      unused_allocated_quantity: unusedAllocatedQuantity,
+      reclaim_candidate_count: reclaimCandidateCount,
+      allocation_usage_variance: allocationUsageVariance,
+      optimization_status: optimizationStatus,
+      is_entitlement_active: normalizeEnum(entitlement.status) === "ACTIVE",
+      is_entitlement_expired: expired,
+      start_date: entitlement.start_date,
+      end_date: entitlement.end_date,
+    };
+  });
+
+  const totals = items.reduce(
+    (acc, item) => {
+      acc.entitlements_count += 1;
+      acc.quantity_purchased += Number(item.quantity_purchased ?? 0);
+      acc.allocated_active += Number(item.allocated_active ?? 0);
+      acc.consumed_quantity_usage += Number(item.consumed_quantity_usage ?? 0);
+      acc.unused_allocated_quantity += Number(item.unused_allocated_quantity ?? 0);
+      acc.reclaim_candidate_count += Number(item.reclaim_candidate_count ?? 0);
+      return acc;
+    },
+    {
+      entitlements_count: 0,
+      quantity_purchased: 0,
+      allocated_active: 0,
+      consumed_quantity_usage: 0,
+      unused_allocated_quantity: 0,
+      reclaim_candidate_count: 0,
+    }
+  );
+
+  return {
+    contract: {
+      id: Number(contract.id),
+      contract_code: contract.contract_code,
+      contract_name: contract.contract_name,
+      contract_type: contract.contract_type,
+      status: contract.status,
+      vendor_id: contract.vendor_id == null ? null : Number(contract.vendor_id),
+      vendor_code: contract.vendor_code ?? null,
+      vendor_name: contract.vendor_name ?? null,
+    },
+    totals: {
+      ...totals,
+      status_counts: statusCounts,
+    },
+    items,
+    total: items.length,
+  };
+}
+
+export async function getContractSoftwareRenewalSummaryService(app, req) {
+  const tenantId = mustTenantId(req);
+  const contractId = mustPositiveInt(req.params?.id, "contract id");
+
+  const contract = await getContractById(app, tenantId, contractId);
+  if (!contract) {
+    throw httpError(404, "Contract not found");
+  }
+
+  const renewalNoticeDays = Number(contract.renewal_notice_days ?? 30);
+  const entitlements = await listSoftwareEntitlementsByContract(app, tenantId, contractId);
+
+  if (entitlements.length === 0) {
+    return {
+      contract: {
+        id: Number(contract.id),
+        contract_code: contract.contract_code,
+        contract_name: contract.contract_name,
+        contract_type: contract.contract_type,
+        status: contract.status,
+        vendor_id: contract.vendor_id == null ? null : Number(contract.vendor_id),
+        vendor_code: contract.vendor_code ?? null,
+        vendor_name: contract.vendor_name ?? null,
+        renewal_notice_days: renewalNoticeDays,
+      },
+      totals: {
+        entitlements_count: 0,
+        quantity_purchased: 0,
+        allocated_active: 0,
+        consumed_quantity_usage: 0,
+        unused_allocated_quantity: 0,
+        expiring_soon_count: 0,
+        expired_count: 0,
+        no_end_date_count: 0,
+        status_counts: createEmptyRenewalStatusCounts(),
+      },
+      items: [],
+      total: 0,
+    };
+  }
+
+  const entitlementIds = [
+    ...new Set(
+      entitlements
+        .map((item) => Number(item.id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ),
+  ];
+
+  const softwareProductIds = [
+    ...new Set(
+      entitlements
+        .map((item) => Number(item.software_product_id))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    ),
+  ];
+
+  const [
+    allocatedByEntitlementId,
+    installationsBySoftwareProductId,
+    assignmentsBySoftwareProductId,
+  ] = await Promise.all([
+    getActiveAllocatedQuantitiesByEntitlementIds(app, tenantId, entitlementIds),
+    countActiveInstallationsBySoftwareProductIds(app, tenantId, softwareProductIds),
+    countActiveAssignmentsBySoftwareProductIds(app, tenantId, softwareProductIds),
+  ]);
+
+  const statusCounts = createEmptyRenewalStatusCounts();
+
+  const items = entitlements.map((entitlement) => {
+    const entitlementId = Number(entitlement.id);
+    const softwareProductId = Number(entitlement.software_product_id);
+    const quantityPurchased = Number(entitlement.quantity_purchased ?? 0);
+    const allocatedActive = Number(allocatedByEntitlementId.get(entitlementId) ?? 0);
+    const activeInstallationCount = Number(
+      installationsBySoftwareProductId.get(softwareProductId) ?? 0
+    );
+    const activeAssignmentCount = Number(
+      assignmentsBySoftwareProductId.get(softwareProductId) ?? 0
+    );
+
+    const consumptionBasis = deriveConsumptionBasis(entitlement.licensing_metric);
+    const consumedQuantityUsage =
+      consumptionBasis === "ASSIGNMENT"
+        ? activeAssignmentCount
+        : activeInstallationCount;
+
+    const unusedAllocatedQuantity = Math.max(
+      allocatedActive - consumedQuantityUsage,
+      0
+    );
+
+    const expired = isEntitlementExpired(entitlement);
+    const daysToExpiry = calculateDaysToExpiry(entitlement.end_date);
+
+    const renewalStatus = deriveRenewalStatus({
+      entitlementStatus: entitlement.status,
+      isExpired: expired,
+      endDate: entitlement.end_date,
+      daysToExpiry,
+      renewalNoticeDays,
+    });
+
+    statusCounts[renewalStatus] = Number(statusCounts[renewalStatus] ?? 0) + 1;
+
+    return {
+      entitlement_id: entitlementId,
+      contract_id: Number(entitlement.contract_id),
+      entitlement_code: entitlement.entitlement_code,
+      entitlement_name: entitlement.entitlement_name,
+      entitlement_status: entitlement.status,
+      software_product_id: softwareProductId,
+      software_product_code: entitlement.software_product_code,
+      software_product_name: entitlement.software_product_name,
+      licensing_metric: entitlement.licensing_metric,
+      quantity_purchased: quantityPurchased,
+      allocated_active: allocatedActive,
+      active_installation_count: activeInstallationCount,
+      active_assignment_count: activeAssignmentCount,
+      consumption_basis: consumptionBasis,
+      consumed_quantity_usage: consumedQuantityUsage,
+      unused_allocated_quantity: unusedAllocatedQuantity,
+      renewal_notice_days: renewalNoticeDays,
+      days_to_expiry: daysToExpiry,
+      renewal_status: renewalStatus,
+      is_entitlement_active: normalizeEnum(entitlement.status) === "ACTIVE",
+      is_entitlement_expired: expired,
+      start_date: entitlement.start_date,
+      end_date: entitlement.end_date,
+    };
+  });
+
+  const totals = items.reduce(
+    (acc, item) => {
+      acc.entitlements_count += 1;
+      acc.quantity_purchased += Number(item.quantity_purchased ?? 0);
+      acc.allocated_active += Number(item.allocated_active ?? 0);
+      acc.consumed_quantity_usage += Number(item.consumed_quantity_usage ?? 0);
+      acc.unused_allocated_quantity += Number(item.unused_allocated_quantity ?? 0);
+      return acc;
+    },
+    {
+      entitlements_count: 0,
+      quantity_purchased: 0,
+      allocated_active: 0,
+      consumed_quantity_usage: 0,
+      unused_allocated_quantity: 0,
+    }
+  );
+
+  return {
+    contract: {
+      id: Number(contract.id),
+      contract_code: contract.contract_code,
+      contract_name: contract.contract_name,
+      contract_type: contract.contract_type,
+      status: contract.status,
+      vendor_id: contract.vendor_id == null ? null : Number(contract.vendor_id),
+      vendor_code: contract.vendor_code ?? null,
+      vendor_name: contract.vendor_name ?? null,
+      renewal_notice_days: renewalNoticeDays,
+    },
+    totals: {
+      ...totals,
+      expiring_soon_count: Number(statusCounts.EXPIRING_SOON ?? 0),
+      expired_count: Number(statusCounts.EXPIRED_ENTITLEMENT ?? 0),
+      no_end_date_count: Number(statusCounts.NO_END_DATE ?? 0),
       status_counts: statusCounts,
     },
     items,
