@@ -366,12 +366,12 @@ export default function ContractsClient() {
   return (
     <div className="relative z-10 space-y-12">
       <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6 lg:p-8">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
-            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            <div className="inline-flex rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
               Contracts
             </div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
               Contracts
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-700">
@@ -379,10 +379,7 @@ export default function ContractsClient() {
             </p>
           </div>
 
-          <Link
-            href="/"
-            className="itam-secondary-action"
-          >
+          <Link href="/" className="itam-secondary-action md:self-end">
             Back
           </Link>
         </div>

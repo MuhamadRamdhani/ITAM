@@ -12,6 +12,9 @@ import AdminIdentitiesLauncher from "./components/AdminIdentitiesLauncher";
 import AdminAssetTypesLauncher from "./components/AdminAssetTypesLauncher";
 import AdminLifecycleStatesLauncher from "./components/AdminLifecycleStatesLauncher";
 import AssetTransfersLauncher from "./components/AssetTransfersLauncher";
+import KpiModuleLauncher from "./components/KpiModuleLauncher";
+import KpiCardsLauncher from "./components/KpiCardsLauncher";
+import KpiQuickLinks from "./components/KpiQuickLinks";
 
 function Card(props: { title: string; desc: string; href: string }) {
   return (
@@ -108,6 +111,27 @@ export default function HomePage() {
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-800">
+                  KPI Workspace
+                </div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                  Monitoring performa KPI tenant
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
+                  Akses cepat ke KPI Library dan KPI Scorecard beserta ringkasan scorecard
+                  bulanan periode berjalan.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <KpiModuleLauncher />
+            </div>
+          </section>
+
+          <section className="mt-10">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-800">
                   Modul Utama
                 </div>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
@@ -177,6 +201,14 @@ export default function HomePage() {
                 desc="MVP2.0 software product registry"
                 href="/software-products"
               />
+
+              <Card
+                title="Internal Audits"
+                desc="MVP2.0 internal audit register + schedule"
+                href="/internal-audits"
+              />
+
+              <KpiCardsLauncher />
 
               <AssetTransfersLauncher />
               <AdminUsersLauncher />
@@ -254,6 +286,8 @@ export default function HomePage() {
               >
                 Audit Events
               </Link>
+
+              <KpiQuickLinks />
             </div>
           </section>
         </div>

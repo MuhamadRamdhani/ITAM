@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import {
   KpiDefinition,
   KpiMeasurement,
-  KpiPeriodParts,
   KpiTrendSeries,
   buildPeriodKeyFromParts,
   canManageKpis,
@@ -91,9 +90,57 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
+function EmptyHistoryState({
+  selectedYear,
+  onBackToCurrentYear,
+}: {
+  selectedYear: number;
+  onBackToCurrentYear: () => void;
+}) {
+  const currentYear = new Date().getFullYear();
+  const isCurrentYear = selectedYear === currentYear;
+
+  return (
+    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center">
+      <div className="mx-auto max-w-2xl">
+        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">
+          No measurement data
+        </div>
+        <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+          Belum ada snapshot untuk tahun {selectedYear}
+        </h3>
+        <p className="mt-3 text-sm leading-7 text-slate-700">
+          Trend dan measurement history di halaman ini hanya menampilkan snapshot
+          sesuai rentang tahun yang dipilih. Kalau belum pernah dilakukan capture
+          measurement di tahun tersebut, maka hasilnya akan kosong.
+        </p>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/kpi-scorecard"
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            Open KPI Scorecard
+          </Link>
+
+          {!isCurrentYear && (
+            <button
+              type="button"
+              onClick={onBackToCurrentYear}
+              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+            >
+              Back to {currentYear}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getYearOptions() {
   const currentYear = new Date().getFullYear();
-  return Array.from({ length: 11 }, (_, index) => String(currentYear - 5 + index));
+  return Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
 }
 
 export default function KpiDetailClient({ id }: Props) {
@@ -101,12 +148,16 @@ export default function KpiDetailClient({ id }: Props) {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [trendLoading, setTrendLoading] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [formError, setFormError] = useState('');
   const [kpi, setKpi] = useState<KpiDefinition | null>(null);
   const [measurements, setMeasurements] = useState<KpiMeasurement[]>([]);
   const [trend, setTrend] = useState<KpiTrendSeries | null>(null);
+  const [selectedTrendYear, setSelectedTrendYear] = useState<number>(
+    new Date().getFullYear()
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [measurementForm, setMeasurementForm] = useState<MeasurementFormState>({
@@ -118,30 +169,19 @@ export default function KpiDetailClient({ id }: Props) {
   const canManage = useMemo(() => canManageKpis(roles), [roles]);
   const yearOptions = useMemo(() => getYearOptions(), []);
 
-  async function loadAll() {
+  async function loadBaseData() {
     const me = await getAuthMe();
     const roleCodes = extractRoleCodes(me);
     setRoles(roleCodes);
 
     if (!canViewKpiModule(roleCodes)) {
       router.replace('/assets');
-      return;
+      return null;
     }
 
     const detail = await getKpiDetail(id);
-    const range = getPeriodKeyRangeForYear(new Date().getFullYear(), detail.period_type);
-
-    const [measurementResult, trendResult] = await Promise.all([
-      getKpiMeasurements(id, {
-        page: 1,
-        page_size: 25,
-      }),
-      getKpiTrend(id, range),
-    ]);
 
     setKpi(detail);
-    setMeasurements(measurementResult.items);
-    setTrend(trendResult);
 
     const currentParts = parsePeriodKeyToParts(
       detail.period_type,
@@ -153,6 +193,32 @@ export default function KpiDetailClient({ id }: Props) {
       actual_value: '',
       measurement_note: '',
     });
+
+    return detail;
+  }
+
+  async function loadTrendAndHistory(detail: KpiDefinition, year: number) {
+    const range = getPeriodKeyRangeForYear(year, detail.period_type);
+
+    const [measurementResult, trendResult] = await Promise.all([
+      getKpiMeasurements(id, {
+        period_key_from: range.period_key_from,
+        period_key_to: range.period_key_to,
+        page: 1,
+        page_size: 25,
+      }),
+      getKpiTrend(id, range),
+    ]);
+
+    setMeasurements(measurementResult.items);
+    setTrend(trendResult);
+  }
+
+  async function loadAll(initialYear = selectedTrendYear) {
+    const detail = await loadBaseData();
+    if (!detail) return;
+
+    await loadTrendAndHistory(detail, initialYear);
   }
 
   useEffect(() => {
@@ -161,7 +227,7 @@ export default function KpiDetailClient({ id }: Props) {
     async function bootstrap() {
       try {
         setLoading(true);
-        await loadAll();
+        await loadAll(selectedTrendYear);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(getErrorMessage(error));
@@ -179,6 +245,56 @@ export default function KpiDetailClient({ id }: Props) {
       cancelled = true;
     };
   }, [id, router]);
+
+  useEffect(() => {
+    const currentKpi = kpi as KpiDefinition | null;
+    if (!currentKpi) return;
+    const detail = currentKpi as KpiDefinition;
+
+    let cancelled = false;
+
+    async function refreshTrendByYear() {
+      try {
+        setTrendLoading(true);
+        setErrorMessage('');
+
+        await loadTrendAndHistory(detail, selectedTrendYear);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(getErrorMessage(error));
+          setMeasurements([]);
+          setTrend({
+            kpi: {
+              id: detail.id,
+              code: detail.code,
+              name: detail.name,
+              category_code: detail.category_code,
+              unit_code: detail.unit_code,
+              source_type: detail.source_type,
+              metric_key: detail.metric_key,
+              direction: detail.direction,
+              period_type: detail.period_type,
+              target_value: detail.target_value,
+              warning_value: detail.warning_value,
+              critical_value: detail.critical_value,
+              baseline_value: detail.baseline_value,
+            },
+            items: [],
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setTrendLoading(false);
+        }
+      }
+    }
+
+    refreshTrendByYear();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [kpi, selectedTrendYear]);
 
   function openMeasurementModal() {
     if (!kpi) return;
@@ -231,7 +347,7 @@ export default function KpiDetailClient({ id }: Props) {
 
       closeMeasurementModal();
       setLoading(true);
-      await loadAll();
+      await loadAll(selectedTrendYear);
     } catch (error) {
       setFormError(getErrorMessage(error));
     } finally {
@@ -242,6 +358,8 @@ export default function KpiDetailClient({ id }: Props) {
 
   const latestMeasurement = measurements[0] ?? null;
   const sparklineValues = trend?.items.map((item) => item.actual_value) ?? [];
+  const hasTrendData = (trend?.items.length ?? 0) > 0;
+  const hasHistoryData = measurements.length > 0;
 
   function renderPeriodPicker() {
     if (!kpi) return null;
@@ -281,7 +399,7 @@ export default function KpiDetailClient({ id }: Props) {
             className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
           >
             {yearOptions.map((year) => (
-              <option key={year} value={year}>
+              <option key={year} value={String(year)}>
                 {year}
               </option>
             ))}
@@ -297,10 +415,10 @@ export default function KpiDetailClient({ id }: Props) {
             }
             className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
           >
-            <option value="1">Q1</option>
-            <option value="2">Q2</option>
-            <option value="3">Q3</option>
-            <option value="4">Q4</option>
+            <option value="1">Quarter 1 (Jan–Mar)</option>
+            <option value="2">Quarter 2 (Apr–Jun)</option>
+            <option value="3">Quarter 3 (Jul–Sep)</option>
+            <option value="4">Quarter 4 (Oct–Dec)</option>
           </select>
         </div>
       );
@@ -318,7 +436,7 @@ export default function KpiDetailClient({ id }: Props) {
         className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
       >
         {yearOptions.map((year) => (
-          <option key={year} value={year}>
+          <option key={year} value={String(year)}>
             {year}
           </option>
         ))}
@@ -336,40 +454,43 @@ export default function KpiDetailClient({ id }: Props) {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link
-              href="/kpis"
-              className="text-sm font-medium text-blue-600 hover:text-blue-700"
-            >
-              ← Back to KPI Library
-            </Link>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900">
-              KPI Detail
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-gray-600">
-              Review KPI definition, capture measurement, dan lihat histori trend KPI.
-            </p>
-          </div>
+      <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                KPI Detail
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-gray-600">
+                Review KPI definition, capture measurement, dan lihat histori trend KPI.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/kpi-scorecard"
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-            >
-              Open Scorecard
-            </Link>
-
-            {canManage && (
-              <button
-                type="button"
-                onClick={openMeasurementModal}
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-black"
+            <div className="flex flex-wrap justify-end gap-3">
+              <Link
+                href="/kpis"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
               >
-                Capture Measurement
-              </button>
-            )}
+                Back to KPI Library
+              </Link>
+
+              <Link
+                href="/kpi-scorecard"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
+              >
+                Open Scorecard
+              </Link>
+
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={openMeasurementModal}
+                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-black"
+                >
+                  Capture Measurement
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -380,13 +501,13 @@ export default function KpiDetailClient({ id }: Props) {
         )}
 
         {loading || !kpi ? (
-          <div className="rounded-2xl border border-gray-200 bg-white px-6 py-14 text-center text-sm text-gray-500 shadow-sm">
+          <div className="rounded-3xl border border-gray-200 bg-white px-6 py-14 text-center text-sm text-gray-500 shadow-sm">
             Loading KPI detail...
           </div>
         ) : (
           <>
             <div className="grid gap-6 lg:grid-cols-3">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="font-mono text-xs text-gray-500">{kpi.code}</div>
@@ -480,7 +601,7 @@ export default function KpiDetailClient({ id }: Props) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="text-sm font-semibold text-gray-900">Latest Snapshot</div>
 
                 {!latestMeasurement ? (
@@ -555,81 +676,128 @@ export default function KpiDetailClient({ id }: Props) {
 
             <div className="mt-6 grid gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">Trend</h3>
                       <p className="mt-1 text-sm text-gray-500">
                         Baseline trend dari measurement snapshot yang sudah tersimpan.
                       </p>
                     </div>
+
+                    <div className="flex items-end gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Trend Year
+                        </label>
+                        <select
+                          value={selectedTrendYear}
+                          onChange={(event) => setSelectedTrendYear(Number(event.target.value))}
+                          className="rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                        >
+                          {yearOptions.map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!kpi) return;
+
+                          try {
+                            setTrendLoading(true);
+                            setErrorMessage('');
+                            await loadTrendAndHistory(kpi, selectedTrendYear);
+                          } catch (error) {
+                            setErrorMessage(getErrorMessage(error));
+                          } finally {
+                            setTrendLoading(false);
+                          }
+                        }}
+                        className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+                      >
+                        Refresh
+                      </button>
+                    </div>
                   </div>
 
-                  <Sparkline values={sparklineValues} />
+                  {trendLoading ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500">
+                      Loading trend...
+                    </div>
+                  ) : !hasTrendData ? (
+                    <EmptyHistoryState
+                      selectedYear={selectedTrendYear}
+                      onBackToCurrentYear={() => setSelectedTrendYear(new Date().getFullYear())}
+                    />
+                  ) : (
+                    <>
+                      <Sparkline values={sparklineValues} />
 
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                          <th className="px-4 py-3">Period</th>
-                          <th className="px-4 py-3">Actual</th>
-                          <th className="px-4 py-3">Target</th>
-                          <th className="px-4 py-3">Achievement</th>
-                          <th className="px-4 py-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {trend?.items.length ? (
-                          trend.items.map((item) => (
-                            <tr key={item.period_key}>
-                              <td className="px-4 py-3 text-gray-700">{item.period_key}</td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {formatKpiValue(item.actual_value, kpi.unit_code)}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {formatKpiValue(item.target_value, kpi.unit_code)}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {formatKpiValue(item.achievement_pct, 'PERCENT')}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span
-                                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                                    item.status_code
-                                  )}`}
-                                >
-                                  {item.status_code}
-                                </span>
-                              </td>
+                      <div className="mt-4 overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                          <thead>
+                            <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                              <th className="px-4 py-3">Period</th>
+                              <th className="px-4 py-3">Actual</th>
+                              <th className="px-4 py-3">Target</th>
+                              <th className="px-4 py-3">Achievement</th>
+                              <th className="px-4 py-3">Status</th>
                             </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td
-                              colSpan={5}
-                              className="px-4 py-8 text-center text-sm text-gray-500"
-                            >
-                              No trend series yet.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {trend?.items.map((item) => (
+                              <tr key={item.period_key}>
+                                <td className="px-4 py-3 text-gray-700">{item.period_key}</td>
+                                <td className="px-4 py-3 text-gray-700">
+                                  {formatKpiValue(item.actual_value, kpi.unit_code)}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700">
+                                  {formatKpiValue(item.target_value, kpi.unit_code)}
+                                </td>
+                                <td className="px-4 py-3 text-gray-700">
+                                  {formatKpiValue(item.achievement_pct, 'PERCENT')}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span
+                                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
+                                      item.status_code
+                                    )}`}
+                                  >
+                                    {item.status_code}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900">Measurement History</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Snapshot terbaru sampai 25 record.
-                  </p>
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Measurement History
+                      </h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Snapshot untuk tahun {selectedTrendYear}.
+                      </p>
+                    </div>
+                  </div>
 
                   <div className="mt-4 space-y-3">
-                    {measurements.length === 0 ? (
+                    {!hasHistoryData ? (
                       <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                        No measurement history yet.
+                        No measurement history for {selectedTrendYear}.
                       </div>
                     ) : (
                       measurements.map((item) => (
@@ -701,7 +869,8 @@ export default function KpiDetailClient({ id }: Props) {
                 </label>
                 {renderPeriodPicker()}
                 <div className="mt-2 text-xs text-gray-500">
-                  Computed period key: <span className="font-medium text-gray-900">{computedPeriodKey}</span>
+                  Computed period key:{' '}
+                  <span className="font-medium text-gray-900">{computedPeriodKey}</span>
                 </div>
               </div>
 
@@ -773,3 +942,4 @@ export default function KpiDetailClient({ id }: Props) {
     </main>
   );
 }
+

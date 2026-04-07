@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  KpiPeriodParts,
   KpiPeriodType,
   KpiScorecardItem,
   KpiScorecardSummary,
+  buildPeriodKeyFromParts,
   canManageKpis,
   canViewKpiModule,
   createKpiMeasurement,
@@ -17,8 +19,9 @@ import {
   getCurrentPeriodKey,
   getErrorMessage,
   getKpiScorecardSummary,
-  getStatusBadgeClass,
   getSourceBadgeClass,
+  getStatusBadgeClass,
+  parsePeriodKeyToParts,
 } from '@/app/lib/kpi';
 
 type CaptureFormState = {
@@ -31,15 +34,91 @@ const DEFAULT_CAPTURE_FORM: CaptureFormState = {
   measurement_note: '',
 };
 
+function getYearOptions() {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 11 }, (_, index) => String(currentYear - 5 + index));
+}
+
+function EmptyState({
+  periodType,
+  periodKey,
+  onBackToMonthly,
+}: {
+  periodType: KpiPeriodType;
+  periodKey: string;
+  onBackToMonthly: () => void;
+}) {
+  const isMonthly = periodType === 'MONTHLY';
+
+  return (
+    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
+      <div className="mx-auto max-w-2xl">
+        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">
+          No scorecard rows
+        </div>
+
+        <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+          Belum ada KPI yang cocok untuk periode ini
+        </h3>
+
+        <p className="mt-3 text-sm leading-7 text-slate-700">
+          Scorecard hanya menampilkan KPI yang period type-nya sama dengan pilihan saat ini.
+          Untuk periode <span className="font-semibold text-slate-900">{periodType}</span> dengan key{' '}
+          <span className="font-semibold text-slate-900">{periodKey}</span>, belum ada baris yang bisa ditampilkan.
+        </p>
+
+        {!isMonthly && (
+          <p className="mt-3 text-sm leading-7 text-slate-700">
+            Ini normal kalau KPI yang sudah kamu buat saat ini masih dominan
+            <span className="font-semibold text-slate-900"> MONTHLY</span>. KPI monthly memang
+            tidak akan muncul saat selector ada di Quarterly atau Yearly.
+          </p>
+        )}
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/kpis"
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            Open KPI Library
+          </Link>
+
+          {!isMonthly && (
+            <button
+              type="button"
+              onClick={onBackToMonthly}
+              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+            >
+              Back to Monthly
+            </button>
+          )}
+        </div>
+
+        <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm text-blue-800">
+          <div className="font-medium">Saran penggunaan</div>
+          <ul className="mt-2 space-y-1">
+            <li>• Gunakan Monthly untuk KPI yang sudah berjalan saat ini.</li>
+            <li>• Buat KPI baru dengan period type Quarterly atau Yearly jika memang dibutuhkan.</li>
+            <li>• Capture measurement hanya bisa dilakukan setelah KPI untuk period type tersebut tersedia.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function KpiScorecardClient() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const [periodType, setPeriodType] = useState<KpiPeriodType>('MONTHLY');
-  const [periodKey, setPeriodKey] = useState(getCurrentPeriodKey('MONTHLY'));
+  const [periodParts, setPeriodParts] = useState<KpiPeriodParts>(() =>
+    parsePeriodKeyToParts('MONTHLY', getCurrentPeriodKey('MONTHLY'))
+  );
   const [scorecard, setScorecard] = useState<KpiScorecardSummary | null>(null);
 
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false);
@@ -48,6 +127,11 @@ export default function KpiScorecardClient() {
   const [captureError, setCaptureError] = useState('');
 
   const canManage = useMemo(() => canManageKpis(roles), [roles]);
+  const yearOptions = useMemo(() => getYearOptions(), []);
+  const periodKey = useMemo(
+    () => buildPeriodKeyFromParts(periodType, periodParts),
+    [periodType, periodParts]
+  );
 
   const summaryCards = useMemo(() => {
     if (!scorecard) return null;
@@ -99,7 +183,6 @@ export default function KpiScorecardClient() {
         setLoading(true);
 
         const me = await getAuthMe();
-
         if (cancelled) return;
 
         const roleCodes = extractRoleCodes(me);
@@ -110,10 +193,7 @@ export default function KpiScorecardClient() {
           return;
         }
 
-        const result = await getKpiScorecardSummary(periodType, periodKey);
-
-        if (cancelled) return;
-        setScorecard(result);
+        setAuthReady(true);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(getErrorMessage(error));
@@ -130,7 +210,40 @@ export default function KpiScorecardClient() {
     return () => {
       cancelled = true;
     };
-  }, [periodKey, periodType, router]);
+  }, [router]);
+
+  useEffect(() => {
+    if (!authReady) return;
+
+    let cancelled = false;
+
+    async function refreshScorecard() {
+      try {
+        setLoading(true);
+        setErrorMessage('');
+
+        const result = await getKpiScorecardSummary(periodType, periodKey);
+        if (cancelled) return;
+
+        setScorecard(result);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(getErrorMessage(error));
+          setScorecard(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    refreshScorecard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, periodType, periodKey]);
 
   function openCaptureModal(item: KpiScorecardItem) {
     setCaptureTarget(item);
@@ -180,6 +293,92 @@ export default function KpiScorecardClient() {
     }
   }
 
+  function handleBackToMonthly() {
+    const nextType: KpiPeriodType = 'MONTHLY';
+    setPeriodType(nextType);
+    setPeriodParts(parsePeriodKeyToParts(nextType, getCurrentPeriodKey(nextType)));
+  }
+
+  function renderPeriodPicker() {
+    if (periodType === 'MONTHLY') {
+      return (
+        <input
+          type="month"
+          value={`${periodParts.year}-${periodParts.month}`}
+          onChange={(event) => {
+            const [year, month] = event.target.value.split('-');
+            if (!year || !month) return;
+
+            setPeriodParts({
+              year,
+              month,
+              quarter: String(Math.floor((Number(month) - 1) / 3) + 1),
+            });
+          }}
+          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+        />
+      );
+    }
+
+    if (periodType === 'QUARTERLY') {
+      return (
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={periodParts.year}
+            onChange={(event) =>
+              setPeriodParts((current) => ({
+                ...current,
+                year: event.target.value,
+              }))
+            }
+            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+          >
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={periodParts.quarter}
+            onChange={(event) =>
+              setPeriodParts((current) => ({
+                ...current,
+                quarter: event.target.value,
+              }))
+            }
+            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+          >
+            <option value="1">Quarter 1 (Jan–Mar)</option>
+            <option value="2">Quarter 2 (Apr–Jun)</option>
+            <option value="3">Quarter 3 (Jul–Sep)</option>
+            <option value="4">Quarter 4 (Oct–Dec)</option>
+          </select>
+        </div>
+      );
+    }
+
+    return (
+      <select
+        value={periodParts.year}
+        onChange={(event) =>
+          setPeriodParts((current) => ({
+            ...current,
+            year: event.target.value,
+          }))
+        }
+        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+      >
+        {yearOptions.map((year) => (
+          <option key={year} value={year}>
+            {year}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   function renderActionCell(item: KpiScorecardItem) {
     const showQuickCapture = canManage && item.measurement_id == null;
 
@@ -205,199 +404,212 @@ export default function KpiScorecardClient() {
     );
   }
 
+  const isEmpty = !loading && !!scorecard && scorecard.items.length === 0;
+
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-blue-600">MVP 3.0</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-              KPI Scorecard
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-gray-600">
-              Ringkasan KPI per periode, target vs actual, dan status scorecard tenant.
-            </p>
-          </div>
+      <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-600">MVP 3.0</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                KPI Scorecard
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-gray-600">
+                Ringkasan KPI per periode, target vs actual, dan status scorecard tenant.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/kpis"
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-            >
-              Open KPI Library
-            </Link>
+            <div className="flex flex-wrap justify-end gap-3">
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
+              >
+                Back
+              </Link>
+              <Link
+                href="/kpis"
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
+              >
+                Open KPI Library
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Period Type
-              </label>
-              <select
-                value={periodType}
-                onChange={(event) => {
-                  const nextType = event.target.value as KpiPeriodType;
-                  setPeriodType(nextType);
-                  setPeriodKey(getCurrentPeriodKey(nextType));
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-              >
-                <option value="MONTHLY">Monthly</option>
-                <option value="QUARTERLY">Quarterly</option>
-                <option value="YEARLY">Yearly</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Period Key
-              </label>
-              <input
-                value={periodKey}
-                onChange={(event) => setPeriodKey(event.target.value)}
-                placeholder={
-                  periodType === 'MONTHLY'
-                    ? '2026-04'
-                    : periodType === 'QUARTERLY'
-                    ? '2026-Q2'
-                    : '2026'
-                }
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-              />
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    await loadScorecard(periodType, periodKey);
-                  } catch (error) {
-                    setErrorMessage(getErrorMessage(error));
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="w-full rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                Refresh Scorecard
-              </button>
-            </div>
-          </div>
-
-          {errorMessage && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
-          {scorecard && (
-            <div className="mt-4 text-sm text-gray-600">
-              Period window:{' '}
-              <span className="font-medium text-gray-900">
-                {scorecard.period_start_date}
-              </span>{' '}
-              to{' '}
-              <span className="font-medium text-gray-900">
-                {scorecard.period_end_date}
-              </span>
-            </div>
-          )}
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-            {(summaryCards || []).map((card) => (
-              <div
-                key={card.label}
-                className={`rounded-2xl border p-4 shadow-sm ${card.className}`}
-              >
-                <div className="text-xs uppercase tracking-wide opacity-80">
-                  {card.label}
-                </div>
-                <div className="mt-2 text-3xl font-semibold">{card.value}</div>
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Period Type
+                </label>
+                <select
+                  value={periodType}
+                  onChange={(event) => {
+                    const nextType = event.target.value as KpiPeriodType;
+                    setPeriodType(nextType);
+                    setPeriodParts(
+                      parsePeriodKeyToParts(nextType, getCurrentPeriodKey(nextType))
+                    );
+                  }}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                >
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                  <option value="YEARLY">Yearly</option>
+                </select>
               </div>
-            ))}
-          </div>
 
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-4 py-3">KPI</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Target</th>
-                  <th className="px-4 py-3">Actual</th>
-                  <th className="px-4 py-3">Achievement</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Measured At</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
-                      Loading scorecard...
-                    </td>
-                  </tr>
-                ) : !scorecard || scorecard.items.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
-                      No KPI scorecard rows found for this period.
-                    </td>
-                  </tr>
-                ) : (
-                  scorecard.items.map((item) => (
-                    <tr key={item.kpi_id} className="align-top">
-                      <td className="px-4 py-4">
-                        <div className="font-medium text-gray-900">{item.name}</div>
-                        <div className="mt-1 font-mono text-xs text-gray-500">
-                          {item.code}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.description || '-'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-gray-700">{item.category_code}</td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
-                            item.source_type
-                          )}`}
-                        >
-                          {item.source_type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-gray-700">
-                        {formatKpiValue(item.target_value, item.unit_code)}
-                      </td>
-                      <td className="px-4 py-4 text-gray-700">
-                        {formatKpiValue(item.actual_value, item.unit_code)}
-                      </td>
-                      <td className="px-4 py-4 text-gray-700">
-                        {formatKpiValue(item.achievement_pct, 'PERCENT')}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                            item.status_code
-                          )}`}
-                        >
-                          {item.status_code}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-gray-700">
-                        {formatDateTime(item.measured_at)}
-                      </td>
-                      <td className="px-4 py-4 text-right">{renderActionCell(item)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Period Picker
+                </label>
+                {renderPeriodPicker()}
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      setErrorMessage('');
+                      await loadScorecard(periodType, periodKey);
+                    } catch (error) {
+                      setErrorMessage(getErrorMessage(error));
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="w-full rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
+                >
+                  Refresh Scorecard
+                </button>
+              </div>
+            </div>
+
+            <div className="text-sm text-gray-600">
+              Computed period key:{' '}
+              <span className="font-medium text-gray-900">{periodKey}</span>
+            </div>
+
+            {scorecard && (
+              <div className="text-sm text-gray-600">
+                Period window:{' '}
+                <span className="font-medium text-gray-900">
+                  {scorecard.period_start_date}
+                </span>{' '}
+                to{' '}
+                <span className="font-medium text-gray-900">
+                  {scorecard.period_end_date}
+                </span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+              {(summaryCards || []).map((card) => (
+                <div
+                  key={card.label}
+                  className={`rounded-2xl border p-4 shadow-sm ${card.className}`}
+                >
+                  <div className="text-xs uppercase tracking-wide opacity-80">
+                    {card.label}
+                  </div>
+                  <div className="mt-2 text-3xl font-semibold">{card.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2">
+              {loading ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-12 text-center text-sm text-gray-500">
+                  Loading scorecard...
+                </div>
+              ) : isEmpty ? (
+                <EmptyState
+                  periodType={periodType}
+                  periodKey={periodKey}
+                  onBackToMonthly={handleBackToMonthly}
+                />
+              ) : !scorecard ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-12 text-center text-sm text-gray-500">
+                  No KPI scorecard data available.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                        <th className="px-4 py-3">KPI</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Source</th>
+                        <th className="px-4 py-3">Target</th>
+                        <th className="px-4 py-3">Actual</th>
+                        <th className="px-4 py-3">Achievement</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Measured At</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {scorecard.items.map((item) => (
+                        <tr key={item.kpi_id} className="align-top">
+                          <td className="px-4 py-4">
+                            <div className="font-medium text-gray-900">{item.name}</div>
+                            <div className="mt-1 font-mono text-xs text-gray-500">
+                              {item.code}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              {item.description || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-gray-700">{item.category_code}</td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
+                                item.source_type
+                              )}`}
+                            >
+                              {item.source_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-700">
+                            {formatKpiValue(item.target_value, item.unit_code)}
+                          </td>
+                          <td className="px-4 py-4 text-gray-700">
+                            {formatKpiValue(item.actual_value, item.unit_code)}
+                          </td>
+                          <td className="px-4 py-4 text-gray-700">
+                            {formatKpiValue(item.achievement_pct, 'PERCENT')}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
+                                item.status_code
+                              )}`}
+                            >
+                              {item.status_code}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-700">
+                            {formatDateTime(item.measured_at)}
+                          </td>
+                          <td className="px-4 py-4 text-right">{renderActionCell(item)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -407,9 +619,9 @@ export default function KpiScorecardClient() {
           <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                {captureTarget.source_type === 'SYSTEM'
-                  ? 'Create System Snapshot'
-                  : 'Capture Manual Measurement'}
+                  {captureTarget.source_type === 'SYSTEM'
+                    ? 'Create System Snapshot'
+                    : 'Capture Manual Measurement'}
               </h2>
               <p className="mt-1 text-sm text-gray-500">
                 KPI: <span className="font-medium text-gray-900">{captureTarget.name}</span>

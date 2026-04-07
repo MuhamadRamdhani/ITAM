@@ -406,6 +406,15 @@ export default function AuditEventsPageClient() {
   const canNext = pageFromUrl < totalPages;
   const shownFrom = total === 0 ? 0 : (pageFromUrl - 1) * pageSize + 1;
   const shownTo = total === 0 ? 0 : Math.min(total, pageFromUrl * pageSize);
+  const exportUrl = buildExportUrl({
+    actor: actorInput.trim(),
+    action: actionInput.trim().toUpperCase(),
+    entityType: entityTypeInput.trim().toUpperCase(),
+    entityId: entityIdInput.trim(),
+    dateFrom: dateFromInput.trim(),
+    dateTo: dateToInput.trim(),
+    q: qInput.trim(),
+  });
 
   function applyQuickFilter(next: {
     action?: string;
@@ -475,52 +484,45 @@ export default function AuditEventsPageClient() {
   return (
     <main className="relative z-10">
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Audit Trail</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Record of important system activity (e.g., login, assets, approvals, documents).
-            </p>
-          </div>
+        <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Audit Trail
+              </div>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+                Audit Trail
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+                Record of important system activity (e.g., login, assets, approvals, documents).
+              </p>
+            </div>
 
-          <div className="flex items-center gap-2">
-            {buildExportUrl({
-              actor: actorInput.trim(),
-              action: actionInput.trim().toUpperCase(),
-              entityType: entityTypeInput.trim().toUpperCase(),
-              entityId: entityIdInput.trim(),
-              dateFrom: dateFromInput.trim(),
-              dateTo: dateToInput.trim(),
-              q: qInput.trim(),
-            }) ? (
-              <a
-                href={buildExportUrl({
-                  actor: actorInput.trim(),
-                  action: actionInput.trim().toUpperCase(),
-                  entityType: entityTypeInput.trim().toUpperCase(),
-                  entityId: entityIdInput.trim(),
-                  dateFrom: dateFromInput.trim(),
-                  dateTo: dateToInput.trim(),
-                  q: qInput.trim(),
-                })}
-                target="_blank"
-                rel="noreferrer"
-                className="itam-secondary-action"
+            <div className="flex flex-wrap items-center gap-2 md:self-end">
+              {exportUrl ? (
+                <a
+                  href={exportUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Download JSON
+                </a>
+              ) : null}
+
+              <Link
+                href="/"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
-                Download JSON
-              </a>
-            ) : null}
+                Back
+              </Link>
+            </div>
 
-            <Link
-              href="/"
-              className="itam-secondary-action"
-            >
-              Back
-            </Link>
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="font-semibold text-slate-900">Quick guide</div>
           <div className="mt-1 text-slate-600">
             Event = what happened, Object = what was affected, Details = extra information.
@@ -560,7 +562,7 @@ export default function AuditEventsPageClient() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <form className="grid grid-cols-1 gap-3 lg:grid-cols-4" onSubmit={onSubmitSearch}>
             <input
               value={actorInput}
@@ -780,6 +782,7 @@ export default function AuditEventsPageClient() {
           </div>
         </div>
       </div>
+    </div>
     </main>
   );
 }

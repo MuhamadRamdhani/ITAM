@@ -197,6 +197,19 @@ export async function apiPatchJson<T>(path: string, body: any, options?: FetchOp
   return throwIfErr<T>(res, json);
 }
 
+export async function apiDelete<T>(path: string, options?: FetchOptions): Promise<ApiOk<T> | null> {
+  const { res, json } = await fetchWithAutoRefresh<T>(path, {
+    ...options,
+    method: "DELETE",
+  });
+
+  if (res.ok && json === null) {
+    return null;
+  }
+
+  return throwIfErr<T>(res, json);
+}
+
 export async function apiPostForm<T>(path: string, form: FormData, options?: FetchOptions): Promise<ApiOk<T>> {
   const { res, json } = await fetchWithAutoRefresh<T>(path, {
     ...options,

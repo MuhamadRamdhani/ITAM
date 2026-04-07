@@ -358,34 +358,36 @@ export default function ScopeVersionsPageClient() {
 
   return (
     <main className="relative z-10">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Governance Scope</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              MVP1.6 — scope versions with submit / approve / activate workflow.
-            </p>
-          </div>
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <div className="rounded-3xl border border-white bg-white/80 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                Governance Scope
+              </div>
+              <h1 className="mt-3 text-2xl font-semibold text-gray-900">
+                Governance Scope
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                MVP1.6 - scope versions with submit / approve / activate workflow.
+              </p>
+            </div>
 
-          <Link
-            href="/"
-            className="itam-secondary-action"
-          >
-            Back
-          </Link>
+            <Link href="/" className="itam-secondary-action md:self-end">
+              Back
+            </Link>
           </div>
         </div>
 
-        <div className="mt-8 rounded-3xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+        <div className="mt-16 rounded-3xl border border-white bg-white/80 p-10 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
             <div className="text-base font-semibold text-gray-900">New Scope Version</div>
             <div className="mt-1 text-sm text-gray-600">
               Buat draft scope version baru untuk tenant aktif.
             </div>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-8 space-y-8">
               <div>
                 <div className="text-sm font-medium text-gray-700">Version Note</div>
                 <input
@@ -397,7 +399,7 @@ export default function ScopeVersionsPageClient() {
                 />
               </div>
 
-              <div className="rounded-md border bg-gray-50 p-3">
+              <div className="rounded-md border bg-gray-50 p-6">
                 <div className="text-sm font-semibold text-gray-900">Asset Types in Scope</div>
                 <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                   {assetTypes.map((row) => (
@@ -421,7 +423,7 @@ export default function ScopeVersionsPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-md border bg-gray-50 p-3">
+              <div className="rounded-md border bg-gray-50 p-6">
                 <div className="text-sm font-semibold text-gray-900">Departments in Scope</div>
                 <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                   {departments.map((row) => (
@@ -445,7 +447,7 @@ export default function ScopeVersionsPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-md border bg-gray-50 p-3">
+              <div className="rounded-md border bg-gray-50 p-6">
                 <div className="text-sm font-semibold text-gray-900">Locations in Scope</div>
                 <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                   {locations.map((row) => (
@@ -469,7 +471,7 @@ export default function ScopeVersionsPageClient() {
                 </div>
               </div>
 
-              <div className="rounded-md border bg-gray-50 p-3">
+              <div className="rounded-md border bg-gray-50 p-6">
                 <div className="text-sm font-semibold text-gray-900">Environments</div>
                 <div className="mt-3 flex flex-wrap gap-4">
                   {ENV_OPTIONS.map((env) => (
@@ -531,9 +533,9 @@ export default function ScopeVersionsPageClient() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {STATUSES.map((s) => (
                   <Link

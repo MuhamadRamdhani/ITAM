@@ -335,9 +335,9 @@ export default function AssetMappingReportClient() {
         <div className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-cyan-300/12 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-72 w-72 rounded-full bg-sky-300/8 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            Loading asset report...
-          </div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+          Loading asset report...
+        </div>
         </div>
       </main>
     );
@@ -350,33 +350,33 @@ export default function AssetMappingReportClient() {
       <div className="pointer-events-none absolute bottom-0 left-0 h-72 w-72 rounded-full bg-sky-300/8 blur-3xl" />
 
       <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
-              Asset Report
+        <div className="rounded-3xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                Asset Report
+              </div>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+                Coverage dan mapping
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Coverage dan mapping sudah digabung dalam satu tabel dan satu export Excel.
+              </p>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-              Coverage dan mapping
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Coverage dan mapping sudah digabung dalam satu tabel dan satu export Excel.
-            </p>
+            <div className="flex flex-wrap gap-2 md:self-end">
+              <button
+                type="button"
+                onClick={onExportExcel}
+                disabled={exporting}
+                className="itam-secondary-action"
+              >
+                {exporting ? "Exporting..." : "Export Excel"}
+              </button>
+              <Link href="/" className="itam-secondary-action">
+                Back
+              </Link>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onExportExcel}
-              disabled={exporting}
-              className="itam-secondary-action"
-            >
-              {exporting ? "Exporting..." : "Export Excel"}
-            </button>
-            <Link href="/" className="itam-secondary-action">
-              Back
-            </Link>
-          </div>
-        </div>
         </div>
 
         {err ? (
@@ -385,7 +385,7 @@ export default function AssetMappingReportClient() {
           </div>
         ) : null}
 
-        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <form className="grid grid-cols-1 gap-4 lg:grid-cols-6" onSubmit={onSearchSubmit}>
             <div className="lg:col-span-2">
               <label className="mb-1 block text-sm font-medium text-slate-700">Search</label>
@@ -458,23 +458,23 @@ export default function AssetMappingReportClient() {
           </form>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Mapped Department</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_with_department}</div></div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Mapped Location</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_with_location}</div></div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Mapped Owner</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_with_owner}</div></div>
-          <div className="rounded-3xl border border-cyan-200 bg-cyan-50/40 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Linked Contract Rows</div><div className="mt-2 text-2xl font-semibold tracking-tight text-cyan-800">{summaryLoading ? "-" : summary.rows_with_linked_contract}</div></div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">No Link Rows</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_without_linked_contract}</div></div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">No Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.no_coverage_count}</div></div>
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Mapped Department</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_with_department}</div></div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Mapped Location</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_with_location}</div></div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Mapped Owner</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_with_owner}</div></div>
+          <div className="rounded-3xl border border-cyan-200 bg-cyan-50/40 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Linked Contract Rows</div><div className="mt-2 text-2xl font-semibold tracking-tight text-cyan-800">{summaryLoading ? "-" : summary.rows_with_linked_contract}</div></div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">No Link Rows</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.rows_without_linked_contract}</div></div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">No Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.no_coverage_count}</div></div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-          <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Active Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-emerald-800">{summaryLoading ? "-" : summary.active_count}</div></div>
-          <div className="rounded-3xl border border-amber-200 bg-amber-50/40 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Expiring Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-amber-800">{summaryLoading ? "-" : summary.expiring_count}</div></div>
-          <div className="rounded-3xl border border-rose-200 bg-rose-50/40 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">Expired Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-rose-800">{summaryLoading ? "-" : summary.expired_count}</div></div>
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">No End Date</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.no_end_date_count}</div></div>
+          <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Active Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-emerald-800">{summaryLoading ? "-" : summary.active_count}</div></div>
+          <div className="rounded-3xl border border-amber-200 bg-amber-50/40 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Expiring Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-amber-800">{summaryLoading ? "-" : summary.expiring_count}</div></div>
+          <div className="rounded-3xl border border-rose-200 bg-rose-50/40 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">Expired Coverage</div><div className="mt-2 text-2xl font-semibold tracking-tight text-rose-800">{summaryLoading ? "-" : summary.expired_count}</div></div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">No End Date</div><div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{summaryLoading ? "-" : summary.no_end_date_count}</div></div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
             <div>Total rows: {total}</div>
             <div>

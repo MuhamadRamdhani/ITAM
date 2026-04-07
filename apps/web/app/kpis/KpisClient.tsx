@@ -309,272 +309,287 @@ export default function KpisClient() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-blue-600">MVP 3.0</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-              KPI Library
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-gray-600">
-              Kelola KPI master, target, source manual/system, dan definisi scorecard
-              untuk tenant ini.
-            </p>
-          </div>
+      <div className="mx-auto max-w-7xl px-6 py-10 space-y-8">
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-600">MVP 3.0</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+                KPI Library
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-gray-600">
+                Kelola KPI master, target, source manual/system, dan definisi scorecard
+                untuk tenant ini.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/kpi-scorecard"
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-            >
-              Open Scorecard
-            </Link>
-            {canManage && (
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-black"
+            <div className="flex flex-wrap justify-end gap-3">
+              <Link
+                href="/"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
               >
-                Create KPI
-              </button>
-            )}
+                Back
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <form
-            onSubmit={handleFilterSubmit}
-            className="grid gap-4 md:grid-cols-2 xl:grid-cols-6"
-          >
-            <div className="xl:col-span-2">
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Search
-              </label>
-              <input
-                value={q}
-                onChange={(event) => setQ(event.target.value)}
-                placeholder="Search code or name"
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Category
-              </label>
-              <select
-                value={categoryCode}
-                onChange={(event) => setCategoryCode(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap justify-end gap-3">
+              <Link
+                href="/kpi-scorecard"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
               >
-                <option value="">All</option>
-                {metadata?.category_options.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Source
-              </label>
-              <select
-                value={sourceType}
-                onChange={(event) => setSourceType(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-              >
-                <option value="">All</option>
-                {metadata?.source_types.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Period
-              </label>
-              <select
-                value={periodType}
-                onChange={(event) => setPeriodType(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-              >
-                <option value="">All</option>
-                {metadata?.period_types.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Active
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={isActive}
-                  onChange={(event) => setIsActive(event.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                >
-                  <option value="">All</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
+                Open Scorecard
+              </Link>
+              {canManage && (
                 <button
-                  type="submit"
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+                  type="button"
+                  onClick={openCreateModal}
+                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-black"
                 >
-                  Apply
+                  Create KPI
                 </button>
-              </div>
+              )}
             </div>
-          </form>
 
-          {errorMessage && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
-            </div>
-          )}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <form
+                onSubmit={handleFilterSubmit}
+                className="grid gap-4 md:grid-cols-2 xl:grid-cols-6"
+              >
+                <div className="xl:col-span-2">
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Search
+                  </label>
+                  <input
+                    value={q}
+                    onChange={(event) => setQ(event.target.value)}
+                    placeholder="Search code or name"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                  />
+                </div>
 
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-4 py-3">Code</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Period</th>
-                  <th className="px-4 py-3">Target</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
-                      Loading KPI library...
-                    </td>
-                  </tr>
-                ) : items.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
-                      No KPI found.
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((item) => (
-                    <tr key={item.id} className="align-top">
-                      <td className="px-4 py-4 font-mono text-xs text-gray-700">
-                        {item.code}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="font-medium text-gray-900">{item.name}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.description || '-'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
-                            item.source_type
-                          )}`}
-                        >
-                          {item.source_type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-gray-700">{item.category_code}</td>
-                      <td className="px-4 py-4 text-gray-700">{item.period_type}</td>
-                      <td className="px-4 py-4 text-gray-700">
-                        {formatKpiValue(item.target_value, item.unit_code)}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                            item.is_active
-                              ? 'border border-green-200 bg-green-50 text-green-700'
-                              : 'border border-gray-200 bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {item.is_active ? 'ACTIVE' : 'INACTIVE'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-end gap-2">
-                          <Link
-                            href={`/kpis/${item.id}`}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                          >
-                            Detail
-                          </Link>
-                          {canManage && (
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(item)}
-                              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                            >
-                              Edit
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Category
+                  </label>
+                  <select
+                    value={categoryCode}
+                    onChange={(event) => setCategoryCode(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                  >
+                    <option value="">All</option>
+                    {metadata?.category_options.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Source
+                  </label>
+                  <select
+                    value={sourceType}
+                    onChange={(event) => setSourceType(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                  >
+                    <option value="">All</option>
+                    {metadata?.source_types.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Period
+                  </label>
+                  <select
+                    value={periodType}
+                    onChange={(event) => setPeriodType(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                  >
+                    <option value="">All</option>
+                    {metadata?.period_types.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Active
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={isActive}
+                      onChange={(event) => setIsActive(event.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                    >
+                      <option value="">All</option>
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {errorMessage && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {errorMessage}
+                </div>
+              )}
+
+              <div className="mt-6 overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                      <th className="px-4 py-3">Code</th>
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Source</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Period</th>
+                      <th className="px-4 py-3">Target</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                          Loading KPI library...
+                        </td>
+                      </tr>
+                    ) : items.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                          No KPI found.
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((item) => (
+                        <tr key={item.id} className="align-top">
+                          <td className="px-4 py-4 font-mono text-xs text-gray-700">
+                            {item.code}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="font-medium text-gray-900">{item.name}</div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              {item.description || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
+                                item.source_type
+                              )}`}
+                            >
+                              {item.source_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-700">{item.category_code}</td>
+                          <td className="px-4 py-4 text-gray-700">{item.period_type}</td>
+                          <td className="px-4 py-4 text-gray-700">
+                            {formatKpiValue(item.target_value, item.unit_code)}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                                item.is_active
+                                  ? 'border border-green-200 bg-green-50 text-green-700'
+                                  : 'border border-gray-200 bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {item.is_active ? 'ACTIVE' : 'INACTIVE'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex justify-end gap-2">
+                              <Link
+                                href={`/kpis/${item.id}`}
+                                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                              >
+                                Detail
+                              </Link>
+                              {canManage && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditModal(item)}
+                                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                                >
+                                  Edit
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-          <div className="mt-6 flex items-center justify-between text-sm text-gray-600">
-            <div>
-              Total: <span className="font-medium text-gray-900">{total}</span>
-            </div>
+              <div className="mt-6 flex items-center justify-between text-sm text-gray-600">
+                <div>
+                  Total: <span className="font-medium text-gray-900">{total}</span>
+                </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={loading || page <= 1}
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    await loadPage(page - 1);
-                  } catch (error) {
-                    setErrorMessage(getErrorMessage(error));
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="rounded-xl border border-gray-200 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Prev
-              </button>
-              <span>
-                Page {page} / {Math.max(totalPages, 1)}
-              </span>
-              <button
-                type="button"
-                disabled={loading || page >= totalPages}
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    await loadPage(page + 1);
-                  } catch (error) {
-                    setErrorMessage(getErrorMessage(error));
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="rounded-xl border border-gray-200 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={loading || page <= 1}
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        await loadPage(page - 1);
+                      } catch (error) {
+                        setErrorMessage(getErrorMessage(error));
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="rounded-xl border border-gray-200 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    Page {page} / {Math.max(totalPages, 1)}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={loading || page >= totalPages}
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        await loadPage(page + 1);
+                      } catch (error) {
+                        setErrorMessage(getErrorMessage(error));
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="rounded-xl border border-gray-200 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
