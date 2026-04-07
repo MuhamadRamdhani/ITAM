@@ -10,3 +10,5 @@ Dokumentasi ini disusun langsung dari kode aplikasi yang ada di repo.
 - [Roadmap MVP ITAM SaaS - Final](./roadmap-mvp-itam-saas-final.md)
 - [Mapping Roadmap ke Kode](./roadmap-to-code-mapping.md)
 - [BRS ITAM ISO/IEC 19770-1](./brs-itam-iso-19770-1-formal.md)
+- [Daftar Gap ITAM](./daftar-gap-itam.md)
+- [CAPA DDL](./capa-ddl.sql)

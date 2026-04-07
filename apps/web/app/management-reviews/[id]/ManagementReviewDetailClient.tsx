@@ -13,9 +13,12 @@ import {
   completeManagementReview,
   createManagementReviewActionItem,
   createManagementReviewDecision,
+  deleteManagementReviewActionItem,
+  deleteManagementReviewDecision,
   getManagementReviewDetail,
   updateManagementReview,
   updateManagementReviewActionItem,
+  updateManagementReviewDecision,
 } from '../../lib/management-reviews';
 import {
   IdentityOption,
@@ -76,6 +79,7 @@ type DecisionFormState = {
 };
 
 type ActionItemFormState = {
+  decision_id: string;
   action_no: string;
   title: string;
   description: string;
@@ -87,10 +91,26 @@ type ActionItemFormState = {
   sort_order: string;
 };
 
-type ActionFollowUpDraft = {
+type DecisionEditDraft = {
+  decision_no: string;
+  title: string;
+  decision_text: string;
+  owner_identity_id: string;
+  target_date: string;
+  sort_order: string;
+};
+
+type ActionItemEditDraft = {
+  decision_id: string;
+  action_no: string;
+  title: string;
+  description: string;
+  owner_identity_id: string;
+  due_date: string;
   status: ManagementReviewActionItemStatus;
   progress_notes: string;
   completion_notes: string;
+  sort_order: string;
 };
 
 function formatDate(value: string | null | undefined) {
@@ -175,6 +195,7 @@ function emptyDecisionForm(): DecisionFormState {
 
 function emptyActionItemForm(): ActionItemFormState {
   return {
+    decision_id: '',
     action_no: '',
     title: '',
     description: '',
@@ -187,13 +208,41 @@ function emptyActionItemForm(): ActionItemFormState {
   };
 }
 
+function buildDecisionDrafts(
+  decisions: ManagementReviewDetailResponse['decisions'],
+): Record<number, DecisionEditDraft> {
+  const next: Record<number, DecisionEditDraft> = {};
+  for (const decision of decisions) {
+    next[decision.id] = {
+      decision_no: decision.decision_no ?? '',
+      title: decision.title ?? '',
+      decision_text: decision.decision_text ?? '',
+      owner_identity_id: decision.owner_identity_id
+        ? String(decision.owner_identity_id)
+        : '',
+      target_date: decision.target_date ?? '',
+      sort_order: String(decision.sort_order ?? 0),
+    };
+  }
+  return next;
+}
+
 function buildActionDrafts(items: ManagementReviewActionItem[]) {
-  const next: Record<number, ActionFollowUpDraft> = {};
+  const next: Record<number, ActionItemEditDraft> = {};
   for (const item of items) {
     next[item.id] = {
+      decision_id: item.decision_id ? String(item.decision_id) : '',
+      action_no: item.action_no ?? '',
+      title: item.title ?? '',
+      description: item.description ?? '',
+      owner_identity_id: item.owner_identity_id
+        ? String(item.owner_identity_id)
+        : '',
+      due_date: item.due_date ?? '',
       status: item.status,
       progress_notes: item.progress_notes ?? '',
       completion_notes: item.completion_notes ?? '',
+      sort_order: String(item.sort_order ?? 0),
     };
   }
   return next;
@@ -202,11 +251,15 @@ function buildActionDrafts(items: ManagementReviewActionItem[]) {
 export default function ManagementReviewDetailClient({ reviewId }: Props) {
   const [detail, setDetail] = useState<ManagementReviewDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [savingOverview, setSavingOverview] = useState(false);
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [submittingActionItem, setSubmittingActionItem] = useState(false);
   const [processingSessionAction, setProcessingSessionAction] = useState(false);
+  const [updatingDecisionId, setUpdatingDecisionId] = useState<number | null>(null);
+  const [deletingDecisionId, setDeletingDecisionId] = useState<number | null>(null);
   const [updatingActionItemId, setUpdatingActionItemId] = useState<number | null>(null);
+  const [deletingActionItemId, setDeletingActionItemId] = useState<number | null>(null);
 
   const [identityOptions, setIdentityOptions] = useState<IdentitySelectOption[]>([]);
   const [loadingIdentityOptions, setLoadingIdentityOptions] = useState(true);
@@ -217,7 +270,8 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   const [overviewForm, setOverviewForm] = useState<OverviewFormState>(emptyOverviewForm());
   const [decisionForm, setDecisionForm] = useState<DecisionFormState>(emptyDecisionForm());
   const [actionItemForm, setActionItemForm] = useState<ActionItemFormState>(emptyActionItemForm());
-  const [actionDrafts, setActionDrafts] = useState<Record<number, ActionFollowUpDraft>>({});
+  const [decisionDrafts, setDecisionDrafts] = useState<Record<number, DecisionEditDraft>>({});
+  const [actionDrafts, setActionDrafts] = useState<Record<number, ActionItemEditDraft>>({});
 
   const loadIdentityOptions = useCallback(async () => {
     setLoadingIdentityOptions(true);
@@ -231,43 +285,61 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     }
   }, []);
 
-  const loadDetail = useCallback(async () => {
-    if (!Number.isFinite(reviewId) || reviewId <= 0) {
-      setErrorMessage('Invalid management review id.');
-      setLoading(false);
-      return;
-    }
+  const loadDetail = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      if (!Number.isFinite(reviewId) || reviewId <= 0) {
+        setErrorMessage('Invalid management review id.');
+        setLoading(false);
+        return;
+      }
 
-    setLoading(true);
-    setErrorMessage(null);
+      if (mode === 'initial') setLoading(true);
+      if (mode === 'refresh') setRefreshing(true);
 
-    try {
-      const response = await getManagementReviewDetail(reviewId);
-      setDetail(response);
-      setOverviewForm({
-        session_code: response.session.session_code ?? '',
-        title: response.session.title ?? '',
-        review_date: response.session.review_date ?? '',
-        chairperson_identity_id: response.session.chairperson_identity_id
-          ? String(response.session.chairperson_identity_id)
-          : '',
-        summary: response.session.summary ?? '',
-        minutes: response.session.minutes ?? '',
-        notes: response.session.notes ?? '',
-      });
-      setActionDrafts(buildActionDrafts(response.action_items ?? []));
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-      setDetail(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [reviewId]);
+      setErrorMessage(null);
+
+      try {
+        const response = await getManagementReviewDetail(reviewId);
+        setDetail(response);
+        setOverviewForm({
+          session_code: response.session.session_code ?? '',
+          title: response.session.title ?? '',
+          review_date: response.session.review_date ?? '',
+          chairperson_identity_id: response.session.chairperson_identity_id
+            ? String(response.session.chairperson_identity_id)
+            : '',
+          summary: response.session.summary ?? '',
+          minutes: response.session.minutes ?? '',
+          notes: response.session.notes ?? '',
+        });
+        setDecisionDrafts(buildDecisionDrafts(response.decisions ?? []));
+        setActionDrafts(buildActionDrafts(response.action_items ?? []));
+      } catch (error) {
+        setErrorMessage(getErrorMessage(error));
+        setDetail(null);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [reviewId],
+  );
 
   useEffect(() => {
-    loadDetail();
+    loadDetail('initial');
     loadIdentityOptions();
   }, [loadDetail, loadIdentityOptions]);
+
+  useEffect(() => {
+    if (!successMessage && !errorMessage) return;
+
+    const timer = window.setTimeout(() => {
+      setSuccessMessage(null);
+      setErrorMessage(null);
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [successMessage, errorMessage]);
 
   const session = detail?.session ?? null;
   const summary = detail?.summary ?? null;
@@ -286,6 +358,17 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     return map;
   }, [identityOptions]);
 
+  const decisionLabelMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const decision of decisions) {
+      const label = decision.decision_no?.trim()
+        ? `${decision.decision_no} — ${decision.title}`
+        : decision.title;
+      map.set(decision.id, label);
+    }
+    return map;
+  }, [decisions]);
+
   const getIdentityName = useCallback(
     (identityId: number | null | undefined) => {
       if (!identityId) return '-';
@@ -294,6 +377,16 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
       return `${label} (ID: ${identityId})`;
     },
     [identityMap],
+  );
+
+  const getDecisionName = useCallback(
+    (decisionId: number | null | undefined) => {
+      if (!decisionId) return '-';
+      const label = decisionLabelMap.get(decisionId);
+      if (!label) return `Decision #${decisionId}`;
+      return `${label} (ID: ${decisionId})`;
+    },
+    [decisionLabelMap],
   );
 
   const readOnlyNotice = useMemo(() => {
@@ -305,17 +398,6 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     }
     return null;
   }, [isCancelled, isCompleted]);
-
-  function syncActionDraft(item: ManagementReviewActionItem) {
-    setActionDrafts((current) => ({
-      ...current,
-      [item.id]: {
-        status: item.status,
-        progress_notes: item.progress_notes ?? '',
-        completion_notes: item.completion_notes ?? '',
-      },
-    }));
-  }
 
   async function handleSaveOverview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -339,7 +421,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
       });
 
       setSuccessMessage('Overview updated successfully.');
-      await loadDetail();
+      await loadDetail('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -358,7 +440,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     try {
       await completeManagementReview(session.id);
       setSuccessMessage('Management review session completed successfully.');
-      await loadDetail();
+      await loadDetail('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -381,7 +463,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
         cancel_reason: cancelReason.trim() || null,
       });
       setSuccessMessage('Management review session cancelled successfully.');
-      await loadDetail();
+      await loadDetail('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -412,11 +494,60 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
       await createManagementReviewDecision(session.id, payload);
       setDecisionForm(emptyDecisionForm());
       setSuccessMessage('Decision created successfully.');
-      await loadDetail();
+      await loadDetail('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
       setSubmittingDecision(false);
+    }
+  }
+
+  async function handleUpdateDecision(decisionId: number) {
+    if (!session) return;
+    const draft = decisionDrafts[decisionId];
+    if (!draft) return;
+
+    setUpdatingDecisionId(decisionId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await updateManagementReviewDecision(session.id, decisionId, {
+        decision_no: draft.decision_no.trim() || null,
+        title: draft.title.trim(),
+        decision_text: draft.decision_text.trim(),
+        owner_identity_id: draft.owner_identity_id
+          ? Number(draft.owner_identity_id)
+          : null,
+        target_date: draft.target_date || null,
+        sort_order: Number(draft.sort_order || 0),
+      });
+
+      setSuccessMessage('Decision updated successfully.');
+      await loadDetail('refresh');
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setUpdatingDecisionId(null);
+    }
+  }
+
+  async function handleDeleteDecision(decisionId: number) {
+    if (!session) return;
+    if (!window.confirm('Delete this decision?')) return;
+
+    setDeletingDecisionId(decisionId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteManagementReviewDecision(session.id, decisionId);
+      setSuccessMessage('Decision deleted successfully.');
+      await loadDetail('refresh');
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setDeletingDecisionId(null);
     }
   }
 
@@ -429,6 +560,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     setSuccessMessage(null);
 
     const payload: CreateManagementReviewActionItemPayload = {
+      decision_id: actionItemForm.decision_id ? Number(actionItemForm.decision_id) : null,
       action_no: actionItemForm.action_no.trim() || null,
       title: actionItemForm.title.trim(),
       description: actionItemForm.description.trim() || null,
@@ -444,7 +576,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
       await createManagementReviewActionItem(session.id, payload);
       setActionItemForm(emptyActionItemForm());
       setSuccessMessage('Action item created successfully.');
-      await loadDetail();
+      await loadDetail('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -452,7 +584,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     }
   }
 
-  async function handleUpdateActionFollowUp(item: ManagementReviewActionItem) {
+  async function handleUpdateActionItem(item: ManagementReviewActionItem) {
     if (!session) return;
     const draft = actionDrafts[item.id];
     if (!draft) return;
@@ -462,19 +594,55 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     setSuccessMessage(null);
 
     try {
-      const updated = await updateManagementReviewActionItem(session.id, item.id, {
-        status: draft.status,
-        progress_notes: draft.progress_notes.trim() || null,
-        completion_notes: draft.completion_notes.trim() || null,
-      });
+      if (isDraft) {
+        await updateManagementReviewActionItem(session.id, item.id, {
+          decision_id: draft.decision_id ? Number(draft.decision_id) : null,
+          action_no: draft.action_no.trim() || null,
+          title: draft.title.trim(),
+          description: draft.description.trim() || null,
+          owner_identity_id: Number(draft.owner_identity_id),
+          due_date: draft.due_date,
+          status: draft.status,
+          progress_notes: draft.progress_notes.trim() || null,
+          completion_notes: draft.completion_notes.trim() || null,
+          sort_order: Number(draft.sort_order || 0),
+        });
 
-      syncActionDraft(updated);
-      setSuccessMessage(`Action item ${item.action_no || item.id} updated successfully.`);
-      await loadDetail();
+        setSuccessMessage('Action item updated successfully.');
+      } else {
+        await updateManagementReviewActionItem(session.id, item.id, {
+          status: draft.status,
+          progress_notes: draft.progress_notes.trim() || null,
+          completion_notes: draft.completion_notes.trim() || null,
+        });
+
+        setSuccessMessage(`Action item ${item.action_no || item.id} updated successfully.`);
+      }
+
+      await loadDetail('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
       setUpdatingActionItemId(null);
+    }
+  }
+
+  async function handleDeleteActionItem(actionItemId: number) {
+    if (!session) return;
+    if (!window.confirm('Delete this action item?')) return;
+
+    setDeletingActionItemId(actionItemId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteManagementReviewActionItem(session.id, actionItemId);
+      setSuccessMessage('Action item deleted successfully.');
+      await loadDetail('refresh');
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setDeletingActionItemId(null);
     }
   }
 
@@ -542,6 +710,15 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => loadDetail('refresh')}
+              disabled={loading || refreshing}
+              className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+
             {isDraft ? (
               <>
                 <button
@@ -815,38 +992,211 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
           <div className="px-5 py-5">
             {decisions.length === 0 ? (
-              <div className="mb-5 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-500">
-                No decisions have been recorded yet.
+              <div className="mb-5 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center">
+                <div className="text-base font-medium text-gray-900">
+                  No decisions have been recorded yet
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Add management review decisions to document direction, approvals, and follow-up intent.
+                </p>
               </div>
             ) : (
               <div className="mb-6 space-y-4">
-                {decisions.map((decision) => (
-                  <div
-                    key={decision.id}
-                    className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">
-                          {decision.decision_no || `Decision #${decision.id}`}
+                {decisions.map((decision) => {
+                  const draft = decisionDrafts[decision.id] ?? {
+                    decision_no: decision.decision_no ?? '',
+                    title: decision.title ?? '',
+                    decision_text: decision.decision_text ?? '',
+                    owner_identity_id: decision.owner_identity_id
+                      ? String(decision.owner_identity_id)
+                      : '',
+                    target_date: decision.target_date ?? '',
+                    sort_order: String(decision.sort_order ?? 0),
+                  };
+
+                  return (
+                    <div
+                      key={decision.id}
+                      className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                    >
+                      {isDraft ? (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Decision No
+                            </label>
+                            <input
+                              value={draft.decision_no}
+                              onChange={(event) =>
+                                setDecisionDrafts((current) => ({
+                                  ...current,
+                                  [decision.id]: {
+                                    ...draft,
+                                    decision_no: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Owner
+                            </label>
+                            <select
+                              value={draft.owner_identity_id}
+                              disabled={loadingIdentityOptions}
+                              onChange={(event) =>
+                                setDecisionDrafts((current) => ({
+                                  ...current,
+                                  [decision.id]: {
+                                    ...draft,
+                                    owner_identity_id: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50"
+                            >
+                              <option value="">Select owner</option>
+                              {identityOptions.map((option) => (
+                                <option key={option.id} value={String(option.id)}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Title
+                            </label>
+                            <input
+                              value={draft.title}
+                              onChange={(event) =>
+                                setDecisionDrafts((current) => ({
+                                  ...current,
+                                  [decision.id]: {
+                                    ...draft,
+                                    title: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Decision Text
+                            </label>
+                            <textarea
+                              rows={4}
+                              value={draft.decision_text}
+                              onChange={(event) =>
+                                setDecisionDrafts((current) => ({
+                                  ...current,
+                                  [decision.id]: {
+                                    ...draft,
+                                    decision_text: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Target Date
+                            </label>
+                            <input
+                              type="date"
+                              value={draft.target_date}
+                              onChange={(event) =>
+                                setDecisionDrafts((current) => ({
+                                  ...current,
+                                  [decision.id]: {
+                                    ...draft,
+                                    target_date: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Sort Order
+                            </label>
+                            <input
+                              type="number"
+                              value={draft.sort_order}
+                              onChange={(event) =>
+                                setDecisionDrafts((current) => ({
+                                  ...current,
+                                  [decision.id]: {
+                                    ...draft,
+                                    sort_order: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2 flex justify-between gap-3">
+                            <button
+                              type="button"
+                              disabled={deletingDecisionId === decision.id}
+                              onClick={() => handleDeleteDecision(decision.id)}
+                              className="inline-flex items-center rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {deletingDecisionId === decision.id
+                                ? 'Deleting...'
+                                : 'Delete Decision'}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={updatingDecisionId === decision.id}
+                              onClick={() => handleUpdateDecision(decision.id)}
+                              className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {updatingDecisionId === decision.id
+                                ? 'Updating...'
+                                : 'Save Decision'}
+                            </button>
+                          </div>
                         </div>
-                        <div className="mt-1 text-base text-gray-800">{decision.title}</div>
-                      </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">
+                                {decision.decision_no || `Decision #${decision.id}`}
+                              </div>
+                              <div className="mt-1 text-base text-gray-800">{decision.title}</div>
+                            </div>
 
-                      <div className="text-xs text-gray-500">
-                        Target Date: {formatDate(decision.target_date)}
-                      </div>
+                            <div className="text-xs text-gray-500">
+                              Target Date: {formatDate(decision.target_date)}
+                            </div>
+                          </div>
+
+                          <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">
+                            {decision.decision_text}
+                          </p>
+
+                          <div className="mt-3 text-xs text-gray-500">
+                            Owner: {getIdentityName(decision.owner_identity_id)}
+                          </div>
+                        </>
+                      )}
                     </div>
-
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">
-                      {decision.decision_text}
-                    </p>
-
-                    <div className="mt-3 text-xs text-gray-500">
-                      Owner: {getIdentityName(decision.owner_identity_id)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -988,16 +1338,30 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
           <div className="px-5 py-5">
             {actionItems.length === 0 ? (
-              <div className="mb-5 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-500">
-                No action items have been recorded yet.
+              <div className="mb-5 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center">
+                <div className="text-base font-medium text-gray-900">
+                  No action items have been recorded yet
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Add action items to track ownership, due dates, and completion progress from this review session.
+                </p>
               </div>
             ) : (
               <div className="mb-6 space-y-4">
                 {actionItems.map((item) => {
                   const draft = actionDrafts[item.id] ?? {
+                    decision_id: item.decision_id ? String(item.decision_id) : '',
+                    action_no: item.action_no ?? '',
+                    title: item.title ?? '',
+                    description: item.description ?? '',
+                    owner_identity_id: item.owner_identity_id
+                      ? String(item.owner_identity_id)
+                      : '',
+                    due_date: item.due_date ?? '',
                     status: item.status,
                     progress_notes: item.progress_notes ?? '',
                     completion_notes: item.completion_notes ?? '',
+                    sort_order: String(item.sort_order ?? 0),
                   };
 
                   return (
@@ -1032,6 +1396,10 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                               {item.description}
                             </p>
                           ) : null}
+
+                          <div className="mt-2 text-xs text-gray-500">
+                            Linked Decision: {getDecisionName(item.decision_id)}
+                          </div>
                         </div>
 
                         <div className="text-sm text-gray-600 md:text-right">
@@ -1041,7 +1409,254 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                         </div>
                       </div>
 
-                      {isCompleted ? (
+                      {isDraft ? (
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Linked Decision
+                            </label>
+                            <select
+                              value={draft.decision_id}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    decision_id: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            >
+                              <option value="">No linked decision</option>
+                              {decisions.map((decision) => {
+                                const label = decision.decision_no?.trim()
+                                  ? `${decision.decision_no} — ${decision.title}`
+                                  : decision.title;
+
+                                return (
+                                  <option key={decision.id} value={String(decision.id)}>
+                                    {label}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Action No
+                            </label>
+                            <input
+                              value={draft.action_no}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    action_no: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Owner
+                            </label>
+                            <select
+                              value={draft.owner_identity_id}
+                              disabled={loadingIdentityOptions}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    owner_identity_id: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50"
+                            >
+                              <option value="">Select owner</option>
+                              {identityOptions.map((option) => (
+                                <option key={option.id} value={String(option.id)}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Due Date
+                            </label>
+                            <input
+                              type="date"
+                              value={draft.due_date}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    due_date: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Title
+                            </label>
+                            <input
+                              value={draft.title}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    title: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Description
+                            </label>
+                            <textarea
+                              rows={4}
+                              value={draft.description}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    description: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Status
+                            </label>
+                            <select
+                              value={draft.status}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    status: event.target.value as ManagementReviewActionItemStatus,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            >
+                              <option value="OPEN">OPEN</option>
+                              <option value="IN_PROGRESS">IN_PROGRESS</option>
+                              <option value="DONE">DONE</option>
+                              <option value="CANCELLED">CANCELLED</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Sort Order
+                            </label>
+                            <input
+                              type="number"
+                              value={draft.sort_order}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    sort_order: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Progress Notes
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={draft.progress_notes}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    progress_notes: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                              Completion Notes
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={draft.completion_notes}
+                              onChange={(event) =>
+                                setActionDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...draft,
+                                    completion_notes: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2 flex justify-between gap-3">
+                            <button
+                              type="button"
+                              disabled={deletingActionItemId === item.id}
+                              onClick={() => handleDeleteActionItem(item.id)}
+                              className="inline-flex items-center rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {deletingActionItemId === item.id
+                                ? 'Deleting...'
+                                : 'Delete Action Item'}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={updatingActionItemId === item.id}
+                              onClick={() => handleUpdateActionItem(item)}
+                              className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {updatingActionItemId === item.id
+                                ? 'Updating...'
+                                : 'Save Action Item'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : isCompleted ? (
                         <div className="mt-4 grid gap-4 md:grid-cols-3">
                           <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -1111,7 +1726,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                             <button
                               type="button"
                               disabled={updatingActionItemId === item.id}
-                              onClick={() => handleUpdateActionFollowUp(item)}
+                              onClick={() => handleUpdateActionItem(item)}
                               className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {updatingActionItemId === item.id
@@ -1145,6 +1760,35 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
             {isDraft ? (
               <form onSubmit={handleCreateActionItem} className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Linked Decision
+                  </label>
+                  <select
+                    value={actionItemForm.decision_id}
+                    onChange={(event) =>
+                      setActionItemForm((current) => ({
+                        ...current,
+                        decision_id: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                  >
+                    <option value="">No linked decision</option>
+                    {decisions.map((decision) => {
+                      const label = decision.decision_no?.trim()
+                        ? `${decision.decision_no} — ${decision.title}`
+                        : decision.title;
+
+                      return (
+                        <option key={decision.id} value={String(decision.id)}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Action No
@@ -1187,42 +1831,6 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                   </select>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Title
-                  </label>
-                  <input
-                    required
-                    value={actionItemForm.title}
-                    onChange={(event) =>
-                      setActionItemForm((current) => ({
-                        ...current,
-                        title: event.target.value,
-                      }))
-                    }
-                    placeholder="Action item title"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Description
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={actionItemForm.description}
-                    onChange={(event) =>
-                      setActionItemForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                    placeholder="Describe the required follow-up action"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                  />
-                </div>
-
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Due Date
@@ -1260,6 +1868,42 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                     <option value="DONE">DONE</option>
                     <option value="CANCELLED">CANCELLED</option>
                   </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Title
+                  </label>
+                  <input
+                    required
+                    value={actionItemForm.title}
+                    onChange={(event) =>
+                      setActionItemForm((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    placeholder="Action item title"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Description
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={actionItemForm.description}
+                    onChange={(event) =>
+                      setActionItemForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    placeholder="Describe the required follow-up action"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                  />
                 </div>
 
                 <div>

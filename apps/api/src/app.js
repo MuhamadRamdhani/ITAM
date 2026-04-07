@@ -38,6 +38,7 @@ import softwareAssignmentsRoutes from "./modules/software-assignments/routes.js"
 import softwareEntitlementsRoutes from "./modules/software-entitlements/routes.js";
 import softwareEntitlementAllocationsRoutes from "./modules/software-entitlement-allocations/routes.js";
 import assetTransferRoutes from "./modules/asset-transfer/asset-transfer.routes.js";
+import capaRoutes from "./modules/capa/capa.routes.js";
 import kpiRoutes from "./modules/kpi/kpi.routes.js";
 import internalAuditRoutes from './modules/internal-audits/internal-audit.routes.js';
 import managementReviewRoutes from './modules/management-review/management-review.routes.js';
@@ -113,6 +114,7 @@ export async function buildApp() {
   await app.register(softwareEntitlementsRoutes, { prefix: "/api/v1/contracts" });
   await app.register(softwareEntitlementAllocationsRoutes, { prefix: "/api/v1/software-entitlements" });
   await app.register(assetTransferRoutes, { prefix: "/api/v1/asset-transfer-requests" });
+  await app.register(capaRoutes, { prefix: "/api/v1/capa" });
   await app.register(kpiRoutes, { prefix: "/api/v1/kpis" });
   await app.register(internalAuditRoutes, { prefix: "/api/v1/internal-audits"});
   await app.register(managementReviewRoutes, { prefix: "/api/v1/management-reviews" });

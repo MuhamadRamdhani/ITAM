@@ -61,8 +61,8 @@ Dokumen ini menunjukkan bagaimana roadmap MVP ITAM SaaS kamu sudah tercermin di 
 | KPI scorecard | DONE | `apps/web/app/kpi-scorecard/KpiScorecardClient.tsx`, `apps/web/app/lib/kpi.ts` |
 | KPI trend / measurement | DONE | `apps/api/src/modules/kpi/kpi.routes.js`, helper logic di `apps/web/app/lib/kpi.ts` |
 | Internal audit module | PARTIAL | `apps/api/src/modules/internal-audits/internal-audit.routes.js`, `apps/api/src/modules/internal-audits/internal-audit.service.js`, `apps/api/src/modules/internal-audits/internal-audit.repo.js`, `apps/api/src/modules/internal-audits/internal-audit.schemas.js`, `apps/web/app/internal-audits/InternalAuditsClient.tsx`, `apps/web/app/internal-audits/[id]/InternalAuditDetailClient.tsx` |
-| Management review | NOT SEEN | belum terlihat sebagai modul dedicated |
-| CAPA workflow | NOT SEEN | belum terlihat sebagai modul dedicated |
+| Management review | PARTIAL | `apps/api/src/modules/management-review/management-review.routes.js`, `apps/api/src/modules/management-review/management-review.service.js`, `apps/api/src/modules/management-review/management-review.repo.js`, `apps/api/src/modules/management-review/management-review.schema.js`, `apps/web/app/management-reviews/ManagementReviewsClient.tsx`, `apps/web/app/management-reviews/[id]/ManagementReviewDetailClient.tsx`, `apps/web/app/management-reviews/action-items/ManagementReviewActionTrackerClient.tsx` |
+| CAPA workflow | PARTIAL | `apps/api/src/modules/capa/capa.routes.js`, `apps/api/src/modules/capa/capa.service.js`, `apps/api/src/modules/capa/capa.repo.js`, `apps/api/src/modules/capa/capa.schemas.js`, `apps/web/app/capa/CapaClient.tsx`, `apps/web/app/capa/[id]/CapaDetailClient.tsx`, `docs/capa-ddl.sql` |
 
 ## Governance Maturity Layer
 

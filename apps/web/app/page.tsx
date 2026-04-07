@@ -201,11 +201,20 @@ export default function HomePage() {
                 desc="MVP2.0 software product registry"
                 href="/software-products"
               />
-
               <Card
                 title="Internal Audits"
-                desc="MVP2.0 internal audit register + schedule"
+                desc="MVP3.1 internal audit register + schedule"
                 href="/internal-audits"
+              />
+              <Card
+                title="Management Review"
+                desc="MVP3.2 session, minutes, decisions, dan action tracker"
+                href="/management-reviews"
+              />
+              <Card
+                title="CAPA"
+                desc="MVP3.3 corrective and preventive action workflow"
+                href="/capa"
               />
 
               <KpiCardsLauncher />
@@ -285,6 +294,12 @@ export default function HomePage() {
                 href="/audit-events"
               >
                 Audit Events
+              </Link>
+              <Link
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-900"
+                href="/management-reviews"
+              >
+                Management Review
               </Link>
 
               <KpiQuickLinks />

@@ -43,7 +43,7 @@ Legenda:
 | KPI library, scorecard, trend | SUDAH | KPI module dan scorecard sudah ada |
 | Internal audit module | SEDANG BERJALAN | Modul ada, tetapi belum menjadi lifecycle audit yang penuh |
 | Management review | BELUM | Belum terlihat sebagai modul khusus |
-| CAPA workflow | BELUM | Belum terlihat sebagai modul khusus |
+| CAPA workflow | SEDANG BERJALAN | Fondasi module sudah ada, tinggal hardening dan linkage lintas modul |
 | Policy management, RACI, risk register, training matrix | BELUM | Belum terlihat sebagai modul governance maturity |
 | Discovery, ingestion, reconciliation, SCIM, webhooks | BELUM | Belum terlihat sebagai integrasi/scale layer |
 
@@ -505,7 +505,7 @@ FE:
 - Checklist page
 - Findings page
 
-### MVP 3.2 - Management Review [BELUM]
+### MVP 3.2 - Management Review [SEDANG BERJALAN]
 
 Scope:
 
@@ -520,7 +520,7 @@ FE:
 - Meeting minutes
 - Action tracker
 
-### MVP 3.3 - CAPA Workflow [BELUM]
+### MVP 3.3 - CAPA Workflow [SEDANG BERJALAN]
 
 Scope:
 

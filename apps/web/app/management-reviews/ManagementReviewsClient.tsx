@@ -9,20 +9,55 @@ import {
   createManagementReview,
   listManagementReviews,
 } from '../lib/management-reviews';
+import {
+  IdentityOption,
+  getIdentityLabel,
+  listIdentityOptions,
+} from '../lib/internal-audits';
 
 type CreateFormState = {
   session_code: string;
   title: string;
   review_date: string;
+  chairperson_identity_id: string;
   summary: string;
   minutes: string;
   notes: string;
+};
+
+type IdentitySelectOption = {
+  id: number;
+  label: string;
 };
 
 const PAGE_SIZE = 10;
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeIdentityOptions(input: unknown): IdentitySelectOption[] {
+  const rawItems = Array.isArray(input)
+    ? input
+    : Array.isArray((input as { items?: unknown[] } | null)?.items)
+      ? ((input as { items?: unknown[] }).items ?? [])
+      : [];
+
+  return rawItems
+    .map((item) => {
+      const raw = item as IdentityOption & { id?: string | number };
+      const id = Number(raw.id);
+
+      if (!Number.isFinite(id) || id <= 0) {
+        return null;
+      }
+
+      return {
+        id,
+        label: getIdentityLabel(raw),
+      };
+    })
+    .filter((item): item is IdentitySelectOption => item !== null);
 }
 
 function formatDate(value: string | null | undefined) {
@@ -60,12 +95,17 @@ export default function ManagementReviewsClient() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const [identityOptions, setIdentityOptions] = useState<IdentitySelectOption[]>([]);
+  const [loadingIdentityOptions, setLoadingIdentityOptions] = useState(true);
+
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ManagementReviewSessionStatus | ''>('');
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -74,40 +114,88 @@ export default function ManagementReviewsClient() {
     session_code: '',
     title: '',
     review_date: getTodayDate(),
+    chairperson_identity_id: '',
     summary: '',
     minutes: '',
     notes: '',
   });
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage(null);
-
+  const loadIdentityOptions = useCallback(async () => {
+    setLoadingIdentityOptions(true);
     try {
-      const response = await listManagementReviews({
-        q: search || undefined,
-        status: status || undefined,
-        page,
-        page_size: PAGE_SIZE,
-      });
-
-      setItems(response.items ?? []);
-      setPage(response.page ?? 1);
-      setTotalPages(response.total_pages ?? 1);
-      setTotal(response.total ?? 0);
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-      setItems([]);
-      setTotal(0);
-      setTotalPages(1);
+      const result = await listIdentityOptions();
+      setIdentityOptions(normalizeIdentityOptions(result));
+    } catch {
+      setIdentityOptions([]);
     } finally {
-      setLoading(false);
+      setLoadingIdentityOptions(false);
     }
-  }, [page, search, status]);
+  }, []);
+
+  const loadData = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      if (mode === 'initial') setLoading(true);
+      if (mode === 'refresh') setRefreshing(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await listManagementReviews({
+          q: search || undefined,
+          status: status || undefined,
+          page,
+          page_size: PAGE_SIZE,
+        });
+
+        setItems(response.items ?? []);
+        setPage(response.page ?? 1);
+        setTotalPages(response.total_pages ?? 1);
+        setTotal(response.total ?? 0);
+      } catch (error) {
+        setErrorMessage(getErrorMessage(error));
+        setItems([]);
+        setTotal(0);
+        setTotalPages(1);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [page, search, status],
+  );
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData('initial');
+    loadIdentityOptions();
+  }, [loadData, loadIdentityOptions]);
+
+  useEffect(() => {
+    if (!successMessage && !errorMessage) return;
+
+    const timer = window.setTimeout(() => {
+      setSuccessMessage(null);
+      setErrorMessage(null);
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [successMessage, errorMessage]);
+
+  const identityMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const option of identityOptions) {
+      map.set(option.id, option.label);
+    }
+    return map;
+  }, [identityOptions]);
+
+  const getIdentityName = useCallback(
+    (identityId: number | null | undefined) => {
+      if (!identityId) return '-';
+      const label = identityMap.get(identityId);
+      if (!label) return `Identity #${identityId}`;
+      return `${label} (ID: ${identityId})`;
+    },
+    [identityMap],
+  );
 
   const draftCount = useMemo(
     () => items.filter((item) => item.status === 'DRAFT').length,
@@ -129,6 +217,7 @@ export default function ManagementReviewsClient() {
       session_code: '',
       title: '',
       review_date: getTodayDate(),
+      chairperson_identity_id: '',
       summary: '',
       minutes: '',
       notes: '',
@@ -168,6 +257,9 @@ export default function ManagementReviewsClient() {
       session_code: createForm.session_code.trim(),
       title: createForm.title.trim(),
       review_date: createForm.review_date,
+      chairperson_identity_id: createForm.chairperson_identity_id
+        ? Number(createForm.chairperson_identity_id)
+        : null,
       summary: createForm.summary.trim() || null,
       minutes: createForm.minutes.trim() || null,
       notes: createForm.notes.trim() || null,
@@ -179,7 +271,7 @@ export default function ManagementReviewsClient() {
       resetCreateForm();
       setSuccessMessage('Management review session created successfully.');
       setPage(1);
-      await loadData();
+      await loadData('refresh');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -202,12 +294,22 @@ export default function ManagementReviewsClient() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => loadData('refresh')}
+              disabled={loading || refreshing}
+              className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+
             <Link
               href="/management-reviews/action-items"
               className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
             >
               Open Action Tracker
             </Link>
+
             <button
               type="button"
               onClick={openCreateModal}
@@ -322,10 +424,28 @@ export default function ManagementReviewsClient() {
           </div>
 
           {loading ? (
-            <div className="px-5 py-10 text-sm text-gray-500">Loading management reviews...</div>
-          ) : items.length === 0 ? (
             <div className="px-5 py-10 text-sm text-gray-500">
-              No management review sessions found.
+              Loading management reviews...
+            </div>
+          ) : items.length === 0 ? (
+            <div className="px-5 py-12">
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
+                <div className="text-base font-medium text-gray-900">
+                  No management review sessions found
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Try changing the filter, or create a new management review session.
+                </p>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                  >
+                    Create Session
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -334,6 +454,7 @@ export default function ManagementReviewsClient() {
                   <tr className="text-left text-gray-600">
                     <th className="px-5 py-3 font-medium">Session</th>
                     <th className="px-5 py-3 font-medium">Review Date</th>
+                    <th className="px-5 py-3 font-medium">Chairperson</th>
                     <th className="px-5 py-3 font-medium">Status</th>
                     <th className="px-5 py-3 font-medium">Action Items</th>
                     <th className="px-5 py-3 font-medium">Summary</th>
@@ -350,6 +471,10 @@ export default function ManagementReviewsClient() {
 
                       <td className="px-5 py-4 text-gray-700">
                         {formatDate(item.review_date)}
+                      </td>
+
+                      <td className="px-5 py-4 text-gray-700">
+                        {getIdentityName(item.chairperson_identity_id)}
                       </td>
 
                       <td className="px-5 py-4">
@@ -495,6 +620,30 @@ export default function ManagementReviewsClient() {
                     placeholder="Management Review Q2 2026"
                     className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Chairperson
+                  </label>
+                  <select
+                    value={createForm.chairperson_identity_id}
+                    disabled={loadingIdentityOptions}
+                    onChange={(event) =>
+                      setCreateForm((current) => ({
+                        ...current,
+                        chairperson_identity_id: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50"
+                  >
+                    <option value="">Select chairperson</option>
+                    {identityOptions.map((option) => (
+                      <option key={option.id} value={String(option.id)}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="md:col-span-2">
