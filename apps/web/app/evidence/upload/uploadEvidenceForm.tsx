@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { apiPostForm } from "../../lib/api";
+import { apiGet, apiPostForm } from "../../lib/api";
 import { useGlobalLoading } from "../../components/GlobalLoadingProvider";
+import { canManageEvidence } from "../../lib/evidenceAccess";
 
 type UploadResp = {
   file: {
@@ -15,6 +16,16 @@ type UploadResp = {
     storage_path: string;
     created_at: string;
   };
+};
+
+type MeData = {
+  roles: string[];
+};
+
+type ApiMeResponse = {
+  data?: {
+    data?: MeData;
+  } | MeData;
 };
 
 const MAX_FILES = 5;
@@ -29,6 +40,33 @@ export default function UploadEvidenceForm() {
   const [err, setErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progressText, setProgressText] = useState<string | null>(null);
+  const [gateReady, setGateReady] = useState(false);
+  const [canUpload, setCanUpload] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMe() {
+      try {
+        const res = await apiGet<ApiMeResponse>("/api/v1/auth/me");
+        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+        if (!mounted) return;
+        setCanUpload(canManageEvidence(me?.roles ?? []));
+      } catch {
+        if (!mounted) return;
+        setCanUpload(false);
+      } finally {
+        if (!mounted) return;
+        setGateReady(true);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function onPickFiles(list: FileList | null) {
     if (submitting) return;
@@ -83,8 +121,6 @@ export default function UploadEvidenceForm() {
     setSubmitting(true);
     show("Uploading...");
 
-    let shouldHideOverlay = true;
-
     try {
       for (let i = 0; i < files.length; i += 1) {
         const f = files[i];
@@ -96,20 +132,34 @@ export default function UploadEvidenceForm() {
         await apiPostForm<UploadResp>("/api/v1/evidence/files", fd);
       }
 
-      shouldHideOverlay = false;
-      router.push("/evidence");
+      router.replace(`/evidence?uploaded_at=${Date.now()}`);
       router.refresh();
-    } catch (eAny: any) {
-      setErr(eAny?.message || "Upload gagal");
+    } catch (error) {
+      const e = error as { message?: string };
+      setErr(e?.message || "Upload gagal");
     } finally {
       inFlightRef.current = false;
       setSubmitting(false);
       setProgressText(null);
-
-      if (shouldHideOverlay) {
-        hide();
-      }
+      hide();
     }
+  }
+
+  if (!gateReady) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        Loading permission...
+      </div>
+    );
+  }
+
+  if (!canUpload) {
+    return (
+      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        Kamu hanya bisa melihat evidence library. Upload evidence dibatasi untuk TENANT_ADMIN,
+        ITAM_MANAGER, dan ASSET_CUSTODIAN.
+      </div>
+    );
   }
 
   return (

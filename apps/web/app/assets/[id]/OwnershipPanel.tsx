@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPostJson } from "../../lib/api";
+import {
+  displayLookup,
+  parseActiveScopeJson,
+  resolveLookupLabel,
+  resolveScopedLookupLabel,
+  lookupMatchesScope,
+} from "../../lib/governanceScope";
 
 type LookupItem = {
   id: number;
@@ -29,12 +36,13 @@ type OwnershipHistoryData = {
   items: OwnershipHistoryItem[];
 };
 
+type ActiveScopeVersionItem = {
+  version_no?: number | string | null;
+  scope_json?: unknown;
+};
+
 function extractItems(json: any) {
   return json?.data?.items ?? json?.items ?? [];
-}
-
-function displayLookup(x: LookupItem) {
-  return x.name || x.label || x.display_name || x.email || `#${x.id}`;
 }
 
 export default function OwnershipPanel(props: {
@@ -42,6 +50,7 @@ export default function OwnershipPanel(props: {
   currentOwnerDepartmentId: number | null;
   currentCustodianIdentityId: number | null;
   currentLocationId: number | null;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
 
@@ -53,18 +62,15 @@ export default function OwnershipPanel(props: {
   const [saving, setSaving] = useState(false);
   const [modalErr, setModalErr] = useState<string | null>(null);
 
-  const [deptQ, setDeptQ] = useState("");
-  const [idenQ, setIdenQ] = useState("");
-  const [locQ, setLocQ] = useState("");
-
   const [deptOptions, setDeptOptions] = useState<LookupItem[]>([]);
   const [idenOptions, setIdenOptions] = useState<LookupItem[]>([]);
   const [locOptions, setLocOptions] = useState<LookupItem[]>([]);
+  const [activeScopeDepartmentTokens, setActiveScopeDepartmentTokens] = useState<string[]>([]);
+  const [activeScopeLocationTokens, setActiveScopeLocationTokens] = useState<string[]>([]);
 
   const [ownerDepartmentId, setOwnerDepartmentId] = useState<number | "">("");
   const [custodianIdentityId, setCustodianIdentityId] = useState<number | "">("");
   const [locationId, setLocationId] = useState<number | "">("");
-  const [reason, setReason] = useState("");
 
   async function loadHistory() {
     try {
@@ -98,16 +104,30 @@ export default function OwnershipPanel(props: {
   }
 
   async function loadLookup(
-    kind: "departments" | "identities" | "locations",
-    q: string
+    kind: "departments" | "identities" | "locations"
   ) {
     const qs = new URLSearchParams();
-    if (q.trim()) qs.set("q", q.trim());
     qs.set("page", "1");
     qs.set("page_size", "50");
 
     const json = await apiGet<any>(`/api/v1/${kind}?${qs.toString()}`);
     return extractItems(json) as LookupItem[];
+  }
+
+  async function loadActiveScope() {
+    const json = await apiGet<{ items: ActiveScopeVersionItem[] }>(
+      "/api/v1/governance/scope/versions?status=ACTIVE&page=1&page_size=1"
+    );
+
+    const items =
+      (json as any)?.data?.items ??
+      (json as any)?.data?.data?.items ??
+      [];
+
+    const active = Array.isArray(items) ? items[0] ?? null : null;
+    const parsed = parseActiveScopeJson(active?.scope_json, active?.version_no ?? null);
+    setActiveScopeDepartmentTokens(parsed.departmentTokens);
+    setActiveScopeLocationTokens(parsed.locationTokens);
   }
 
   useEffect(() => {
@@ -118,7 +138,6 @@ export default function OwnershipPanel(props: {
     if (!open) return;
 
     setModalErr(null);
-    setReason("");
 
     setOwnerDepartmentId(props.currentOwnerDepartmentId ?? "");
     setCustodianIdentityId(props.currentCustodianIdentityId ?? "");
@@ -127,10 +146,11 @@ export default function OwnershipPanel(props: {
     (async () => {
       try {
         const [d, i, l] = await Promise.all([
-          loadLookup("departments", ""),
-          loadLookup("identities", ""),
-          loadLookup("locations", ""),
+          loadLookup("departments"),
+          loadLookup("identities"),
+          loadLookup("locations"),
         ]);
+        await loadActiveScope();
         setDeptOptions(d);
         setIdenOptions(i);
         setLocOptions(l);
@@ -149,35 +169,42 @@ export default function OwnershipPanel(props: {
     })();
   }, [open, props.currentOwnerDepartmentId, props.currentCustodianIdentityId, props.currentLocationId, router]);
 
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      try {
-        const d = await loadLookup("departments", deptQ);
-        setDeptOptions(d);
-      } catch {}
-    })();
-  }, [deptQ, open]);
+  const visibleDeptOptions = activeScopeDepartmentTokens.length
+    ? deptOptions.filter((item) => lookupMatchesScope(item, activeScopeDepartmentTokens))
+    : deptOptions;
 
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      try {
-        const i = await loadLookup("identities", idenQ);
-        setIdenOptions(i);
-      } catch {}
-    })();
-  }, [idenQ, open]);
+  const visibleLocOptions = activeScopeLocationTokens.length
+    ? locOptions.filter((item) => lookupMatchesScope(item, activeScopeLocationTokens))
+    : locOptions;
 
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      try {
-        const l = await loadLookup("locations", locQ);
-        setLocOptions(l);
-      } catch {}
-    })();
-  }, [locQ, open]);
+  const currentOwnerLabel = resolveScopedLookupLabel(
+    visibleDeptOptions,
+    props.currentOwnerDepartmentId,
+    activeScopeDepartmentTokens
+  );
+  const currentCustodianLabel = resolveLookupLabel(idenOptions, props.currentCustodianIdentityId);
+  const currentLocationLabel = resolveScopedLookupLabel(
+    visibleLocOptions,
+    props.currentLocationId,
+    activeScopeLocationTokens
+  );
+  const currentOwnerDepartmentItem = deptOptions.find(
+    (item) => Number(item.id) === Number(props.currentOwnerDepartmentId)
+  );
+  const currentLocationItem = locOptions.find(
+    (item) => Number(item.id) === Number(props.currentLocationId)
+  );
+
+  const ownerOutOfScope =
+    props.currentOwnerDepartmentId != null &&
+    activeScopeDepartmentTokens.length > 0 &&
+    !!currentOwnerDepartmentItem &&
+    !lookupMatchesScope(currentOwnerDepartmentItem, activeScopeDepartmentTokens);
+  const locationOutOfScope =
+    props.currentLocationId != null &&
+    activeScopeLocationTokens.length > 0 &&
+    !!currentLocationItem &&
+    !lookupMatchesScope(currentLocationItem, activeScopeLocationTokens);
 
   async function submitChange() {
     try {
@@ -188,7 +215,7 @@ export default function OwnershipPanel(props: {
         owner_department_id: ownerDepartmentId === "" ? null : Number(ownerDepartmentId),
         custodian_identity_id: custodianIdentityId === "" ? null : Number(custodianIdentityId),
         location_id: locationId === "" ? null : Number(locationId),
-        change_reason: reason?.trim() ? reason.trim() : null,
+        change_reason: null,
       };
 
       await apiPostJson(`/api/v1/assets/${props.assetId}/ownership-changes`, payload);
@@ -218,30 +245,36 @@ export default function OwnershipPanel(props: {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current Snapshot</p>
           <p className="mt-1 text-sm text-slate-600">
-            (sementara tampil ID dulu; nanti kalau BE resolve label, otomatis bisa tampil nama)
+            (nilai department dan location hanya muncul jika berada di active governance scope)
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="itam-primary-action"
-        >
-          Change Ownership
-        </button>
+        {props.canEdit !== false ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="itam-primary-action"
+          >
+            Change Ownership
+          </button>
+        ) : (
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-500">
+            Read only
+          </span>
+        )}
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Owner Department</p>
-          <p className="mt-2 text-sm font-medium text-slate-900">{props.currentOwnerDepartmentId ?? "-"}</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{currentOwnerLabel ?? "-"}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Custodian</p>
-          <p className="mt-2 text-sm font-medium text-slate-900">{props.currentCustodianIdentityId ?? "-"}</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{currentCustodianLabel ?? "-"}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Location</p>
-          <p className="mt-2 text-sm font-medium text-slate-900">{props.currentLocationId ?? "-"}</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{currentLocationLabel ?? "-"}</p>
         </div>
       </div>
 
@@ -298,7 +331,7 @@ export default function OwnershipPanel(props: {
         </div>
       </div>
 
-      {open ? (
+      {open && props.canEdit !== false ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
           <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
@@ -321,34 +354,32 @@ export default function OwnershipPanel(props: {
             <div className="mt-5 space-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700">Owner Department</label>
-                <input
-                  value={deptQ}
-                  onChange={(e) => setDeptQ(e.target.value)}
-                  placeholder="Search department..."
-                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                />
                 <select
                   value={ownerDepartmentId}
                   onChange={(e) => setOwnerDepartmentId(e.target.value ? Number(e.target.value) : "")}
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 >
                   <option value="">(empty)</option>
-                  {deptOptions.map((x) => (
+                  {visibleDeptOptions.map((x) => (
                     <option key={x.id} value={x.id}>
                       {displayLookup(x)}
                     </option>
                   ))}
                 </select>
+                {activeScopeDepartmentTokens.length > 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Only departments inside the active governance scope are selectable.
+                  </p>
+                ) : null}
+                {ownerOutOfScope ? (
+                  <p className="mt-2 text-xs font-medium text-amber-700">
+                    Current owner department is outside the active scope and will not appear in the dropdown.
+                  </p>
+                ) : null}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">Custodian (Identity)</label>
-                <input
-                  value={idenQ}
-                  onChange={(e) => setIdenQ(e.target.value)}
-                  placeholder="Search identity..."
-                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                />
                 <select
                   value={custodianIdentityId}
                   onChange={(e) => setCustodianIdentityId(e.target.value ? Number(e.target.value) : "")}
@@ -365,34 +396,28 @@ export default function OwnershipPanel(props: {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700">Location</label>
-                <input
-                  value={locQ}
-                  onChange={(e) => setLocQ(e.target.value)}
-                  placeholder="Search location..."
-                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                />
                 <select
                   value={locationId}
                   onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : "")}
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                 >
                   <option value="">(empty)</option>
-                  {locOptions.map((x) => (
+                  {visibleLocOptions.map((x) => (
                     <option key={x.id} value={x.id}>
                       {displayLookup(x)}
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Reason (optional)</label>
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Reassign to new department"
-                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                />
+                {activeScopeLocationTokens.length > 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Only locations inside the active governance scope are selectable.
+                  </p>
+                ) : null}
+                {locationOutOfScope ? (
+                  <p className="mt-2 text-xs font-medium text-amber-700">
+                    Current location is outside the active scope and will not appear in the dropdown.
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

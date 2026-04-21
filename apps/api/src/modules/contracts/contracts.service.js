@@ -37,6 +37,13 @@ const CONTRACT_HEALTHS = new Set([
   "EXPIRED",
 ]);
 
+const CONTRACT_WRITE_ROLES = [
+  "SUPERADMIN",
+  "TENANT_ADMIN",
+  "ITAM_MANAGER",
+  "PROCUREMENT_CONTRACT_MANAGER",
+];
+
 function httpError(statusCode, message) {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -66,6 +73,25 @@ function normalizeString(value) {
 function normalizeEnum(value) {
   const s = normalizeString(value);
   return s ? s.toUpperCase() : null;
+}
+
+function normalizeRoles(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((role) => String(role ?? "").trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function mustHaveAnyRole(req, allowedRoles) {
+  const raw = Array.isArray(req?.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = normalizeRoles(raw);
+  const ok = allowedRoles.some((role) => roles.includes(role));
+  if (!ok) {
+    const err = httpError(403, "Forbidden");
+    err.code = "FORBIDDEN";
+    err.details = { required_any: allowedRoles, got: roles };
+    throw err;
+  }
 }
 
 function normalizeDate(value) {
@@ -1047,6 +1073,7 @@ export async function getContractSoftwareRenewalSummaryService(app, req) {
 
 export async function createContractService(app, req) {
   const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, CONTRACT_WRITE_ROLES);
   const body = req.body || {};
 
   const vendorId = mustPositiveInt(body.vendor_id, "vendor_id");
@@ -1110,6 +1137,7 @@ export async function createContractService(app, req) {
 
 export async function updateContractService(app, req) {
   const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, CONTRACT_WRITE_ROLES);
   const contractId = mustPositiveInt(req.params?.id, "contract id");
   const body = req.body || {};
 

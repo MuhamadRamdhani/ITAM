@@ -15,6 +15,7 @@ import {
   calculateSystemKpiMetricRepo,
   createKpiDefinitionRepo,
   createKpiMeasurementRepo,
+  getKpiMeasurementByIdRepo,
   getKpiDefinitionByCodeRepo,
   getKpiDefinitionByIdRepo,
   getKpiMeasurementByPeriodRepo,
@@ -24,6 +25,7 @@ import {
   listKpiMeasurementsForTrendRepo,
   listKpiMeasurementsRepo,
   updateKpiDefinitionRepo,
+  updateKpiMeasurementRepo,
 } from './kpi.repo.js';
 
 const ALLOWED_PAGE_SIZES = new Set([10, 25, 50, 100]);
@@ -879,6 +881,80 @@ export async function createKpiMeasurementService({
     measurement_source_type: kpi.source_type,
     measurement_note: measurementNote,
     source_snapshot_json: sourceSnapshotJson,
+    measured_by_user_id: userId,
+  });
+}
+
+export async function updateKpiMeasurementService({
+  db,
+  tenantId,
+  requestContext,
+  kpiId,
+  measurementId,
+  body,
+}) {
+  const roles = normalizeRoles(requestContext?.roles);
+  assertCanManageKpis(roles);
+
+  const resolvedTenantId = resolveTenantId({ tenantId, requestContext });
+  const resolvedKpiId = parsePositiveInteger(kpiId, null, 'id');
+  const resolvedMeasurementId = parsePositiveInteger(measurementId, null, 'measurement id');
+  const userId = requestContext?.userId == null ? null : Number(requestContext.userId);
+
+  const kpi = await ensureKpiExists(db, {
+    tenantId: resolvedTenantId,
+    kpiId: resolvedKpiId,
+  });
+
+  const existingMeasurement = await getKpiMeasurementByIdRepo(db, {
+    tenantId: resolvedTenantId,
+    measurementId: resolvedMeasurementId,
+  });
+
+  if (!existingMeasurement || Number(existingMeasurement.kpi_definition_id) !== kpi.id) {
+    throw appError('KPI_MEASUREMENT_NOT_FOUND', 'Measurement was not found.', 404);
+  }
+
+  if (kpi.source_type !== 'MANUAL') {
+    throw appError(
+      'VALIDATION_ERROR',
+      'Only MANUAL KPI measurements can be edited.',
+      400
+    );
+  }
+
+  const nextActualValue =
+    body?.actual_value == null || body?.actual_value === ''
+      ? Number(existingMeasurement.actual_value)
+      : normalizeRequiredNumeric(body.actual_value, 'actual_value');
+
+  const nextMeasurementNote =
+    body?.measurement_note == null
+      ? existingMeasurement.measurement_note
+      : normalizeNullableString(body.measurement_note);
+
+  const achievementPct = calculateAchievementPct({
+    direction: kpi.direction,
+    targetValue: kpi.target_value,
+    actualValue: nextActualValue,
+  });
+
+  const statusCode = evaluateKpiStatus({
+    direction: kpi.direction,
+    targetValue: kpi.target_value,
+    warningValue: kpi.warning_value,
+    criticalValue: kpi.critical_value,
+    actualValue: nextActualValue,
+  });
+
+  return await updateKpiMeasurementRepo(db, {
+    tenant_id: resolvedTenantId,
+    id: existingMeasurement.id,
+    actual_value: nextActualValue,
+    achievement_pct: achievementPct,
+    status_code: statusCode,
+    measurement_note: nextMeasurementNote,
+    source_snapshot_json: existingMeasurement.source_snapshot_json,
     measured_by_user_id: userId,
   });
 }

@@ -325,6 +325,31 @@ export async function attachEvidenceLinkService(app, { tenantId, actorId, body }
   await requireExistsById(app, tenantId, targetTable, targetId);
   await requireExistsById(app, tenantId, "evidence_files", evidenceFileId);
 
+  const duplicateRes = await app.pg.query(
+    `
+    select id
+    from public.evidence_links
+    where tenant_id = $1
+      and target_type = $2
+      and target_id = $3
+      and evidence_file_id = $4
+    limit 1
+    `,
+    [tenantId, targetType, targetId, evidenceFileId]
+  );
+
+  if (duplicateRes.rows?.[0]) {
+    const e = new Error("Evidence already attached to this target");
+    e.statusCode = 409;
+    e.code = "DUPLICATE_RELATION";
+    e.details = {
+      target_type: targetType,
+      target_id: targetId,
+      evidence_file_id: evidenceFileId,
+    };
+    throw e;
+  }
+
   const uiCfg = await getUiConfig(app, tenantId);
   const maxPerTarget = toPositiveInt(uiCfg?.evidence_max_per_target, 10);
 

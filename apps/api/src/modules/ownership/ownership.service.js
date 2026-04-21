@@ -8,6 +8,9 @@ import {
   locationExists,
   changeOwnership,
 } from "./ownership.repo.js";
+import { getDepartmentById } from "../departments/departments.repo.js";
+import { getLocationById } from "../locations/locations.repo.js";
+import { getActiveScopeVersion } from "../governance/scope.repo.js";
 
 // ===== HELPERS =====
 
@@ -92,6 +95,107 @@ function validateReasonOrNull(v) {
   if (v == null) return null;
   const s = String(v).trim();
   return s || null;
+}
+
+function parseScopeJson(value) {
+  if (value && typeof value === "object") return value;
+  if (typeof value !== "string") return {};
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeNumberArray(value) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set();
+  const out = [];
+  for (const item of value) {
+    const n = Number(item);
+    if (!Number.isFinite(n) || n <= 0 || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
+function normalizeTokenArray(value) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set();
+  const out = [];
+  for (const item of value) {
+    const token = String(item ?? "").trim().toUpperCase();
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    out.push(token);
+  }
+  return out;
+}
+
+function getActiveScopeRestrictedIds(scopeJson, key) {
+  const parsed = parseScopeJson(scopeJson);
+  return normalizeNumberArray(parsed?.[key]);
+}
+
+function getActiveScopeRestrictedTokens(scopeJson, key) {
+  const parsed = parseScopeJson(scopeJson);
+  return normalizeTokenArray(parsed?.[key]);
+}
+
+function matchesAnyScopeToken(record, allowedTokens) {
+  if (!record) return false;
+  if (!Array.isArray(allowedTokens) || allowedTokens.length === 0) return true;
+
+  const tokens = [
+    record.id,
+    record.code,
+    record.name,
+    record.label,
+    record.display_name,
+    record.email,
+  ]
+    .map((token) => String(token ?? "").trim().toUpperCase())
+    .filter(Boolean);
+
+  return tokens.some((token) => allowedTokens.includes(token));
+}
+
+function assertWithinScope({ fieldName, record, allowedTokens }) {
+  if (!Array.isArray(allowedTokens) || allowedTokens.length === 0) return;
+  if (matchesAnyScopeToken(record, allowedTokens)) return;
+
+  const got = record?.id ?? null;
+  const e = new Error(`${fieldName} is outside the active governance scope`);
+  e.statusCode = 409;
+  e.code = "SCOPE_VIOLATION";
+  e.details = {
+    field: fieldName,
+    allowed: allowedTokens,
+    got,
+  };
+  throw e;
+}
+
+function assertAllowedIdOrNull(value, allowedIds, fieldName) {
+  if (value == null) return;
+  if (!Array.isArray(allowedIds) || allowedIds.length === 0) return;
+
+  const n = Number(value);
+  if (!allowedIds.includes(n)) {
+    const e = new Error(`${fieldName} is outside the active governance scope`);
+    e.statusCode = 409;
+    e.code = "SCOPE_VIOLATION";
+    e.details = {
+      field: fieldName,
+      allowed: allowedIds,
+      got: n,
+    };
+    throw e;
+  }
 }
 
 // ===== SERVICES =====
@@ -182,6 +286,42 @@ export async function changeOwnershipService(
       e.code = "INVALID_REF";
       throw e;
     }
+  }
+
+  const activeScope = await getActiveScopeVersion(app.pg, { tenantId });
+  const activeScopeDepartmentIds = activeScope
+    ? getActiveScopeRestrictedIds(activeScope.scope_json, "department_ids")
+    : [];
+  const activeScopeLocationIds = activeScope
+    ? getActiveScopeRestrictedIds(activeScope.scope_json, "location_ids")
+    : [];
+  const activeScopeDepartmentTokens = activeScope
+    ? getActiveScopeRestrictedTokens(activeScope.scope_json, "department_ids")
+    : [];
+  const activeScopeLocationTokens = activeScope
+    ? getActiveScopeRestrictedTokens(activeScope.scope_json, "location_ids")
+    : [];
+
+  assertAllowedIdOrNull(ownerDepartmentId, activeScopeDepartmentIds, "owner_department_id");
+
+  if (ownerDepartmentId != null && activeScopeDepartmentTokens.length > 0) {
+    const department = await getDepartmentById(app, tenantId, ownerDepartmentId);
+    assertWithinScope({
+      fieldName: "owner_department_id",
+      record: department,
+      allowedTokens: activeScopeDepartmentTokens,
+    });
+  }
+
+  assertAllowedIdOrNull(locationId, activeScopeLocationIds, "location_id");
+
+  if (locationId != null && activeScopeLocationTokens.length > 0) {
+    const location = await getLocationById(app, tenantId, locationId);
+    assertWithinScope({
+      fieldName: "location_id",
+      record: location,
+      allowedTokens: activeScopeLocationTokens,
+    });
   }
 
   if (custodianIdentityId != null) {

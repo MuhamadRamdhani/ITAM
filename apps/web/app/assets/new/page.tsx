@@ -6,6 +6,11 @@ import { apiGet, apiPostJson } from "../../lib/api";
 
 type AssetTypeItem = { code: string; label: string };
 type StateItem = { code: string; label: string };
+type ScopeVersionItem = {
+  scope_json?: {
+    asset_type_codes?: string[];
+  };
+};
 type CoverageMode = "HARDWARE" | "SOFTWARE" | "SUBSCRIPTION" | "OTHER";
 
 type CoverageView = {
@@ -31,6 +36,8 @@ type CreateAssetPayload = {
   subscription_end_date: string | null;
 };
 
+const STATUS_OPTIONS = ["AKTIF", "NON_AKTIF", "PENDING", "RUSAK", "PENSIUN", "DIHAPUS"] as const;
+
 function emptyToNull(v: string) {
   const s = String(v ?? "").trim();
   return s === "" ? null : s;
@@ -38,6 +45,22 @@ function emptyToNull(v: string) {
 
 function normalizeAssetTypeCode(value: string) {
   return String(value ?? "").trim().toUpperCase();
+}
+
+function normalizeScopeAssetTypeCodes(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const item of value) {
+    const code = normalizeAssetTypeCode(String(item ?? ""));
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+  }
+
+  return out;
 }
 
 function getCoverageMode(assetTypeCode: string): CoverageMode {
@@ -107,11 +130,13 @@ export default function NewAssetPage() {
 
   const [assetTypes, setAssetTypes] = useState<AssetTypeItem[]>([]);
   const [states, setStates] = useState<StateItem[]>([]);
+  const [activeScopeAssetTypeCodes, setActiveScopeAssetTypeCodes] = useState<string[]>([]);
+  const [activeScopeVersionNo, setActiveScopeVersionNo] = useState<number | null>(null);
 
   const [assetTag, setAssetTag] = useState("");
   const [name, setName] = useState("");
   const [assetTypeCode, setAssetTypeCode] = useState<string>("");
-  const [stateCode, setStateCode] = useState<string>("REQUESTED");
+  const [stateCode, setStateCode] = useState<string>("");
   const [status, setStatus] = useState<string>("AKTIF");
 
   const [purchaseDate, setPurchaseDate] = useState("");
@@ -131,9 +156,12 @@ export default function NewAssetPage() {
         setLoading(true);
         setError(null);
 
-        const [typesRes, statesRes] = await Promise.all([
+        const [typesRes, statesRes, scopeRes] = await Promise.all([
           apiGet<{ items: AssetTypeItem[] }>("/api/v1/config/asset-types"),
           apiGet<{ items: StateItem[] }>("/api/v1/config/lifecycle-states"),
+          apiGet<{ items: ScopeVersionItem[] }>(
+            "/api/v1/governance/scope/versions?status=ACTIVE&page=1&page_size=1"
+          ),
         ]);
 
         if (!mounted) return;
@@ -147,12 +175,45 @@ export default function NewAssetPage() {
           (statesRes as any)?.data?.items ??
           (statesRes as any)?.data?.data?.items ??
           [];
+        const scopeItems =
+          (scopeRes as any)?.data?.items ??
+          (scopeRes as any)?.data?.data?.items ??
+          [];
 
         setAssetTypes(Array.isArray(types) ? types : []);
         setStates(Array.isArray(st) ? st : []);
 
-        if (Array.isArray(types) && types.length > 0) {
+        const activeScope = Array.isArray(scopeItems) ? scopeItems[0] : null;
+        const activeScopeCodes = normalizeScopeAssetTypeCodes(
+          activeScope?.scope_json?.asset_type_codes
+        );
+        setActiveScopeAssetTypeCodes(activeScopeCodes);
+        setActiveScopeVersionNo(
+          Number.isFinite(Number((activeScope as any)?.version_no))
+            ? Number((activeScope as any)?.version_no)
+            : null
+        );
+
+        const allowedTypes = Array.isArray(types)
+          ? activeScopeCodes.length > 0
+            ? types.filter((row) => activeScopeCodes.includes(normalizeAssetTypeCode(row.code)))
+            : types
+          : [];
+
+        if (allowedTypes.length > 0) {
+          setAssetTypeCode((prev) => {
+            const current = normalizeAssetTypeCode(prev);
+            const currentAllowed = allowedTypes.some(
+              (row) => normalizeAssetTypeCode(row.code) === current
+            );
+            return currentAllowed ? prev : allowedTypes[0].code;
+          });
+        } else if (Array.isArray(types) && types.length > 0) {
           setAssetTypeCode((prev) => prev || types[0].code);
+        }
+
+        if (Array.isArray(st) && st.length > 0) {
+          setStateCode((prev) => prev || st[0].code);
         }
       } catch (eAny: any) {
         if (!mounted) return;
@@ -181,11 +242,29 @@ export default function NewAssetPage() {
     };
   }, [router]);
 
+  const visibleAssetTypes = activeScopeAssetTypeCodes.length
+    ? assetTypes.filter((row) =>
+        activeScopeAssetTypeCodes.includes(normalizeAssetTypeCode(row.code))
+      )
+    : assetTypes;
+
+  const activeScopeSummary = activeScopeAssetTypeCodes.length
+    ? visibleAssetTypes.map((row) => `${row.label} (${row.code})`)
+    : [];
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!assetTag.trim() || !name.trim() || !assetTypeCode || !stateCode) {
       setError("Please fill Asset Tag, Name, Type, and Initial State.");
+      return;
+    }
+
+    if (
+      activeScopeAssetTypeCodes.length > 0 &&
+      !activeScopeAssetTypeCodes.includes(normalizeAssetTypeCode(assetTypeCode))
+    ) {
+      setError("Asset type ini berada di luar active governance scope tenant.");
       return;
     }
 
@@ -287,6 +366,16 @@ export default function NewAssetPage() {
               ) : null}
 
               <div className="space-y-4">
+                {activeScopeSummary.length > 0 ? (
+                  <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+                    <div className="font-semibold">Active governance scope limits asset types</div>
+                    <div className="mt-1">
+                      {activeScopeVersionNo ? `Scope v${activeScopeVersionNo}: ` : ""}
+                      {activeScopeSummary.join(", ")}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Asset Tag</label>
                   <input
@@ -315,7 +404,7 @@ export default function NewAssetPage() {
                       onChange={(e) => setAssetTypeCode(e.target.value)}
                       className={inputClass}
                     >
-                      {assetTypes.map((t) => (
+                      {visibleAssetTypes.map((t) => (
                         <option key={t.code} value={t.code}>
                           {t.label} ({t.code})
                         </option>
@@ -341,12 +430,17 @@ export default function NewAssetPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Status</label>
-                  <input
+                  <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    placeholder="AKTIF"
                     className={inputClass}
-                  />
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

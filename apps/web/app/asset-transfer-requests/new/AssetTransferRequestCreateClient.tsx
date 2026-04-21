@@ -52,7 +52,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 const MESSAGE_LABELS: Record<string, string> = {
   OWNER_DEPARTMENT_WILL_BE_RESET: "Owner department will be reset",
-  CUSTODIAN_IDENTITY_WILL_BE_RESET: "Custodian identity will be reset",
+  CUSTODIAN_IDENTITY_WILL_BE_RESET: "Current custodian will be reset",
   LOCATION_WILL_BE_RESET: "Location will be reset",
   CONTRACT_ASSET_LINKS_WILL_BE_REMOVED: "Contract asset links will be removed",
   SAME_TENANT_NOT_ALLOWED: "Target tenant must be different from source tenant",
@@ -311,6 +311,29 @@ export default function AssetTransferRequestCreateClient() {
     if (!rawPresetAssetId) return "";
     return /^\d+$/.test(rawPresetAssetId) ? rawPresetAssetId : "";
   }, [rawPresetAssetId]);
+
+  const rawReturnTo = useMemo(() => {
+    return searchParams.get("return_to")?.trim() ?? "";
+  }, [searchParams]);
+
+  const safeReturnTo = useMemo(() => {
+    if (!rawReturnTo) return "";
+    return rawReturnTo.startsWith("/") ? rawReturnTo : "";
+  }, [rawReturnTo]);
+
+  const backHref = useMemo(() => {
+    if (safeReturnTo) return safeReturnTo;
+    if (presetAssetId) return `/assets/${presetAssetId}`;
+    return "/asset-transfer-requests";
+  }, [safeReturnTo, presetAssetId]);
+
+  const assetDetailHref = useMemo(() => {
+    if (!presetAssetId) return "/assets";
+    if (safeReturnTo.startsWith(`/assets/${presetAssetId}`)) {
+      return safeReturnTo;
+    }
+    return `/assets/${presetAssetId}`;
+  }, [presetAssetId, safeReturnTo]);
 
   const hasPresetAssetQuery = rawPresetAssetId.length > 0;
 
@@ -691,17 +714,16 @@ export default function AssetTransferRequestCreateClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/asset-transfer-requests")}
+            <Link
+              href={backHref}
               className="inline-flex items-center justify-center itam-secondary-action"
             >
               Back
-            </button>
+            </Link>
 
             {presetAssetId ? (
               <Link
-                href={`/assets/${presetAssetId}`}
+                href={assetDetailHref}
                 className="inline-flex items-center justify-center itam-secondary-action"
               >
                 Go to Asset Detail

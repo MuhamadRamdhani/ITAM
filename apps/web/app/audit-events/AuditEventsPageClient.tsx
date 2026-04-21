@@ -192,6 +192,7 @@ function buildHref(params: {
 }
 
 function buildExportUrl(params: {
+  format: "json" | "xlsx";
   actor: string;
   action: string;
   entityType: string;
@@ -205,7 +206,7 @@ function buildExportUrl(params: {
   if (!base) return "";
 
   const p = new URLSearchParams();
-  p.set("format", "json");
+  p.set("format", params.format);
   p.set("limit", "5000");
   p.set("offset", "0");
 
@@ -286,6 +287,22 @@ function actorLabel(actor: string | null | undefined) {
   if (s.startsWith("USER:")) return `User ${s.replace("USER:", "#")}`;
   if (s.startsWith("IDENTITY:")) return `Identity ${s.replace("IDENTITY:", "#")}`;
   return s;
+}
+
+function actorEmailFromPayload(payload: unknown): string {
+  const record = toObjectRecord(payload);
+  if (!record) return "";
+
+  const value =
+    record.email ??
+    record.actor_email ??
+    record.user_email ??
+    record.identity_email ??
+    record.identityEmail ??
+    record.userEmail ??
+    null;
+
+  return String(value || "").trim();
 }
 
 function toIsoDate(d: Date) {
@@ -407,6 +424,17 @@ export default function AuditEventsPageClient() {
   const shownFrom = total === 0 ? 0 : (pageFromUrl - 1) * pageSize + 1;
   const shownTo = total === 0 ? 0 : Math.min(total, pageFromUrl * pageSize);
   const exportUrl = buildExportUrl({
+    format: "json",
+    actor: actorInput.trim(),
+    action: actionInput.trim().toUpperCase(),
+    entityType: entityTypeInput.trim().toUpperCase(),
+    entityId: entityIdInput.trim(),
+    dateFrom: dateFromInput.trim(),
+    dateTo: dateToInput.trim(),
+    q: qInput.trim(),
+  });
+  const exportXlsxUrl = buildExportUrl({
+    format: "xlsx",
     actor: actorInput.trim(),
     action: actionInput.trim().toUpperCase(),
     entityType: entityTypeInput.trim().toUpperCase(),
@@ -499,6 +527,17 @@ export default function AuditEventsPageClient() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 md:self-end">
+              {exportXlsxUrl ? (
+                <a
+                  href={exportXlsxUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-800 transition hover:border-cyan-300 hover:bg-cyan-100"
+                >
+                  Download Excel
+                </a>
+              ) : null}
+
               {exportUrl ? (
                 <a
                   href={exportUrl}
@@ -681,7 +720,14 @@ export default function AuditEventsPageClient() {
                     <tr key={String(row.id)} className="border-t border-slate-100 align-top">
                       <td className="whitespace-nowrap px-4 py-4 pr-6 align-top">{fmtDateTime(row.created_at)}</td>
                       <td className="px-4 py-4 pr-6 align-top">
-                        <div className="font-medium text-slate-900">{actorLabel(row.actor)}</div>
+                        <div className="font-medium text-slate-900">
+                          {actorLabel(row.actor)}
+                        </div>
+                        {actorEmailFromPayload(row.payload) ? (
+                          <div className="mt-1 text-xs text-cyan-700">
+                            {actorEmailFromPayload(row.payload)}
+                          </div>
+                        ) : null}
                         {row.actor ? (
                           <div className="mt-1 text-xs text-slate-500">{row.actor}</div>
                         ) : null}

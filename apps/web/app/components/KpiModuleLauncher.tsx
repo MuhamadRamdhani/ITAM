@@ -148,23 +148,16 @@ export default function KpiModuleLauncher() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Link
-            href="/kpi-scorecard"
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-          >
+          <Link href="/kpi-scorecard" className="itam-secondary-action">
             Open KPI Scorecard
           </Link>
-          <Link
-            href="/kpis"
-            className="rounded-xl border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-          >
+
+          <Link href="/kpis" className="itam-primary-action">
             Open KPI Library
           </Link>
+
           {canManage && (
-            <Link
-              href="/kpis"
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-100"
-            >
+            <Link href="/kpis" className="itam-secondary-action">
               Manage KPI
             </Link>
           )}
@@ -288,12 +281,12 @@ export default function KpiModuleLauncher() {
                 </p>
               </div>
 
-              <Link
-                href="/kpi-scorecard"
-                className="rounded-xl border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-              >
-                Open full scorecard
-              </Link>
+             <Link
+  href="/kpi-scorecard"
+  className="inline-flex items-center justify-center rounded-full border border-cyan-200 bg-gradient-to-r from-cyan-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(14,165,233,0.20)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(14,165,233,0.24)]"
+>
+  Open full scorecard
+</Link>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -329,18 +322,18 @@ export default function KpiModuleLauncher() {
 
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        href={`/kpis/${item.kpi_id}`}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-                      >
-                        View Detail
-                      </Link>
+  href={`/kpis/${item.kpi_id}`}
+  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-900"
+>
+  View Detail
+</Link>
 
                       <Link
-                        href="/kpi-scorecard"
-                        className="rounded-lg border border-slate-950 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-slate-900"
-                      >
-                        Open Scorecard
-                      </Link>
+  href="/kpi-scorecard"
+  className="inline-flex items-center justify-center rounded-full border border-cyan-200 bg-gradient-to-r from-cyan-500 to-sky-500 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(14,165,233,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_22px_rgba(14,165,233,0.22)]"
+>
+  Open Scorecard
+</Link>
                     </div>
                   </div>
                 ))

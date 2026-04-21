@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { apiGet } from '../../lib/api';
 import {
   ManagementReviewActionItem,
   ManagementReviewActionItemStatus,
   listManagementReviewActionTracker,
   updateManagementReviewActionItem,
 } from '../../lib/management-reviews';
+import { canFollowUpManagementReviewActionItems } from '../../lib/managementReviewAccess';
 import {
   IdentityOption,
   getIdentityLabel,
@@ -128,6 +130,8 @@ export default function ManagementReviewActionTrackerClient() {
 
   const [identityOptions, setIdentityOptions] = useState<IdentitySelectOption[]>([]);
   const [loadingIdentityOptions, setLoadingIdentityOptions] = useState(true);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -154,6 +158,20 @@ export default function ManagementReviewActionTrackerClient() {
       setIdentityOptions([]);
     } finally {
       setLoadingIdentityOptions(false);
+    }
+  }, []);
+
+  const loadAuth = useCallback(async () => {
+    setLoadingRoles(true);
+    try {
+      const response = await apiGet('/api/v1/auth/me');
+      const data = (response as { data?: { roles?: string[] } } | null)?.data;
+      const nextRoles = Array.isArray(data?.roles) ? data.roles.filter(Boolean) : [];
+      setRoles(nextRoles);
+    } catch {
+      setRoles([]);
+    } finally {
+      setLoadingRoles(false);
     }
   }, []);
 
@@ -192,7 +210,8 @@ export default function ManagementReviewActionTrackerClient() {
   useEffect(() => {
     loadData();
     loadIdentityOptions();
-  }, [loadData, loadIdentityOptions]);
+    loadAuth();
+  }, [loadAuth, loadData, loadIdentityOptions]);
 
   const identityMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -231,6 +250,17 @@ export default function ManagementReviewActionTrackerClient() {
     () => items.filter((item) => item.is_overdue).length,
     [items],
   );
+
+  const canFollowUp = useMemo(
+    () => canFollowUpManagementReviewActionItems(roles),
+    [roles],
+  );
+
+  const readOnlyNotice = useMemo(() => {
+    if (loadingRoles) return null;
+    if (canFollowUp) return null;
+    return 'Read-only access: management review action follow-up is restricted for your role.';
+  }, [canFollowUp, loadingRoles]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -312,6 +342,12 @@ export default function ManagementReviewActionTrackerClient() {
         {errorMessage ? (
           <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {errorMessage}
+          </div>
+        ) : null}
+
+        {readOnlyNotice ? (
+          <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            {readOnlyNotice}
           </div>
         ) : null}
 
@@ -546,7 +582,7 @@ export default function ManagementReviewActionTrackerClient() {
                       </div>
                     </div>
 
-                    {item.session_status === 'COMPLETED' ? (
+                    {item.session_status === 'COMPLETED' && canFollowUp ? (
                       <div className="mt-5 grid gap-4 md:grid-cols-3">
                         <div>
                           <label className="mb-2 block text-sm font-medium text-gray-700">

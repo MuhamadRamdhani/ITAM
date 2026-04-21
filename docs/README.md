@@ -11,4 +11,5 @@ Dokumentasi ini disusun langsung dari kode aplikasi yang ada di repo.
 - [Mapping Roadmap ke Kode](./roadmap-to-code-mapping.md)
 - [BRS ITAM ISO/IEC 19770-1](./brs-itam-iso-19770-1-formal.md)
 - [Daftar Gap ITAM](./daftar-gap-itam.md)
+- [Rekap Pengerjaan Testing dan Implementasi](./rekap-pengerjaan-testing.md)
 - [CAPA DDL](./capa-ddl.sql)

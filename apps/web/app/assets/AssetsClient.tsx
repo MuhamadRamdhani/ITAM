@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet } from "../lib/api";
+import { canCreateOrEditAsset } from "../lib/assetAccess";
+import { canCreateAssetTransfer } from "../lib/assetTransferAccess";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
 
 type MeData = {
@@ -37,8 +39,6 @@ type AssetsListData = {
   page: number;
   page_size: number;
 };
-
-const TRANSFER_ALLOWED_ROLES = ["SUPERADMIN", "TENANT_ADMIN", "ITAM_MANAGER"];
 
 function pickInt(value: string | null, fallback: number) {
   const n = Number.parseInt(String(value || "").trim(), 10);
@@ -103,9 +103,19 @@ export default function AssetsClient() {
     return pageSizeOptions.includes(candidate) ? candidate : pageSizeDefault;
   }, [searchParams, pageSizeDefault, pageSizeOptions]);
 
-  const canSeeTransferAction = useMemo(() => {
-    return roles.some((role) => TRANSFER_ALLOWED_ROLES.includes(role));
-  }, [roles]);
+  const currentAssetsHref = useMemo(
+    () =>
+      buildAssetsHref({
+        q,
+        type_code,
+        state_code,
+        page,
+        pageSize,
+      }),
+    [q, type_code, state_code, page, pageSize]
+  );
+
+  const canCreateAsset = useMemo(() => canCreateOrEditAsset(roles), [roles]);
 
   const total = Number(data.total ?? 0);
   const items = Array.isArray(data.items) ? data.items : [];
@@ -298,12 +308,11 @@ export default function AssetsClient() {
 
       <div className="rounded-3xl border border-white bg-white/85 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
         <div className="mb-4 flex justify-end">
-          <Link
-            href="/assets/new"
-            className="itam-primary-action"
-          >
-            New Asset
-          </Link>
+          {canCreateAsset ? (
+            <Link href="/assets/new" className="itam-primary-action">
+              New Asset
+            </Link>
+          ) : null}
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
@@ -391,57 +400,67 @@ export default function AssetsClient() {
                       </td>
                     </tr>
                   ) : (
-                    items.map((a) => (
-                      <tr key={String(a.id)} className="border-t border-slate-200">
-                        <td className="px-4 py-5 pr-6 font-mono text-xs">
-                          <Link
-                            className="text-blue-700 hover:underline"
-                            href={`/assets/${a.id}`}
-                          >
-                            {a.asset_tag}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-5 pr-6">{a.name}</td>
-                        <td className="px-4 py-5 pr-6">
-                          {a.asset_type?.label
-                            ? `${a.asset_type.label} (${a.asset_type.code})`
-                            : "-"}
-                        </td>
-                        <td className="px-4 py-5 pr-6">
-                          {a.state?.label
-                            ? `${a.state.label} (${a.state.code})`
-                            : "-"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-5 pr-6 text-right">
-                          <Link
-                            className="text-blue-700 hover:underline"
-                            href={`/assets/${a.id}`}
-                          >
-                            View
-                          </Link>
+                    items.map((a) => {
+                      const transferHref = `/asset-transfer-requests/new?asset_id=${a.id}&return_to=${encodeURIComponent(
+                        currentAssetsHref
+                      )}`;
 
-                          {canSeeTransferAction ? (
-                            <>
-                              <span className="mx-2 text-slate-300">|</span>
-                              <Link
-                                className="text-indigo-700 hover:underline"
-                                href={`/asset-transfer-requests/new?asset_id=${a.id}`}
-                              >
-                                Transfer
-                              </Link>
-                            </>
-                          ) : null}
+                      return (
+                        <tr key={String(a.id)} className="border-t border-slate-200">
+                          <td className="px-4 py-5 pr-6 font-mono text-xs">
+                            <Link
+                              className="text-blue-700 hover:underline"
+                              href={`/assets/${a.id}`}
+                            >
+                              {a.asset_tag}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-5 pr-6">{a.name}</td>
+                          <td className="px-4 py-5 pr-6">
+                            {a.asset_type?.label
+                              ? `${a.asset_type.label} (${a.asset_type.code})`
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-5 pr-6">
+                            {a.state?.label
+                              ? `${a.state.label} (${a.state.code})`
+                              : "-"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-5 pr-6 text-right">
+                            <Link
+                              className="text-cyan-700 hover:underline"
+                              href={`/assets/${a.id}`}
+                            >
+                              View
+                            </Link>
 
-                          <span className="mx-2 text-slate-300">|</span>
-                          <Link
-                            className="text-blue-700 hover:underline"
-                            href={`/assets/${a.id}/edit`}
-                          >
-                            Edit
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
+                            {canCreateAssetTransfer(roles) ? (
+                              <>
+                                <span className="mx-2 text-slate-300">|</span>
+                                <Link
+                                  className="text-cyan-700 hover:underline"
+                                  href={transferHref}
+                                >
+                                  Transfer
+                                </Link>
+                              </>
+                            ) : null}
+
+                            {canCreateAsset ? (
+                              <>
+                                <span className="mx-2 text-slate-300">|</span>
+                                <Link
+                                  className="text-cyan-700 hover:underline"
+                                  href={`/assets/${a.id}/edit`}
+                                >
+                                  Edit
+                                </Link>
+                              </>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

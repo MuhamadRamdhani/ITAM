@@ -21,23 +21,18 @@ export default function LogoutButton() {
     setLoading(true);
     show("Logging out...");
 
-    let shouldHideOverlay = true;
-
     try {
       await apiPostJson<{ ok: true }>("/api/v1/auth/logout", {});
-      shouldHideOverlay = false;
+      hide();
       router.replace("/login");
       router.refresh();
     } catch (error: unknown) {
       const eAny = error as { message?: string } | null;
       setErr(eAny?.message || "Logout failed");
+      hide();
     } finally {
       inFlightRef.current = false;
       setLoading(false);
-
-      if (shouldHideOverlay) {
-        hide();
-      }
     }
   }
 

@@ -50,7 +50,13 @@ function fmtBytes(n?: number) {
   return `${(x / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-export default function AssetEvidenceTab({ assetId }: { assetId: number }) {
+export default function AssetEvidenceTab({
+  assetId,
+  canEdit = true,
+}: {
+  assetId: number;
+  canEdit?: boolean;
+}) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -131,12 +137,20 @@ export default function AssetEvidenceTab({ assetId }: { assetId: number }) {
 
   return (
     <div className="space-y-4">
-      <EvidenceAttachForm
-        targetType="ASSET"
-        targetId={assetId}
-        maxFilesPerTarget={maxPerTarget}
-        pageSizeForCount={countPageSize}
-      />
+      {canEdit ? (
+        <EvidenceAttachForm
+          targetType="ASSET"
+          targetId={assetId}
+          maxFilesPerTarget={maxPerTarget}
+          pageSizeForCount={countPageSize}
+          onChanged={loadAll}
+        />
+      ) : (
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          Evidence untuk asset ini bisa dilihat, tetapi upload dan attach hanya tersedia
+          untuk role yang berwenang.
+        </div>
+      )}
 
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

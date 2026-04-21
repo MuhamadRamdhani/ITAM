@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiGet } from "../lib/api";
+import { parseActiveScopeJson, resolveScopedLookupLabel } from "../lib/governanceScope";
 
 type DashboardSummaryData = {
   totals: {
@@ -50,6 +51,121 @@ type ContractListApiShape = {
   total?: unknown;
 };
 
+type AssetTypeItem = {
+  code: string;
+  label: string;
+};
+
+type LookupItem = {
+  id: number;
+  name?: string;
+  label?: string;
+  display_name?: string;
+  code?: string;
+  active?: boolean;
+};
+
+type GovernanceSnapshotData = {
+  versionNo: number | null;
+  assetTypes: string[];
+  departments: string[];
+  locations: string[];
+  environments: string[];
+  openContexts: number;
+  openStakeholders: number;
+  hasActiveScope: boolean;
+};
+
+function GovernanceMiniCard(props: {
+  title: string;
+  headline: string;
+  description: string;
+  href: string;
+  tone: "warning" | "success" | "info";
+  badges: string[];
+  ctaLabel: string;
+  loading: boolean;
+  error: string | null;
+}) {
+  const toneClass =
+    props.tone === "warning"
+      ? "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white"
+      : props.tone === "success"
+      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white"
+      : "border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-white";
+
+  const titleClass =
+    props.tone === "warning"
+      ? "text-amber-700"
+      : props.tone === "success"
+      ? "text-emerald-700"
+      : "text-cyan-700";
+
+  const badgeToneClass =
+    props.tone === "warning"
+      ? "bg-amber-100 text-amber-800"
+      : props.tone === "success"
+      ? "bg-emerald-100 text-emerald-800"
+      : "bg-cyan-100 text-cyan-800";
+
+  if (props.loading) {
+    return (
+      <div className={`rounded-3xl border p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ${toneClass}`}>
+        <div className={`text-xs font-semibold uppercase tracking-[0.22em] ${titleClass}`}>
+          {props.title}
+        </div>
+        <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Loading...</div>
+        <div className="mt-2 text-sm leading-6 text-slate-600">Loading governance snapshot...</div>
+      </div>
+    );
+  }
+
+  if (props.error) {
+    return (
+      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)]">
+        <div className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-700">
+          {props.title}
+        </div>
+        <div className="mt-2 text-sm leading-6 text-rose-700">{props.error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={props.href}
+      className={`block rounded-3xl border p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_60px_rgba(15,23,42,0.12)] ${toneClass}`}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className={`text-xs font-semibold uppercase tracking-[0.22em] ${titleClass}`}>
+            {props.title}
+          </div>
+          <div className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+            {props.headline}
+          </div>
+          <div className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+            {props.description}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {props.badges.map((badge) => (
+            <span
+              key={badge}
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeToneClass}`}
+            >
+              {badge}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5 text-sm font-semibold text-cyan-700">{props.ctaLabel} →</div>
+    </Link>
+  );
+}
+
 function SummaryCard(props: {
   title: string;
   value: number | string;
@@ -66,11 +182,13 @@ function SummaryCard(props: {
       : "border-slate-200 bg-white";
 
   const inner = (
-    <div className={`rounded-3xl border p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ${toneClass}`}>
-      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+    <div
+      className={`flex min-h-[150px] flex-col justify-between rounded-3xl border p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ${toneClass}`}
+    >
+      <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
         {props.title}
       </div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+      <div className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
         {props.value}
       </div>
       {props.href ? (
@@ -157,6 +275,88 @@ function ContractAlertCard(props: {
   );
 }
 
+function GovernanceAlertCard(props: {
+  data: GovernanceSnapshotData | null;
+  loading: boolean;
+  error: string | null;
+  activeScopeVersions: number;
+}) {
+  const data = props.data;
+  const hasActiveScope = Boolean(data?.hasActiveScope && data.versionNo);
+  const activeScopeVersion = data?.versionNo ?? null;
+  const scopeHeadline = !hasActiveScope
+    ? "Active governance scope not yet configured"
+    : `Active Scope v${String(activeScopeVersion ?? "").trim()}`;
+
+  const scopeDescription = !hasActiveScope
+    ? "This tenant does not yet have an active governance scope. Configure and activate scope to establish the operational boundary for assets, context, and stakeholders."
+    : "The active governance scope is shown first so operators can quickly confirm the tenant boundary before reviewing context and stakeholders.";
+
+  const scopeBadges = [
+    data?.assetTypes?.length ? `Asset types: ${data.assetTypes.join(", ")}` : "Asset types: -",
+    data?.departments?.length ? `Departments: ${data.departments.join(", ")}` : "Departments: -",
+    data?.locations?.length ? `Locations: ${data.locations.join(", ")}` : "Locations: -",
+    data?.environments?.length ? `Environments: ${data.environments.join(", ")}` : "Environments: -",
+  ];
+
+  return (
+    <div className="space-y-4">
+      <GovernanceMiniCard
+        title="Governance Scope"
+        headline={scopeHeadline}
+        description={scopeDescription}
+        href="/governance/scope"
+        tone={hasActiveScope ? "success" : "warning"}
+        badges={[
+          `Active Scope: ${props.activeScopeVersions.toLocaleString()}`,
+          ...scopeBadges,
+        ]}
+        ctaLabel="Open Governance Scope"
+        loading={props.loading}
+        error={props.error}
+      />
+
+      <GovernanceMiniCard
+        title="Governance Context"
+        headline={
+          (data?.openContexts ?? 0) > 0
+            ? `${data?.openContexts?.toLocaleString() ?? "0"} open context entries`
+            : "No open context entries"
+        }
+        description="Operational drivers, risks, and review items that influence the active ITAM boundary."
+        href="/governance/context"
+        tone={(data?.openContexts ?? 0) > 0 ? "info" : "warning"}
+        badges={[
+          `Open: ${data?.openContexts?.toLocaleString() ?? "0"}`,
+          "Review queue: Governance Context",
+        ]}
+        ctaLabel="Open Governance Context"
+        loading={props.loading}
+        error={props.error}
+      />
+
+      <GovernanceMiniCard
+        title="Governance Stakeholders"
+        headline={
+          (data?.openStakeholders ?? 0) > 0
+            ? `${data?.openStakeholders?.toLocaleString() ?? "0"} open stakeholder records`
+            : "No open stakeholder records"
+        }
+        description="People, teams, and interested parties that need visibility or review when governance changes."
+        href="/governance/stakeholders"
+        tone={(data?.openStakeholders ?? 0) > 0 ? "info" : "warning"}
+        badges={[
+          `Open: ${data?.openStakeholders?.toLocaleString() ?? "0"}`,
+          "Review queue: Governance Stakeholders",
+        ]}
+        ctaLabel="Open Governance Stakeholders"
+        loading={props.loading}
+        error={props.error}
+      />
+    </div>
+  );
+}
+
 function getErrorMessage(error: unknown) {
   const fallback = "Failed to load dashboard summary.";
   if (!error) return fallback;
@@ -198,6 +398,88 @@ function extractResponsePayload(res: unknown): unknown {
   return response.data ?? {};
 }
 
+function normalizeLookupItems(res: unknown): LookupItem[] {
+  const raw = extractResponsePayload(res) as { items?: unknown };
+  const items = Array.isArray(raw?.items) ? raw.items : [];
+
+  return items
+    .map((item: any) => ({
+      id: Number(item?.id),
+      name: String(item?.name ?? "").trim() || undefined,
+      label: String(item?.label ?? "").trim() || undefined,
+      display_name: String(item?.display_name ?? "").trim() || undefined,
+      code: String(item?.code ?? "").trim() || undefined,
+      active: item?.active ?? item?.is_active ?? true,
+    }))
+    .filter((item) => Number.isFinite(item.id) && item.id > 0);
+}
+
+function normalizeGovernanceSnapshot(res: unknown, activeScopeVersions: number): GovernanceSnapshotData {
+  const raw = extractResponsePayload(res) as {
+    version?: { version_no?: number | string | null; scope_json?: unknown } | null;
+    departments?: LookupItem[];
+    locations?: LookupItem[];
+    assetTypes?: AssetTypeItem[];
+    totals?: {
+      open_context_entries?: unknown;
+      open_stakeholder_entries?: unknown;
+    };
+  };
+
+  const version = raw?.version ?? null;
+  const parsed = parseActiveScopeJson(version?.scope_json ?? null, version?.version_no ?? null);
+
+  const departmentItems = Array.isArray(raw?.departments) ? raw.departments : [];
+  const locationItems = Array.isArray(raw?.locations) ? raw.locations : [];
+  const assetTypeItems = Array.isArray(raw?.assetTypes) ? raw.assetTypes : [];
+
+  const assetTypeMap = new Map<string, string>();
+  for (const row of assetTypeItems) {
+    const code = String(row?.code ?? "").trim().toUpperCase();
+    const label = String(row?.label ?? row?.code ?? "").trim();
+    if (code && label) assetTypeMap.set(code, label);
+  }
+
+  const departmentLabels =
+    parsed.departmentTokens.length > 0
+      ? departmentItems
+          .map((item) =>
+            resolveScopedLookupLabel(
+              departmentItems as any,
+              Number(item.id),
+              parsed.departmentTokens
+            )
+          )
+          .filter((v): v is string => Boolean(v))
+      : [];
+
+  const locationLabels =
+    parsed.locationTokens.length > 0
+      ? locationItems
+          .map((item) =>
+            resolveScopedLookupLabel(
+              locationItems as any,
+              Number(item.id),
+              parsed.locationTokens
+            )
+          )
+          .filter((v): v is string => Boolean(v))
+      : [];
+
+  return {
+    versionNo: parsed.versionNo,
+    assetTypes: parsed.assetTypeCodes.map((code) => assetTypeMap.get(code.toUpperCase()) || code),
+    departments: departmentLabels,
+    locations: locationLabels,
+    environments: parsed.environmentCodes.map((env) =>
+      String(env || "").toUpperCase() === "ON_PREM" ? "On Prem" : env
+    ),
+    openContexts: Number(raw?.totals?.open_context_entries ?? 0),
+    openStakeholders: Number(raw?.totals?.open_stakeholder_entries ?? 0),
+    hasActiveScope: activeScopeVersions > 0,
+  };
+}
+
 function normalizeSummary(res: unknown): DashboardSummaryData {
   const raw = extractResponsePayload(res) as SummaryApiShape;
 
@@ -235,9 +517,58 @@ export default function DashboardSummaryCards() {
   const [contractAlerts, setContractAlerts] = useState<ContractAlertSummaryData | null>(
     null
   );
+  const [governanceLoading, setGovernanceLoading] = useState(true);
+  const [governanceErr, setGovernanceErr] = useState<string | null>(null);
+  const [governanceSnapshot, setGovernanceSnapshot] = useState<GovernanceSnapshotData | null>(
+    null
+  );
 
   useEffect(() => {
     let active = true;
+
+    async function loadGovernanceSnapshot() {
+      setGovernanceLoading(true);
+      setGovernanceErr(null);
+
+      try {
+        const [summaryRes, scopeRes, assetTypesRes, departmentsRes, locationsRes] = await Promise.all([
+          apiGet<unknown>("/api/v1/dashboard/summary"),
+          apiGet<unknown>("/api/v1/governance/scope/versions?status=ACTIVE&page=1&page_size=1"),
+          apiGet<unknown>("/api/v1/config/asset-types"),
+          apiGet<unknown>("/api/v1/departments?page=1&page_size=500"),
+          apiGet<unknown>("/api/v1/locations?page=1&page_size=500"),
+        ]);
+
+        if (!active) return;
+
+        const scopePayload = extractResponsePayload(scopeRes) as { items?: unknown };
+        const scopeItems = Array.isArray(scopePayload?.items) ? scopePayload.items : [];
+        const version = scopeItems.length > 0 ? (scopeItems[0] as any) : null;
+        const summaryPayload = extractResponsePayload(summaryRes) as { totals?: unknown };
+        const snapshot = normalizeGovernanceSnapshot(
+          {
+            data: {
+              data: {
+                totals: (summaryPayload as any)?.totals ?? {},
+                version,
+                assetTypes: normalizeLookupItems(assetTypesRes),
+                departments: normalizeLookupItems(departmentsRes),
+                locations: normalizeLookupItems(locationsRes),
+              },
+            },
+          },
+          Number((summaryRes as any)?.data?.data?.totals?.active_scope_versions ?? 0)
+        );
+
+        setGovernanceSnapshot(snapshot);
+      } catch (error) {
+        if (!active) return;
+        setGovernanceErr(getErrorMessage(error));
+        setGovernanceSnapshot(null);
+      } finally {
+        if (active) setGovernanceLoading(false);
+      }
+    }
 
     async function load() {
       setLoading(true);
@@ -258,6 +589,7 @@ export default function DashboardSummaryCards() {
     }
 
     void load();
+    void loadGovernanceSnapshot();
 
     return () => {
       active = false;
@@ -323,13 +655,20 @@ export default function DashboardSummaryCards() {
 
   return (
     <div className="mt-6 space-y-4">
+      <GovernanceAlertCard
+        data={governanceSnapshot}
+        loading={governanceLoading}
+        error={governanceErr}
+        activeScopeVersions={data.totals.active_scope_versions}
+      />
+
       <ContractAlertCard
         data={contractAlerts}
         loading={contractAlertsLoading}
         error={contractAlertsErr}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-7">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
         <SummaryCard title="Assets" value={data.totals.assets} href="/assets" />
         <SummaryCard
           title="Pending Approvals"
@@ -347,22 +686,6 @@ export default function DashboardSummaryCards() {
           title="Evidence Files"
           value={data.totals.evidence_files}
           href="/evidence"
-        />
-        <SummaryCard
-          title="Active Scope"
-          value={data.totals.active_scope_versions}
-          href="/governance/scope?status=ACTIVE"
-          tone="success"
-        />
-        <SummaryCard
-          title="Open Context"
-          value={data.totals.open_context_entries}
-          href="/governance/context?status=OPEN"
-        />
-        <SummaryCard
-          title="Open Stakeholders"
-          value={data.totals.open_stakeholder_entries}
-          href="/governance/stakeholders?status=OPEN"
         />
       </div>
 

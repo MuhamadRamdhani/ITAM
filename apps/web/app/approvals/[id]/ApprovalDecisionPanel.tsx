@@ -8,6 +8,7 @@ import { useGlobalLoading } from "../../components/GlobalLoadingProvider";
 export default function ApprovalDecisionPanel(props: {
   approvalId: number;
   status: string;
+  onDecisionApplied?: () => void;
 }) {
   const router = useRouter();
   const { show, hide } = useGlobalLoading();
@@ -46,15 +47,13 @@ export default function ApprovalDecisionPanel(props: {
     setErr(null);
     show(decision === "APPROVE" ? "Approving..." : "Rejecting...");
 
-    let shouldHideOverlay = true;
-
     try {
       await apiPostJson(`/api/v1/approvals/${props.approvalId}/decide`, {
         decision,
         reason: reason.trim() ? reason.trim() : undefined,
       });
 
-      shouldHideOverlay = false;
+      props.onDecisionApplied?.();
       router.refresh();
     } catch (eAny: any) {
       if (
@@ -62,7 +61,6 @@ export default function ApprovalDecisionPanel(props: {
         eAny?.code === "AUTH_UNAUTHORIZED" ||
         eAny?.http_status === 401
       ) {
-        shouldHideOverlay = false;
         router.replace("/login");
         router.refresh();
         return;
@@ -72,10 +70,7 @@ export default function ApprovalDecisionPanel(props: {
     } finally {
       inFlightRef.current = false;
       setLoadingDecision(null);
-
-      if (shouldHideOverlay) {
-        hide();
-      }
+      hide();
     }
   }
 

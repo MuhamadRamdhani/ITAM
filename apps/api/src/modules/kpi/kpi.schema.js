@@ -454,6 +454,48 @@ export const createKpiMeasurementSchema = {
   },
 };
 
+export const updateKpiMeasurementSchema = {
+  tags: ['KPI'],
+  summary: 'Update KPI measurement snapshot',
+  params: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      id: { anyOf: [{ type: 'integer' }, { type: 'string' }] },
+      measurementId: { anyOf: [{ type: 'integer' }, { type: 'string' }] },
+    },
+    required: ['id', 'measurementId'],
+  },
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      actual_value: { anyOf: [{ type: 'number' }, { type: 'string' }] },
+      measurement_note: { type: ['string', 'null'] },
+      source_snapshot_json: {
+        anyOf: [
+          {
+            type: 'object',
+            additionalProperties: true,
+          },
+          { type: 'null' },
+        ],
+      },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        ok: { type: 'boolean' },
+        data: kpiMeasurementSchema,
+      },
+      required: ['ok', 'data'],
+    },
+  },
+};
+
 export const getKpiScorecardSummarySchema = {
   tags: ['KPI'],
   summary: 'Get KPI scorecard summary by period',

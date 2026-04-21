@@ -6,6 +6,7 @@ const KPI_VIEW_ROLE_SET = new Set([
 ]);
 
 const KPI_MANAGE_ROLE_SET = new Set([
+  'SUPERADMIN',
   'TENANT_ADMIN',
   'ITAM_MANAGER',
 ]);

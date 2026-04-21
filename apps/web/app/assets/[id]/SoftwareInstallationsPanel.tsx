@@ -610,13 +610,15 @@ export default function SoftwareInstallationsPanel({
 
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openAssignmentsModal(item)}
-                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                          >
-                            Manage Assignments
-                          </button>
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              onClick={() => openAssignmentsModal(item)}
+                              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                            >
+                              Manage Assignments
+                            </button>
+                          ) : null}
 
                           {canEdit ? (
                             <button

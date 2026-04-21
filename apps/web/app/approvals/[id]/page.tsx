@@ -13,7 +13,9 @@ type Approval = {
   subject_type: string;
   subject_id: number | string;
   requested_at: string;
+  requested_by_identity_id?: number | null;
   decided_at?: string | null;
+  decided_by_identity_id?: number | null;
   decision_reason?: string | null;
   payload?: any;
 };
@@ -64,6 +66,7 @@ export default function ApprovalDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ApprovalDetailData | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +111,7 @@ export default function ApprovalDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [approvalId, router]);
+  }, [approvalId, router, reloadTick]);
 
   if (!approvalId) {
     return (
@@ -175,6 +178,7 @@ export default function ApprovalDetailPage() {
 
   const approval = data.approval;
   const events = Array.isArray(data.events) ? data.events : [];
+  const sourceWorkflow = `${approval.action_code} - ${approval.subject_type} #${approval.subject_id}`;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
@@ -209,13 +213,32 @@ export default function ApprovalDetailPage() {
                 {approval.status_code}
               </span>
               <div className="mt-3 text-slate-600">
+                Source workflow: {sourceWorkflow}
+              </div>
+              <div className="mt-3 text-slate-600">
                 Requested: {fmtDateTime(approval.requested_at)}
+              </div>
+              <div className="mt-1 text-slate-600">
+                Requester:{" "}
+                {approval.requested_by_identity_id
+                  ? `IDENTITY #${approval.requested_by_identity_id}`
+                  : "-"}
               </div>
               {approval.decided_at && (
                 <div className="mt-1 text-slate-600">
                   Decided: {fmtDateTime(approval.decided_at)}
                 </div>
               )}
+              {approval.decided_by_identity_id ? (
+                <div className="mt-1 text-slate-600">
+                  Decided by: IDENTITY #{approval.decided_by_identity_id}
+                </div>
+              ) : null}
+              {approval.decision_reason ? (
+                <div className="mt-1 text-slate-600">
+                  Decision note: {approval.decision_reason}
+                </div>
+              ) : null}
             </div>
 
             {approval.subject_type === "ASSET" && (
@@ -251,6 +274,7 @@ export default function ApprovalDetailPage() {
             <ApprovalDecisionPanel
               approvalId={Number(approval.id)}
               status={approval.status_code}
+              onDecisionApplied={() => setReloadTick((value) => value + 1)}
             />
           </div>
         </div>

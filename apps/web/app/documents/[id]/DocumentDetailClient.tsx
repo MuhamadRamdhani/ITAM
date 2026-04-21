@@ -3,8 +3,10 @@
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
 import { apiGet } from "../../lib/api";
+import { canFinalizeDocuments, canManageDocuments } from "../../lib/documentAccess";
 import DocumentActionsPanel from "./DocumentActionsPanel";
 import AddVersionPanel from "./AddVersionPanel";
+import DocumentEvidencePanel from "./DocumentEvidencePanel";
 
 type Document = {
   id: number | string;
@@ -20,7 +22,7 @@ type Document = {
 type DocVersion = {
   id: number | string;
   version_no: number;
-  content_json?: any;
+  content_json?: Record<string, unknown> | string | null;
   created_by_identity_id?: number | null;
   created_at: string;
 };
@@ -30,7 +32,7 @@ type DocEvent = {
   event_type: string;
   actor_identity_id?: number | null;
   note?: string | null;
-  event_payload?: any;
+  event_payload?: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -39,6 +41,10 @@ type DocumentBundle = {
   latest_version: DocVersion | null;
   versions: DocVersion[];
   events: DocEvent[];
+};
+
+type MeData = {
+  roles: string[];
 };
 
 function fmtDateTime(value?: string) {
@@ -92,11 +98,18 @@ function getErrorMessage(error: unknown, fallback = "Failed to load document") {
   if (!error) return fallback;
   if (error instanceof Error && error.message) return error.message;
 
-  const e = error as any;
+  const e = error as { error?: { message?: string }; message?: string };
   return e?.error?.message || e?.message || fallback;
 }
 
-function normalizeBundle(res: any): DocumentBundle | null {
+type DocumentBundleResponse = {
+  document?: Document;
+  latest_version?: DocVersion | null;
+  versions?: DocVersion[];
+  events?: DocEvent[];
+};
+
+function normalizeBundle(res: { data?: { data?: DocumentBundleResponse } | DocumentBundleResponse } | null): DocumentBundle | null {
   const raw = res?.data?.data ?? res?.data ?? null;
   if (!raw?.document) return null;
 
@@ -112,13 +125,37 @@ export default function DocumentDetailClient(props: { documentId: number }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [bundle, setBundle] = useState<DocumentBundle | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMe() {
+      try {
+        const res = await apiGet<{ data?: MeData | { data?: MeData } }>("/api/v1/auth/me");
+        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+
+        if (!active) return;
+        setRoles(Array.isArray(me?.roles) ? me.roles : []);
+      } catch {
+        if (!active) return;
+        setRoles([]);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
     setErr(null);
 
     try {
-      const res = await apiGet<any>(`/api/v1/documents/${props.documentId}`);
+      const res = await apiGet<DocumentBundleResponse>(`/api/v1/documents/${props.documentId}`);
       const data = normalizeBundle(res);
 
       if (!data) {
@@ -200,6 +237,8 @@ export default function DocumentDetailClient(props: { documentId: number }) {
   const versions = bundle.versions;
   const events = bundle.events;
   const status = String(doc.status_code ?? "").toUpperCase();
+  const canManageDocs = canManageDocuments(roles);
+  const canFinalizeDocs = canFinalizeDocuments(roles);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
@@ -246,7 +285,7 @@ export default function DocumentDetailClient(props: { documentId: number }) {
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm font-semibold text-slate-900">Latest content</div>
               <div className="mt-2 rounded-2xl bg-white p-4 text-sm leading-7 text-slate-800 shadow-sm whitespace-pre-wrap">
-                {extractTextContent((latest as any)?.content_json)}
+                {extractTextContent(latest?.content_json)}
               </div>
             </div>
 
@@ -254,6 +293,7 @@ export default function DocumentDetailClient(props: { documentId: number }) {
               <AddVersionPanel
                 documentId={Number(doc.id)}
                 status={status}
+                canAddVersion={canManageDocs}
                 onChanged={loadDetail}
               />
             </div>
@@ -263,9 +303,19 @@ export default function DocumentDetailClient(props: { documentId: number }) {
             <DocumentActionsPanel
               documentId={Number(doc.id)}
               status={status}
+              canManageWorkflow={canManageDocs}
+              canFinalizeWorkflow={canFinalizeDocs}
               onChanged={loadDetail}
             />
           </div>
+        </div>
+
+        <div className="mt-8 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mb-4">
+            <div className="text-base font-semibold text-slate-900">Related Evidence</div>
+            <div className="text-sm text-slate-500">Upload dan attach evidence untuk document ini.</div>
+          </div>
+          <DocumentEvidencePanel documentId={Number(doc.id)} roles={roles} />
         </div>
 
         <div className="mt-8 rounded-3xl border border-white bg-white/85 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import UploadEvidenceForm from "./uploadEvidenceForm";
-
 export default function EvidenceUploadPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { apiGet } from '../lib/api';
 import {
   CreateManagementReviewPayload,
   ManagementReviewSession,
@@ -9,6 +10,7 @@ import {
   createManagementReview,
   listManagementReviews,
 } from '../lib/management-reviews';
+import { canManageManagementReviews } from '../lib/managementReviewAccess';
 import {
   IdentityOption,
   getIdentityLabel,
@@ -97,6 +99,8 @@ export default function ManagementReviewsClient() {
 
   const [identityOptions, setIdentityOptions] = useState<IdentitySelectOption[]>([]);
   const [loadingIdentityOptions, setLoadingIdentityOptions] = useState(true);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -129,6 +133,18 @@ export default function ManagementReviewsClient() {
       setIdentityOptions([]);
     } finally {
       setLoadingIdentityOptions(false);
+    }
+  }, []);
+
+  const loadAuth = useCallback(async () => {
+    setLoadingRoles(true);
+    try {
+      const response = await apiGet<{ roles?: string[] }>('/api/v1/auth/me');
+      setRoles(Array.isArray(response.data?.roles) ? response.data.roles : []);
+    } catch {
+      setRoles([]);
+    } finally {
+      setLoadingRoles(false);
     }
   }, []);
 
@@ -166,7 +182,8 @@ export default function ManagementReviewsClient() {
   useEffect(() => {
     loadData('initial');
     loadIdentityOptions();
-  }, [loadData, loadIdentityOptions]);
+    loadAuth();
+  }, [loadData, loadIdentityOptions, loadAuth]);
 
   useEffect(() => {
     if (!successMessage && !errorMessage) return;
@@ -197,6 +214,8 @@ export default function ManagementReviewsClient() {
     [identityMap],
   );
 
+  const canManage = useMemo(() => canManageManagementReviews(roles), [roles]);
+
   const draftCount = useMemo(
     () => items.filter((item) => item.status === 'DRAFT').length,
     [items],
@@ -225,6 +244,7 @@ export default function ManagementReviewsClient() {
   }
 
   function openCreateModal() {
+    if (!canManage) return;
     setErrorMessage(null);
     setSuccessMessage(null);
     setCreateOpen(true);
@@ -310,15 +330,24 @@ export default function ManagementReviewsClient() {
               Open Action Tracker
             </Link>
 
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800"
-            >
-              New Management Review
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800"
+              >
+                New Management Review
+              </button>
+            ) : null}
           </div>
         </div>
+
+        {!loadingRoles && !canManage ? (
+          <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            Read-only access: you can view management review sessions, but creation and
+            edits are restricted.
+          </div>
+        ) : null}
 
         {successMessage ? (
           <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -436,15 +465,17 @@ export default function ManagementReviewsClient() {
                 <p className="mt-2 text-sm text-gray-500">
                   Try changing the filter, or create a new management review session.
                 </p>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={openCreateModal}
-                    className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
-                  >
-                    Create Session
-                  </button>
-                </div>
+                {canManage ? (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={openCreateModal}
+                      className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                    >
+                      Create Session
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -544,7 +575,7 @@ export default function ManagementReviewsClient() {
         </div>
       </div>
 
-      {createOpen ? (
+      {createOpen && canManage ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 px-4">
           <div className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
@@ -725,4 +756,4 @@ export default function ManagementReviewsClient() {
       ) : null}
     </main>
   );
-}
+} 

@@ -241,7 +241,7 @@ export default async function authRoutes(app) {
     await logoutService(app, { refreshTokenRaw: rt, ip, userAgent });
 
     reply.clearCookie(ACCESS_COOKIE, { path: "/" });
-    reply.clearCookie(REFRESH_COOKIE, { path: "/api/v1/auth" });
+    reply.clearCookie(REFRESH_COOKIE, { path: "/" });
 
     return reply.send({
       ok: true,

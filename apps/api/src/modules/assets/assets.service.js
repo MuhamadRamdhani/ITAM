@@ -1,6 +1,7 @@
 import { resolveIdByCode, requireExistsById } from "../../lib/refIntegrity.js";
 import { insertAuditEvent } from "../../lib/audit.js";
 import { getUiConfig } from "../config/config.repo.js";
+import { getActiveScopeVersion } from "../governance/scope.repo.js";
 import {
   countAssets,
   listAssets as repoListAssets,
@@ -127,6 +128,46 @@ function validateDateRange(startDate, endDate, startField, endField) {
   }
 }
 
+function normalizeCode(value) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function extractActiveScopeAssetTypeCodes(scopeJson) {
+  const parsedScopeJson =
+    typeof scopeJson === "string"
+      ? (() => {
+          try {
+            return JSON.parse(scopeJson);
+          } catch {
+            return {};
+          }
+        })()
+      : scopeJson;
+
+  const raw = parsedScopeJson?.asset_type_codes;
+  if (!Array.isArray(raw)) return [];
+
+  const seen = new Set();
+  const out = [];
+  for (const item of raw) {
+    const code = normalizeCode(item);
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+  }
+  return out;
+}
+
+async function getActiveScopeAssetTypeCodes(app, tenantId) {
+  const activeScope = await getActiveScopeVersion(app.pg, { tenantId });
+  if (!activeScope) return null;
+  return {
+    id: activeScope.id,
+    version_no: activeScope.version_no,
+    asset_type_codes: extractActiveScopeAssetTypeCodes(activeScope.scope_json),
+  };
+}
+
 const HARDWARE_TYPE_CODES = new Set(["HARDWARE", "NETWORK"]);
 const SUBSCRIPTION_TYPE_CODES = new Set(["SAAS", "CLOUD", "VM_CONTAINER"]);
 
@@ -220,6 +261,23 @@ export async function getAssetDetail(app, req, assetId) {
 export async function createAsset(app, req, body) {
   const tenantId = mustTenantId(req);
   mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER"]);
+
+  const requestedAssetTypeCode = normalizeCode(body.asset_type_code);
+  const activeScope = await getActiveScopeAssetTypeCodes(app, tenantId);
+  if (activeScope?.asset_type_codes?.length > 0) {
+    if (!activeScope.asset_type_codes.includes(requestedAssetTypeCode)) {
+      const e = new Error("Asset type is outside active governance scope");
+      e.statusCode = 409;
+      e.code = "SCOPE_VIOLATION";
+      e.details = {
+        active_scope_version_id: activeScope.id,
+        active_scope_version_no: activeScope.version_no,
+        requested_asset_type_code: requestedAssetTypeCode,
+        allowed_asset_type_codes: activeScope.asset_type_codes,
+      };
+      throw e;
+    }
+  }
 
   const assetTypeId = await resolveIdByCode(app, tenantId, "asset_types", body.asset_type_code);
   const stateId = await resolveIdByCode(app, tenantId, "lifecycle_states", body.initial_state_code);

@@ -107,6 +107,17 @@ export function assertCanManageScope(request) {
   }
 }
 
+export function assertCanApproveActivateScope(request) {
+  const roles = getRoleCodes(request);
+  const allowed = ["TENANT_ADMIN"];
+
+  if (!roles.some((r) => allowed.includes(r))) {
+    throw makeError("Forbidden", 403, "FORBIDDEN", {
+      roles_seen: roles,
+    });
+  }
+}
+
 async function withTransaction(db, fn) {
   const canConnect = typeof db.connect === "function";
   const client = canConnect ? await db.connect() : db;
@@ -289,7 +300,7 @@ export async function submitScopeVersionService(db, request, id, body) {
 }
 
 export async function approveScopeVersionService(db, request, id, body) {
-  assertCanManageScope(request);
+  assertCanApproveActivateScope(request);
 
   const tenantId = getTenantIdFromRequest(request);
   const actorUserId = getActorUserIdFromRequest(request);
@@ -341,7 +352,7 @@ export async function approveScopeVersionService(db, request, id, body) {
 }
 
 export async function activateScopeVersionService(db, request, id, body) {
-  assertCanManageScope(request);
+  assertCanApproveActivateScope(request);
 
   const tenantId = getTenantIdFromRequest(request);
   const actorUserId = getActorUserIdFromRequest(request);

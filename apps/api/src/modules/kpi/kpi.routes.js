@@ -9,6 +9,7 @@ import {
   listKpiMeasurementsService,
   listKpisService,
   updateKpiService,
+  updateKpiMeasurementService,
 } from './kpi.service.js';
 import {
   createKpiMeasurementSchema,
@@ -20,6 +21,7 @@ import {
   getKpiTrendSchema,
   listKpiMeasurementsSchema,
   listKpisSchema,
+  updateKpiMeasurementSchema,
   updateKpiSchema,
 } from './kpi.schema.js';
 
@@ -182,6 +184,25 @@ export default async function kpiRoutes(fastify) {
         tenantId: request.tenantId,
         requestContext: request.requestContext,
         id: request.params.id,
+        body: request.body,
+      });
+
+      return reply.send({ ok: true, data });
+    }
+  );
+
+  fastify.patch(
+    '/:id/measurements/:measurementId',
+    { schema: updateKpiMeasurementSchema },
+    async function updateKpiMeasurementHandler(request, reply) {
+      const db = resolveDb(fastify);
+
+      const data = await updateKpiMeasurementService({
+        db,
+        tenantId: request.tenantId,
+        requestContext: request.requestContext,
+        kpiId: request.params.id,
+        measurementId: request.params.measurementId,
         body: request.body,
       });
 

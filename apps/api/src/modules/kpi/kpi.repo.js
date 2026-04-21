@@ -628,6 +628,40 @@ export async function getKpiMeasurementByPeriodRepo(
   return mapKpiMeasurementRow(result.rows[0] || null);
 }
 
+export async function getKpiMeasurementByIdRepo(db, { tenantId, measurementId }) {
+  const sql = `
+    SELECT
+      id,
+      tenant_id,
+      kpi_definition_id,
+      period_type,
+      period_key,
+      TO_CHAR(period_start_date, 'YYYY-MM-DD') AS period_start_date,
+      TO_CHAR(period_end_date, 'YYYY-MM-DD') AS period_end_date,
+      target_value_snapshot,
+      warning_value_snapshot,
+      critical_value_snapshot,
+      baseline_value_snapshot,
+      actual_value,
+      achievement_pct,
+      status_code,
+      measurement_source_type,
+      measurement_note,
+      source_snapshot_json,
+      measured_at,
+      measured_by_user_id,
+      created_at,
+      updated_at
+    FROM public.kpi_measurements
+    WHERE tenant_id = $1
+      AND id = $2
+    LIMIT 1
+  `;
+
+  const result = await db.query(sql, [tenantId, measurementId]);
+  return mapKpiMeasurementRow(result.rows[0] || null);
+}
+
 export async function createKpiMeasurementRepo(db, payload) {
   const sql = `
     INSERT INTO public.kpi_measurements (
@@ -701,6 +735,58 @@ export async function createKpiMeasurementRepo(db, payload) {
   ];
 
   const result = await db.query(sql, params);
+  return mapKpiMeasurementRow(result.rows[0] || null);
+}
+
+export async function updateKpiMeasurementRepo(db, payload) {
+  const sql = `
+    UPDATE public.kpi_measurements
+       SET actual_value = $3,
+           achievement_pct = $4,
+           status_code = $5,
+           measurement_note = $6,
+           source_snapshot_json = $7::jsonb,
+           measured_by_user_id = $8,
+           measured_at = NOW()
+     WHERE tenant_id = $1
+       AND id = $2
+     RETURNING
+      id,
+      tenant_id,
+      kpi_definition_id,
+      period_type,
+      period_key,
+      TO_CHAR(period_start_date, 'YYYY-MM-DD') AS period_start_date,
+      TO_CHAR(period_end_date, 'YYYY-MM-DD') AS period_end_date,
+      target_value_snapshot,
+      warning_value_snapshot,
+      critical_value_snapshot,
+      baseline_value_snapshot,
+      actual_value,
+      achievement_pct,
+      status_code,
+      measurement_source_type,
+      measurement_note,
+      source_snapshot_json,
+      measured_at,
+      measured_by_user_id,
+      created_at,
+      updated_at
+  `;
+
+  const result = await db.query(sql, [
+    payload.tenant_id,
+    payload.id,
+    payload.actual_value,
+    payload.achievement_pct,
+    payload.status_code,
+    payload.measurement_note,
+    payload.source_snapshot_json == null
+      ? null
+      : JSON.stringify(payload.source_snapshot_json),
+    payload.measured_by_user_id,
+  ]);
+
   return mapKpiMeasurementRow(result.rows[0] || null);
 }
 

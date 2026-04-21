@@ -222,6 +222,7 @@ export const KPI_VIEW_ROLES = new Set<KpiRoleCode>([
 ]);
 
 export const KPI_MANAGE_ROLES = new Set<KpiRoleCode>([
+  'SUPERADMIN',
   'TENANT_ADMIN',
   'ITAM_MANAGER',
 ]);

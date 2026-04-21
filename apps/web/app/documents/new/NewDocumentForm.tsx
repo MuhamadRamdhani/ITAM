@@ -1,16 +1,35 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiPostJson } from "../../lib/api";
+import { apiGet, apiPostJson } from "../../lib/api";
+import { canManageDocuments } from "../../lib/documentAccess";
 
 const TYPES = ["POLICY", "SOP", "EVIDENCE", "CONTRACT", "OTHER"] as const;
+
+type MeData = {
+  roles: string[];
+};
+
+type ApiResponseShape = {
+  data?: {
+    data?: MeData;
+  } | MeData;
+};
+
+type CreateDocumentResponse = {
+  document?: { id?: number | string };
+  data?: {
+    document?: { id?: number | string };
+  };
+  id?: number | string;
+};
 
 function getErrorMessage(error: unknown, fallback = "Failed to create document") {
   if (!error) return fallback;
   if (error instanceof Error && error.message) return error.message;
 
-  const e = error as any;
+  const e = error as { error?: { message?: string }; message?: string };
   return e?.error?.message || e?.message || fallback;
 }
 
@@ -23,12 +42,43 @@ export default function NewDocumentForm() {
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [gateReady, setGateReady] = useState(false);
+  const [canWrite, setCanWrite] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMe() {
+      try {
+        const res = await apiGet<ApiResponseShape>("/api/v1/auth/me");
+        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+
+        if (!mounted) return;
+        setCanWrite(canManageDocuments(me?.roles ?? []));
+      } catch {
+        if (!mounted) return;
+        setCanWrite(false);
+      } finally {
+        if (!mounted) return;
+        setGateReady(true);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function submit() {
     setLoading(true);
     setErr(null);
 
     try {
+      if (!canWrite) {
+        throw new Error("Forbidden. Hanya TENANT_ADMIN atau ITAM_MANAGER yang bisa membuat document.");
+      }
       if (!title.trim()) throw new Error("Title wajib diisi.");
 
       const body = {
@@ -37,7 +87,7 @@ export default function NewDocumentForm() {
         content_json: { text: text.trim() },
       };
 
-      const res = await apiPostJson<any>("/api/v1/documents", body);
+      const res = await apiPostJson<CreateDocumentResponse>("/api/v1/documents", body);
 
       const payload = res?.data;
       const docId =
@@ -62,6 +112,23 @@ export default function NewDocumentForm() {
   const inputClass =
     "mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100";
 
+  if (!gateReady) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        Loading permission...
+      </div>
+    );
+  }
+
+  if (!canWrite) {
+    return (
+      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        Kamu hanya bisa melihat document ini. Pembuatan document dibatasi untuk TENANT_ADMIN dan
+        ITAM_MANAGER.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -70,7 +137,7 @@ export default function NewDocumentForm() {
           <select
             className={inputClass}
             value={docType}
-            onChange={(e) => setDocType(e.target.value as any)}
+            onChange={(e) => setDocType(e.target.value as (typeof TYPES)[number])}
             disabled={loading}
           >
             {TYPES.map((t) => (

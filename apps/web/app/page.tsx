@@ -15,6 +15,8 @@ import AssetTransfersLauncher from "./components/AssetTransfersLauncher";
 import KpiModuleLauncher from "./components/KpiModuleLauncher";
 import KpiCardsLauncher from "./components/KpiCardsLauncher";
 import KpiQuickLinks from "./components/KpiQuickLinks";
+import NewAssetQuickLink from "./components/NewAssetQuickLink";
+import NewDocumentQuickLink from "./components/NewDocumentQuickLink";
 
 function Card(props: { title: string; desc: string; href: string }) {
   return (
@@ -235,18 +237,8 @@ export default function HomePage() {
               Quick links
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Link
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-900"
-                href="/assets/new"
-              >
-                + New Asset
-              </Link>
-              <Link
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-900"
-                href="/documents/new"
-              >
-                + New Document
-              </Link>
+              <NewAssetQuickLink />
+              <NewDocumentQuickLink />
               <Link
                 className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-900"
                 href="/evidence/upload"

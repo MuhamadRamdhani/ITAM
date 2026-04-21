@@ -29,6 +29,8 @@ type AssetDetailResponse = {
   };
 };
 
+const STATUS_OPTIONS = ["AKTIF", "NON_AKTIF", "PENDING", "RUSAK", "PENSIUN", "DIHAPUS"] as const;
+
 function valueOrEmpty(v?: string | null) {
   return v ? String(v).slice(0, 10) : "";
 }
@@ -220,12 +222,20 @@ export default function EditAssetPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700">Status</label>
-                  <input
+                  <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    placeholder="AKTIF"
                     className={inputClass}
-                  />
+                  >
+                    {status && !STATUS_OPTIONS.includes(status.toUpperCase() as (typeof STATUS_OPTIONS)[number]) ? (
+                      <option value={status}>{status}</option>
+                    ) : null}
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

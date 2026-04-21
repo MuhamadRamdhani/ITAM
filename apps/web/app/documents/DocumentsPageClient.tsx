@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet } from "../lib/api";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
+import { canManageDocuments } from "../lib/documentAccess";
 
 type DocumentItem = {
   id: number | string;
@@ -24,6 +25,35 @@ type DocumentListData = {
 type UiConfigNormalized = {
   pageSizeOptions: number[];
   pageSizeDefault: number;
+};
+
+type MeData = {
+  tenant_id: number;
+  user_id: number;
+  roles: string[];
+  identity_id: number | null;
+};
+
+type ApiPayload<T> = T | { data?: T };
+
+type UiConfigData = {
+  page_size_options?: unknown;
+  documents_page_size_default?: unknown;
+  ui?: {
+    page_size?: {
+      options?: unknown;
+    };
+    documents?: {
+      page_size?: {
+        default?: unknown;
+      };
+    };
+  };
+};
+
+type DocumentListResponse = {
+  total?: number | string;
+  items?: unknown[];
 };
 
 const STATUSES = ["ALL", "DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"] as const;
@@ -72,12 +102,26 @@ function getErrorMessage(error: unknown, fallback = "Failed to load documents") 
   if (!error) return fallback;
   if (error instanceof Error && error.message) return error.message;
 
-  const e = error as any;
+  const e = error as { error?: { message?: string }; message?: string };
   return e?.error?.message || e?.message || fallback;
 }
 
-function normalizeUiConfig(res: any): UiConfigNormalized {
-  const raw = res?.data?.data ?? res?.data ?? {};
+function unwrapApiPayload<T>(payload: ApiPayload<T> | null | undefined): T | null {
+  if (!payload) return null;
+  if (typeof payload === "object" && "data" in payload) {
+    const wrapped = payload as { data?: ApiPayload<T> };
+    const inner = wrapped.data;
+    if (!inner) return null;
+    if (typeof inner === "object" && inner !== null && "data" in inner) {
+      return (((inner as { data?: T }).data ?? null) as T | null);
+    }
+    return inner as T;
+  }
+  return payload as T;
+}
+
+function normalizeUiConfig(res: { data: ApiPayload<UiConfigData> }): UiConfigNormalized {
+  const raw = unwrapApiPayload<UiConfigData>(res?.data) ?? {};
   const optionsRaw =
     raw?.page_size_options ??
     raw?.ui?.page_size?.options ??
@@ -85,7 +129,7 @@ function normalizeUiConfig(res: any): UiConfigNormalized {
 
   const pageSizeOptions = Array.isArray(optionsRaw)
     ? optionsRaw
-        .map((x: any) => Number(x))
+        .map((x) => Number(x))
         .filter((n: number) => Number.isFinite(n) && n > 0)
     : [];
 
@@ -102,11 +146,11 @@ function normalizeUiConfig(res: any): UiConfigNormalized {
   return { pageSizeOptions: safeOptions, pageSizeDefault };
 }
 
-function normalizeDocumentList(res: any): DocumentListData {
-  const raw = res?.data?.data ?? res?.data ?? {};
+function normalizeDocumentList(res: { data: ApiPayload<DocumentListResponse> }): DocumentListData {
+  const raw = unwrapApiPayload<DocumentListResponse>(res?.data);
   return {
     total: Number(raw?.total ?? 0),
-    items: Array.isArray(raw?.items) ? raw.items : [],
+    items: Array.isArray(raw?.items) ? (raw.items as DocumentItem[]) : [],
   };
 }
 
@@ -126,6 +170,7 @@ export default function DocumentsPageClient() {
   const [total, setTotal] = useState(0);
   const [pageSizeOptions, setPageSizeOptions] = useState<number[]>([10, 20, 50]);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [roles, setRoles] = useState<string[]>([]);
 
   const [searchType, setSearchType] = useState(type);
   const [searchQ, setSearchQ] = useState(q);
@@ -138,12 +183,34 @@ export default function DocumentsPageClient() {
   useEffect(() => {
     let active = true;
 
+    async function loadMe() {
+      try {
+        const res = await apiGet<ApiPayload<MeData>>("/api/v1/auth/me");
+        const me = unwrapApiPayload<MeData>(res.data);
+        if (!active) return;
+        setRoles(Array.isArray(me?.roles) ? me.roles : []);
+      } catch {
+        if (!active) return;
+        setRoles([]);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
     async function load() {
       setLoading(true);
       setErr(null);
 
       try {
-        const cfgRes = await apiGet<any>("/api/v1/config/ui", {
+        const cfgRes = await apiGet<ApiPayload<UiConfigData>>("/api/v1/config/ui", {
           loadingKey: "documents_config",
         });
         const cfg = normalizeUiConfig(cfgRes);
@@ -165,7 +232,7 @@ export default function DocumentsPageClient() {
         qs.set("page", String(pageFromUrl));
         qs.set("page_size", String(effectivePageSize));
 
-        const res = await apiGet<any>(`/api/v1/documents?${qs.toString()}`, {
+        const res = await apiGet<ApiPayload<DocumentListResponse>>(`/api/v1/documents?${qs.toString()}`, {
           loadingKey: "documents_list",
           loadingDelay: 300,
         });
@@ -195,6 +262,7 @@ export default function DocumentsPageClient() {
   const totalPages = total > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const canPrev = pageFromUrl > 1;
   const canNext = pageFromUrl < totalPages;
+  const canManageDocs = canManageDocuments(roles);
 
   const startIdx = total === 0 ? 0 : (pageFromUrl - 1) * pageSize + 1;
   const endIdx = total === 0 ? 0 : (pageFromUrl - 1) * pageSize + items.length;
@@ -252,12 +320,11 @@ export default function DocumentsPageClient() {
 
         <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="mb-4 flex justify-end">
-            <Link
-              href="/documents/new"
-              className="itam-primary-action"
-            >
-              New Document
-            </Link>
+            {canManageDocs ? (
+              <Link href="/documents/new" className="itam-primary-action">
+                New Document
+              </Link>
+            ) : null}
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-4">
@@ -384,7 +451,7 @@ export default function DocumentsPageClient() {
                           <Link className="text-cyan-700 hover:underline" href={`/documents/${d.id}`}>
                             View
                           </Link>
-                          {canEdit ? (
+                          {canEdit && canManageDocs ? (
                             <>
                               <span className="mx-2 text-slate-300">|</span>
                               <Link className="text-cyan-700 hover:underline" href={`/documents/${d.id}`}>

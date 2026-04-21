@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { canManageGovernance } from "../../lib/governanceAccess";
 import { apiGet, apiPatchJson, apiPostJson } from "../../lib/api";
 import { SkeletonTableRow } from "../../lib/loadingComponents";
 
@@ -127,6 +128,7 @@ function buildHref(params: {
   q: string;
   page?: number;
   pageSize?: number;
+  returnTo?: string;
 }) {
   const p = new URLSearchParams();
   if (params.status && params.status !== "ALL") p.set("status", params.status);
@@ -134,6 +136,7 @@ function buildHref(params: {
   if (params.q) p.set("q", params.q);
   if (params.page && params.page > 0) p.set("page", String(params.page));
   if (params.pageSize && params.pageSize > 0) p.set("page_size", String(params.pageSize));
+  if (params.returnTo && params.returnTo.startsWith("/")) p.set("return_to", params.returnTo);
   const qs = p.toString();
   return qs ? `/governance/context?${qs}` : "/governance/context";
 }
@@ -159,6 +162,24 @@ export default function ContextRegisterPageClient() {
   const q = (searchParams.get("q") || "").trim();
   const pageFromUrl = pickInt(searchParams.get("page"), 1);
   const pageSizeFromUrl = pickInt(searchParams.get("page_size"), 0);
+  const rawReturnTo = searchParams.get("return_to")?.trim() || "";
+  const safeReturnTo = rawReturnTo && rawReturnTo.startsWith("/") ? rawReturnTo : "";
+  const backHref = safeReturnTo || "/";
+
+  const currentContextHref = useMemo(() => {
+    return buildHref({
+      status,
+      category,
+      q,
+      page: pageFromUrl,
+      pageSize: pageSizeFromUrl > 0 ? pageSizeFromUrl : undefined,
+      returnTo: safeReturnTo,
+    });
+  }, [status, category, q, pageFromUrl, pageSizeFromUrl, safeReturnTo]);
+
+  const scopeHref = useMemo(() => {
+    return `/governance/scope?return_to=${encodeURIComponent(currentContextHref)}`;
+  }, [currentContextHref]);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -167,6 +188,7 @@ export default function ContextRegisterPageClient() {
   const [pageSizeOptions, setPageSizeOptions] = useState<number[]>([10, 20, 50]);
   const [pageSize, setPageSize] = useState<number>(10);
   const [identities, setIdentities] = useState<IdentityItem[]>([]);
+  const [canManage, setCanManage] = useState(false);
 
   const [searchText, setSearchText] = useState(q);
 
@@ -209,14 +231,14 @@ export default function ContextRegisterPageClient() {
         qs.set("page", String(pageFromUrl));
         qs.set("page_size", String(effectivePageSize));
 
-        const [listRes, identitiesRes] = await Promise.all([
+        const [listRes, meRes] = await Promise.all([
           apiGet<any>(`/api/v1/governance/context?${qs.toString()}`, {
             loadingKey: "context_list",
             loadingDelay: 300,
           }),
-          apiGet<any>("/api/v1/admin/identities", {
-            loadingKey: "context_identities",
-          }),
+          apiGet<any>("/api/v1/auth/me", {
+            loadingKey: "context_me",
+          }).catch(() => null),
         ]);
 
         if (!active) return;
@@ -225,13 +247,27 @@ export default function ContextRegisterPageClient() {
         setItems(listData.items);
         setTotal(listData.total);
 
-        const identityRows = normalizeIdentities(identitiesRes);
-        setIdentities(identityRows);
+        const meData = meRes?.data?.data ?? meRes?.data ?? {};
+        const roles = Array.isArray(meData?.roles) ? meData.roles : [];
+        const nextCanManage = canManageGovernance(roles);
+        setCanManage(nextCanManage);
+
+        if (nextCanManage) {
+          const identitiesRes = await apiGet<any>("/api/v1/admin/identities", {
+            loadingKey: "context_identities",
+          });
+
+          if (!active) return;
+
+          const identityRows = normalizeIdentities(identitiesRes);
+          setIdentities(identityRows);
+        }
       } catch (error) {
         if (!active) return;
         setErr(getErrorMessage(error));
         setItems([]);
         setTotal(0);
+        setCanManage(false);
       } finally {
         if (active) setLoading(false);
       }
@@ -310,6 +346,7 @@ export default function ContextRegisterPageClient() {
           q,
           page: 1,
           pageSize,
+          returnTo: safeReturnTo,
         })
       );
     } catch (error) {
@@ -327,6 +364,7 @@ export default function ContextRegisterPageClient() {
         q,
         page: 1,
         pageSize: nextPageSize,
+        returnTo: safeReturnTo,
       })
     );
   }
@@ -340,6 +378,7 @@ export default function ContextRegisterPageClient() {
         q: searchText.trim(),
         page: 1,
         pageSize,
+        returnTo: safeReturnTo,
       })
     );
   }
@@ -359,7 +398,7 @@ export default function ContextRegisterPageClient() {
               </p>
             </div>
 
-            <Link href="/" className="itam-secondary-action md:self-end">
+            <Link href={backHref} className="itam-secondary-action md:self-end">
               Back
             </Link>
           </div>
@@ -367,192 +406,195 @@ export default function ContextRegisterPageClient() {
 
         <div className="mt-16 rounded-3xl border border-white bg-white/80 p-10 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="flex justify-end">
-            <Link href="/governance/scope" className="itam-secondary-action">
+            <Link href={scopeHref} className="itam-secondary-action">
               Scope
             </Link>
           </div>
 
           <div className="mt-12 space-y-12">
-            <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-base font-semibold text-gray-900">
-                    {editingId ? "Edit Context Entry" : "New Context Entry"}
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    Catat isu internal / eksternal yang mempengaruhi ITAM.
-                  </div>
-                </div>
-
-                {editingId ? (
-                  <button
-                    type="button"
-                    onClick={startCreate}
-                    className="itam-secondary-action-sm"
-                  >
-                    Cancel Edit
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="mt-5 space-y-5">
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Title</div>
-                  <input
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    disabled={saving}
-                    placeholder="e.g. Cloud migration strategy"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {canManage ? (
+              <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-gray-700">Category</div>
-                    <select
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={form.category_code}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, category_code: e.target.value }))
-                      }
-                      disabled={saving}
-                    >
-                      {CATEGORY_OPTIONS.filter((x) => x !== "ALL").map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="text-base font-semibold text-gray-900">
+                      {editingId ? "Edit Context Entry" : "New Context Entry"}
+                    </div>
+                    <div className="mt-1 text-sm text-gray-600">
+                      Catat isu internal / eksternal yang mempengaruhi ITAM.
+                    </div>
                   </div>
 
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Priority</div>
-                    <select
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={form.priority_code}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, priority_code: e.target.value }))
-                      }
-                      disabled={saving}
-                    >
-                      {PRIORITY_OPTIONS.map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Status</div>
-                    <select
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={form.status_code}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, status_code: e.target.value }))
-                      }
-                      disabled={saving}
-                    >
-                      {STATUS_OPTIONS.filter((x) => x !== "ALL").map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Owner Identity</div>
-                    <select
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={form.owner_identity_id}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          owner_identity_id: e.target.value,
-                        }))
-                      }
-                      disabled={saving}
-                    >
-                      <option value="">- Unassigned -</option>
-                      {identities.map((row) => (
-                        <option key={row.id} value={String(row.id)}>
-                          {row.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Review Date</div>
-                    <input
-                      type="date"
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={form.review_date}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, review_date: e.target.value }))
-                      }
-                      disabled={saving}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Description</div>
-                  <textarea
-                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                    rows={8}
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    disabled={saving}
-                    placeholder="Describe the internal or external issue impacting ITAM..."
-                  />
-                </div>
-
-                {saveErr ? (
-                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    {saveErr}
-                  </div>
-                ) : null}
-
-                <div className="flex justify-end gap-2">
                   {editingId ? (
                     <button
                       type="button"
                       onClick={startCreate}
-                      disabled={saving}
-                      className="itam-secondary-action"
+                      className="itam-secondary-action-sm"
                     >
-                      Reset
+                      Cancel Edit
                     </button>
                   ) : null}
-
-                  <button
-                    type="button"
-                    onClick={saveForm}
-                    disabled={saving}
-                    className="itam-primary-action disabled:opacity-50"
-                  >
-                    {saving ? "Saving..." : editingId ? "Save Changes" : "Create Context Entry"}
-                  </button>
                 </div>
-              </div>
-            </section>
+
+                <div className="mt-5 space-y-5">
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Title</div>
+                    <input
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      disabled={saving}
+                      placeholder="e.g. Cloud migration strategy"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Category</div>
+                      <select
+                        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                        value={form.category_code}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, category_code: e.target.value }))
+                        }
+                        disabled={saving}
+                      >
+                        {CATEGORY_OPTIONS.filter((x) => x !== "ALL").map((x) => (
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Priority</div>
+                      <select
+                        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                        value={form.priority_code}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, priority_code: e.target.value }))
+                        }
+                        disabled={saving}
+                      >
+                        {PRIORITY_OPTIONS.map((x) => (
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Status</div>
+                      <select
+                        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                        value={form.status_code}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, status_code: e.target.value }))
+                        }
+                        disabled={saving}
+                      >
+                        {STATUS_OPTIONS.filter((x) => x !== "ALL").map((x) => (
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Owner Identity</div>
+                      <select
+                        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                        value={form.owner_identity_id}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, owner_identity_id: e.target.value }))
+                        }
+                        disabled={saving}
+                      >
+                        <option value="">- Unassigned -</option>
+                        {identities.map((row) => (
+                          <option key={row.id} value={String(row.id)}>
+                            {row.display_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">Review Date</div>
+                      <input
+                        type="date"
+                        className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                        value={form.review_date}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, review_date: e.target.value }))
+                        }
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Description</div>
+                    <textarea
+                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                      rows={6}
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, description: e.target.value }))
+                      }
+                      disabled={saving}
+                      placeholder="Describe the internal or external issue impacting ITAM..."
+                    />
+                  </div>
+
+                  {saveErr ? (
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {saveErr}
+                    </div>
+                  ) : null}
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={saveForm}
+                      disabled={saving}
+                      className="itam-primary-action disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : editingId ? "Save Changes" : "Create Context Entry"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+                <div className="text-base font-semibold text-gray-900">Context Register</div>
+                <div className="mt-1 text-sm text-gray-600">
+                  Read only. Create/edit context register is restricted to SUPERADMIN,
+                  TENANT_ADMIN, and ITAM_MANAGER.
+                </div>
+              </section>
+            )}
 
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-gray-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {STATUS_OPTIONS.map((s) => (
                     <Link
                       key={s}
-                      href={buildHref({ status: s, category, q, page: 1, pageSize })}
+                      href={buildHref({
+                        status: s,
+                        category,
+                        q,
+                        page: 1,
+                        pageSize,
+                        returnTo: safeReturnTo,
+                      })}
                       className={
                         status === s
                           ? "border-b-2 border-blue-600 pb-1 text-blue-700"
@@ -578,6 +620,7 @@ export default function ContextRegisterPageClient() {
                           q,
                           page: 1,
                           pageSize,
+                          returnTo: safeReturnTo,
                         })
                       )
                     }
@@ -585,7 +628,7 @@ export default function ContextRegisterPageClient() {
                   >
                     {CATEGORY_OPTIONS.map((x) => (
                       <option key={x} value={x}>
-                        {x === "ALL" ? "All categories" : x}
+                        {x}
                       </option>
                     ))}
                   </select>
@@ -603,13 +646,13 @@ export default function ContextRegisterPageClient() {
                   </select>
 
                   <input
+                    className="rounded-md border px-3 py-2 text-sm"
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                     placeholder="Search title/description..."
-                    className="w-full rounded-md border px-3 py-2 text-sm sm:w-64"
                   />
 
-                  <button className="itam-primary-action-sm">Search</button>
+                  <button className="itam-primary-action">Search</button>
                 </form>
               </div>
 
@@ -625,13 +668,13 @@ export default function ContextRegisterPageClient() {
                 <table className="w-full text-sm">
                   <thead className="text-left text-gray-500">
                     <tr>
-                      <th className="py-2 pr-4">Updated</th>
                       <th className="py-2 pr-4">Title</th>
                       <th className="py-2 pr-4">Category</th>
                       <th className="py-2 pr-4">Priority</th>
+                      <th className="py-2 pr-4">Status</th>
                       <th className="py-2 pr-4">Owner</th>
                       <th className="py-2 pr-4">Review Date</th>
-                      <th className="py-2 pr-4">Status</th>
+                      <th className="py-2 pr-4">Updated</th>
                       <th className="py-2 pr-4 text-right">Action</th>
                     </tr>
                   </thead>
@@ -647,49 +690,48 @@ export default function ContextRegisterPageClient() {
                     ) : items.length === 0 ? (
                       <tr className="border-t">
                         <td colSpan={8} className="py-6 text-gray-600">
-                          Tidak ada context entries.
+                          Tidak ada context register.
                         </td>
                       </tr>
                     ) : (
                       items.map((row) => (
                         <tr key={String(row.id)} className="border-t align-top">
-                          <td className="whitespace-nowrap py-2 pr-4">
-                            {fmtDateTime(row.updated_at)}
-                          </td>
-                          <td className="py-2 pr-4">
+                          <td className="py-3 pr-4">
                             <div className="font-medium text-gray-900">{row.title}</div>
-                            <div className="mt-1 line-clamp-2 text-xs text-gray-600">
+                            <div className="mt-1 text-xs text-gray-500 line-clamp-2">
                               {row.description || "-"}
                             </div>
                           </td>
-                          <td className="py-2 pr-4">{row.category_code}</td>
-                          <td className="py-2 pr-4">
+                          <td className="py-3 pr-4">{row.category_code || "-"}</td>
+                          <td className="py-3 pr-4">
                             <span className={priorityPill(row.priority_code)}>
-                              {row.priority_code}
+                              {row.priority_code || "-"}
                             </span>
                           </td>
-                          <td className="py-2 pr-4">
+                          <td className="py-3 pr-4">
+                            <span className={statusPill(row.status_code)}>
+                              {row.status_code || "-"}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4">
                             {row.owner_identity_id
-                              ? identityMap.get(Number(row.owner_identity_id)) ||
-                                `Identity #${row.owner_identity_id}`
+                              ? identityMap.get(Number(row.owner_identity_id)) || `Identity #${row.owner_identity_id}`
                               : "-"}
                           </td>
-                          <td className="py-2 pr-4 whitespace-nowrap">
-                            {row.review_date ? String(row.review_date).slice(0, 10) : "-"}
-                          </td>
-                          <td className="py-2 pr-4">
-                            <span className={statusPill(row.status_code)}>
-                              {row.status_code}
-                            </span>
-                          </td>
-                          <td className="py-2 pr-4 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => startEdit(row)}
-                              className="text-blue-700 hover:underline"
-                            >
-                              Edit
-                            </button>
+                          <td className="whitespace-nowrap py-3 pr-4">{row.review_date || "-"}</td>
+                          <td className="whitespace-nowrap py-3 pr-4">{fmtDateTime(row.updated_at)}</td>
+                          <td className="whitespace-nowrap py-3 pr-4 text-right">
+                            {canManage ? (
+                              <button
+                                type="button"
+                                onClick={() => startEdit(row)}
+                                className="text-blue-700 hover:underline"
+                              >
+                                Edit
+                              </button>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -713,6 +755,7 @@ export default function ContextRegisterPageClient() {
                         q,
                         page: pageFromUrl - 1,
                         pageSize,
+                        returnTo: safeReturnTo,
                       })}
                     >
                       Prev
@@ -732,6 +775,7 @@ export default function ContextRegisterPageClient() {
                         q,
                         page: pageFromUrl + 1,
                         pageSize,
+                        returnTo: safeReturnTo,
                       })}
                     >
                       Next

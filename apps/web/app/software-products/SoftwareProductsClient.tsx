@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPostJson } from "@/app/lib/api";
 import { ErrorState, SkeletonTableRow } from "@/app/lib/loadingComponents";
+import { canManageSoftwareProducts } from "@/app/lib/softwareProductAccess";
 
 type SoftwareProduct = {
   id: number;
@@ -179,7 +180,9 @@ export default function SoftwareProductsClient() {
 
   const [loading, setLoading] = useState(true);
   const [loadingVendors, setLoadingVendors] = useState(true);
+  const [meLoading, setMeLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [canWrite, setCanWrite] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] =
@@ -257,6 +260,31 @@ export default function SoftwareProductsClient() {
   useEffect(() => {
     loadVendors();
   }, [loadVendors]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMe() {
+      setMeLoading(true);
+      try {
+        const res = await apiGet<{ roles?: string[] }>("/api/v1/auth/me", {
+          loadingKey: "software_products_me",
+        });
+        if (!active) return;
+        setCanWrite(canManageSoftwareProducts(res?.data?.roles ?? []));
+      } catch {
+        if (active) setCanWrite(false);
+      } finally {
+        if (active) setMeLoading(false);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function submitFilter(e: React.FormEvent) {
     e.preventDefault();
@@ -358,36 +386,50 @@ export default function SoftwareProductsClient() {
 
         <div className="mt-16 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreate((prev) => !prev);
-                setCreateErr(null);
-                setCreateOk(null);
-              }}
-              className="itam-primary-action"
-            >
-              {showCreate ? "Tutup Form" : "Create Software Product"}
-            </button>
+            {meLoading ? (
+              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
+                Loading access...
+              </span>
+            ) : canWrite ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreate((prev) => !prev);
+                  setCreateErr(null);
+                  setCreateOk(null);
+                }}
+                className="itam-primary-action"
+              >
+                {showCreate ? "Tutup Form" : "Create Software Product"}
+              </button>
+            ) : (
+              <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
+                Read-only access
+              </span>
+            )}
           </div>
 
-          {showCreate ? (
+          {(createErr || createOk) && (
+            <div className="mt-4 space-y-3">
+              {createErr ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {createErr}
+                </div>
+              ) : null}
+
+              {createOk ? (
+                <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {createOk}
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {showCreate && canWrite ? (
           <div className="mt-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             <h2 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">
               Create Software Product
             </h2>
-
-            {createErr ? (
-              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {createErr}
-              </div>
-            ) : null}
-
-            {createOk ? (
-              <div className="mb-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                {createOk}
-              </div>
-            ) : null}
 
             <form onSubmit={submitCreate} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>

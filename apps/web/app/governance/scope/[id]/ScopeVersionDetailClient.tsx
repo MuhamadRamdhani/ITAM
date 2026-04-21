@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { canApproveActivateGovernance, canManageGovernance } from "../../../lib/governanceAccess";
 import { apiGet, apiPostJson } from "../../../lib/api";
 
 type ScopeVersion = {
@@ -37,6 +38,15 @@ type ScopeDetailData = {
   events: ScopeEvent[];
 };
 
+type ScopeSummary = {
+  assetTypes: string[];
+  departments: string[];
+  locations: string[];
+  environments: string[];
+  notes: string;
+  stakeholderSummary: string;
+};
+
 function fmtDateTime(value?: string | null) {
   if (!value) return "-";
   const d = new Date(value);
@@ -62,6 +72,87 @@ function prettyJson(v: any) {
   }
 }
 
+function parseJsonLike(v: any) {
+  if (v && typeof v === "object") return v;
+  if (typeof v !== "string") return {};
+
+  try {
+    return JSON.parse(v);
+  } catch {
+    return {};
+  }
+}
+
+function toTextArray(value: any): string[] {
+  const arr = Array.isArray(value) ? value : [];
+  return arr
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+}
+
+function formatScopeLabel(value: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  if (raw.toUpperCase() === "SAAS") return "SaaS";
+  if (raw.toUpperCase() === "ON_PREM") return "On Prem";
+  return raw
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/(^|\s)\w/g, (m) => m.toUpperCase())
+    .replace(/\bVm\b/g, "VM")
+    .replace(/\bId\b/g, "ID");
+}
+
+function normalizeLookupItems(res: any) {
+  const raw = res?.data?.data ?? res?.data ?? {};
+  const items = Array.isArray(raw?.items) ? raw.items : [];
+  return items
+    .map((row: any) => ({
+      id: Number(row?.id),
+      name: String(row?.name ?? row?.display_name ?? row?.label ?? "").trim(),
+      code: row?.code ? String(row.code).trim() : undefined,
+    }))
+    .filter((row: { id: number; name: string }) => Number.isFinite(row.id) && row.id > 0 && row.name);
+}
+
+function resolveDepartmentLabel(value: string, labelMap: Map<number, string>) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric) || numeric <= 0) return formatScopeLabel(raw);
+  return labelMap.get(numeric) || "-";
+}
+
+function resolveLocationLabel(value: string, labelMap: Map<number, string>) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "-";
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric) || numeric <= 0) return formatScopeLabel(raw);
+  return labelMap.get(numeric) || "-";
+}
+
+function normalizeScopeSummary(
+  rawScopeJson: any,
+  departmentLabelMap: Map<number, string>,
+  locationLabelMap: Map<number, string>
+): ScopeSummary {
+  const source = parseJsonLike(rawScopeJson);
+  return {
+    assetTypes: toTextArray(source.asset_type_codes).map(formatScopeLabel),
+    departments: toTextArray(source.department_ids).map((value) =>
+      resolveDepartmentLabel(value, departmentLabelMap)
+    ),
+    locations: toTextArray(source.location_ids).map((value) =>
+      resolveLocationLabel(value, locationLabelMap)
+    ),
+    environments: toTextArray(source.environments).map(formatScopeLabel),
+    notes: String(source.notes ?? "").trim(),
+    stakeholderSummary: String(source.stakeholder_summary ?? "").trim(),
+  };
+}
+
 function getErrorMessage(error: unknown, fallback = "Failed to load scope version") {
   if (!error) return fallback;
   if (error instanceof Error && error.message) return error.message;
@@ -83,6 +174,10 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<ScopeDetailData | null>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [canApproveActivate, setCanApproveActivate] = useState(false);
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [locations, setLocations] = useState<{ id: number; name: string }[]>([]);
 
   const [actionNote, setActionNote] = useState("");
   const [acting, setActing] = useState(false);
@@ -93,7 +188,12 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
     setErr(null);
 
     try {
-      const res = await apiGet<any>(`/api/v1/governance/scope/versions/${props.scopeVersionId}`);
+      const [res, meRes, deptRes, locRes] = await Promise.all([
+        apiGet<any>(`/api/v1/governance/scope/versions/${props.scopeVersionId}`),
+        apiGet<any>("/api/v1/auth/me").catch(() => null),
+        apiGet<any>("/api/v1/departments?page=1&page_size=500").catch(() => null),
+        apiGet<any>("/api/v1/locations?page=1&page_size=500").catch(() => null),
+      ]);
       const normalized = normalizeScopeDetail(res);
 
       if (!normalized) {
@@ -101,9 +201,20 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
       }
 
       setData(normalized);
+      setDepartments(normalizeLookupItems(deptRes));
+      setLocations(normalizeLookupItems(locRes));
+
+      const meData = meRes?.data?.data ?? meRes?.data ?? {};
+      const roles = Array.isArray(meData?.roles) ? meData.roles : [];
+      setCanManage(canManageGovernance(roles));
+      setCanApproveActivate(canApproveActivateGovernance(roles));
     } catch (error) {
       setErr(getErrorMessage(error));
       setData(null);
+      setCanManage(false);
+      setCanApproveActivate(false);
+      setDepartments([]);
+      setLocations([]);
     } finally {
       setLoading(false);
     }
@@ -116,6 +227,22 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
   const status = useMemo(() => {
     return String(data?.version?.status ?? "").toUpperCase();
   }, [data]);
+
+  const departmentLabelMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const row of departments) {
+      map.set(Number(row.id), row.name);
+    }
+    return map;
+  }, [departments]);
+
+  const locationLabelMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const row of locations) {
+      map.set(Number(row.id), row.name);
+    }
+    return map;
+  }, [locations]);
 
   const canSubmit = status === "DRAFT";
   const canApprove = status === "SUBMITTED";
@@ -195,6 +322,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
 
   const version = data.version;
   const events = data.events;
+  const scopeSummary = normalizeScopeSummary(version.scope_json, departmentLabelMap, locationLabelMap);
 
   return (
     <main className="relative z-10">
@@ -261,15 +389,121 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
             </div>
 
             <div className="mt-4 rounded-md border bg-gray-50 p-3">
-              <div className="text-sm font-semibold text-gray-900">scope_json</div>
-              <pre className="mt-2 max-h-[520px] overflow-auto rounded-md bg-white p-3 text-xs">
-                {prettyJson(version.scope_json)}
-              </pre>
+              <div className="text-sm font-semibold text-gray-900">Scope Summary</div>
+              <div className="mt-3 space-y-4 text-sm text-gray-700">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Asset Types
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {scopeSummary.assetTypes.length > 0 ? (
+                      scopeSummary.assetTypes.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-xs text-sky-700"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-500">-</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Departments
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {scopeSummary.departments.length > 0 ? (
+                      scopeSummary.departments.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-500">-</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Locations
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {scopeSummary.locations.length > 0 ? (
+                      scopeSummary.locations.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-xs text-violet-700"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-500">-</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Environments
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {scopeSummary.environments.length > 0 ? (
+                      scopeSummary.environments.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-500">-</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Notes
+                  </div>
+                  <div className="mt-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-700">
+                    {scopeSummary.notes || "-"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    Stakeholder Summary
+                  </div>
+                  <div className="mt-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-700">
+                    {scopeSummary.stakeholderSummary || "-"}
+                  </div>
+                </div>
+              </div>
+
+              <details className="mt-4 rounded-md border bg-white px-3 py-2">
+                <summary className="cursor-pointer text-sm font-medium text-gray-900">
+                  Advanced: raw scope_json
+                </summary>
+                <pre className="mt-3 max-h-56 overflow-auto rounded-md bg-gray-50 p-3 text-xs">
+                  {prettyJson(version.scope_json)}
+                </pre>
+              </details>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            {canManage ? (
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
               <div className="text-base font-semibold text-gray-900">Workflow Actions</div>
               <div className="mt-1 text-sm text-gray-600">
                 Status sekarang: <b>{status || "-"}</b>
@@ -303,7 +537,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
                 <button
                   type="button"
                   onClick={() => callAction("approve")}
-                  disabled={!canApprove || acting}
+                  disabled={!canApprove || !canApproveActivate || acting}
                   className="itam-primary-action-sm disabled:opacity-50"
                 >
                   Approve
@@ -312,7 +546,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
                 <button
                   type="button"
                   onClick={() => callAction("activate")}
-                  disabled={!canActivate || acting}
+                  disabled={!canActivate || !canApproveActivate || acting}
                   className="itam-primary-action-sm disabled:opacity-50"
                 >
                   Activate
@@ -323,6 +557,17 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
                 Rule: DRAFT → SUBMITTED → APPROVED → ACTIVE
               </div>
             </div>
+
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="text-base font-semibold text-gray-900">Workflow Actions</div>
+                <div className="mt-2 text-sm text-gray-600">
+                  Read only. Submit scope versions are restricted to SUPERADMIN,
+                  TENANT_ADMIN, and ITAM_MANAGER. Approve and activate are restricted to
+                  TENANT_ADMIN.
+                </div>
+              </div>
+            )}
 
             <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
               <div className="text-base font-semibold text-gray-900">Event Timeline</div>

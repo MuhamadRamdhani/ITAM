@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPostJson } from "../lib/api";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
+import { canManageContracts } from "../lib/contractAccess";
 
 type ContractItem = {
   id: number | string;
@@ -56,6 +57,15 @@ type CreateContractResponse = {
 
 const STATUSES = ["ALL", "DRAFT", "ACTIVE", "EXPIRED", "TERMINATED"] as const;
 const HEALTHS = ["", "ACTIVE", "EXPIRING", "EXPIRED", "NO_END_DATE"] as const;
+const CONTRACT_TYPES_FILTER = [
+  "ALL",
+  "SOFTWARE",
+  "HARDWARE",
+  "SERVICE",
+  "CLOUD",
+  "MAINTENANCE",
+  "OTHER",
+] as const;
 const CONTRACT_TYPES = [
   "SOFTWARE",
   "HARDWARE",
@@ -106,6 +116,7 @@ function getErrorMessage(error: unknown, fallback = "Failed to load contracts") 
 
 function buildContractsHref(params: {
   status: string;
+  contractType: string;
   health: string;
   q: string;
   page?: number;
@@ -113,6 +124,9 @@ function buildContractsHref(params: {
 }) {
   const p = new URLSearchParams();
   if (params.status && params.status !== "ALL") p.set("status", params.status);
+  if (params.contractType && params.contractType !== "ALL") {
+    p.set("contract_type", params.contractType);
+  }
   if (params.health) p.set("health", params.health);
   if (params.q) p.set("q", params.q);
   if (params.pageSize && params.pageSize > 0) p.set("page_size", String(params.pageSize));
@@ -166,6 +180,7 @@ export default function ContractsClient() {
   const searchParams = useSearchParams();
 
   const status = (searchParams.get("status") || "ALL").trim() || "ALL";
+  const contractType = (searchParams.get("contract_type") || "ALL").trim() || "ALL";
   const health = (searchParams.get("health") || "").trim();
   const q = (searchParams.get("q") || "").trim();
   const pageFromUrl = pickInt(searchParams.get("page"), 1);
@@ -173,7 +188,9 @@ export default function ContractsClient() {
 
   const [loading, setLoading] = useState(true);
   const [loadingVendors, setLoadingVendors] = useState(true);
+  const [meLoading, setMeLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [canWrite, setCanWrite] = useState(false);
 
   const [err, setErr] = useState<string | null>(null);
   const [items, setItems] = useState<ContractItem[]>([]);
@@ -206,6 +223,32 @@ export default function ContractsClient() {
   useEffect(() => {
     let active = true;
 
+    async function loadMe() {
+      setMeLoading(true);
+      try {
+        const res = await apiGet<{ roles?: string[] }>("/api/v1/auth/me", {
+          loadingKey: "contracts_me",
+        });
+
+        if (!active) return;
+        setCanWrite(canManageContracts(res?.data?.roles ?? []));
+      } catch {
+        if (active) setCanWrite(false);
+      } finally {
+        if (active) setMeLoading(false);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
     async function load() {
       setLoading(true);
       setErr(null);
@@ -213,6 +256,7 @@ export default function ContractsClient() {
       try {
         const qs = new URLSearchParams();
         if (status && status !== "ALL") qs.set("status", status);
+        if (contractType && contractType !== "ALL") qs.set("contract_type", contractType);
         if (health) qs.set("health", health);
         if (q) qs.set("search", q);
         qs.set("page", String(pageFromUrl));
@@ -247,7 +291,7 @@ export default function ContractsClient() {
     return () => {
       active = false;
     };
-  }, [status, health, q, pageFromUrl, pageSizeFromUrl]);
+  }, [status, contractType, health, q, pageFromUrl, pageSizeFromUrl]);
 
   useEffect(() => {
     let active = true;
@@ -292,11 +336,12 @@ export default function ContractsClient() {
   function onSearchSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     router.push(
-      buildContractsHref({
-        status,
-        health,
-        q: searchQ.trim(),
-        page: 1,
+        buildContractsHref({
+          status,
+          contractType,
+          health,
+          q: searchQ.trim(),
+          page: 1,
         pageSize,
       })
     );
@@ -387,17 +432,27 @@ export default function ContractsClient() {
 
       <div className="mt-16 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowCreate((v) => !v)}
-              className="itam-primary-action"
-              disabled={submitting}
-            >
-              {showCreate ? "Close Form" : "New Contract"}
-            </button>
+            {meLoading ? (
+              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
+                Loading access...
+              </span>
+            ) : canWrite ? (
+              <button
+                type="button"
+                onClick={() => setShowCreate((v) => !v)}
+                className="itam-primary-action"
+                disabled={submitting}
+              >
+                {showCreate ? "Close Form" : "New Contract"}
+              </button>
+            ) : (
+              <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
+                Read-only access
+              </span>
+            )}
           </div>
 
-          {showCreate ? (
+          {showCreate && canWrite ? (
             <form className="mt-4 mb-6 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onCreateSubmit}>
               <div className="md:col-span-2">
                 <div className="mb-2 text-sm font-medium text-slate-700">Vendor</div>
@@ -562,7 +617,14 @@ export default function ContractsClient() {
               {STATUSES.map((s) => (
                 <Link
                   key={s}
-                  href={buildContractsHref({ status: s, health, q, page: 1, pageSize })}
+                  href={buildContractsHref({
+                    status: s,
+                    contractType,
+                    health,
+                    q,
+                    page: 1,
+                    pageSize,
+                  })}
                   className={
                     status === s
                       ? "border-b-2 border-cyan-600 pb-1 text-cyan-700"
@@ -579,11 +641,35 @@ export default function ContractsClient() {
               onSubmit={onSearchSubmit}
             >
               <select
+                value={contractType}
+                onChange={(e) =>
+                  router.push(
+                    buildContractsHref({
+                      status,
+                      contractType: e.target.value,
+                      health,
+                      q,
+                      page: 1,
+                      pageSize,
+                    })
+                  )
+                }
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+              >
+                {CONTRACT_TYPES_FILTER.map((t) => (
+                  <option key={t} value={t === "ALL" ? "" : t}>
+                    {t === "ALL" ? "All Types" : t}
+                  </option>
+                ))}
+              </select>
+
+              <select
                 value={health}
                 onChange={(e) =>
                   router.push(
                     buildContractsHref({
                       status,
+                      contractType,
                       health: e.target.value,
                       q,
                       page: 1,
@@ -717,6 +803,7 @@ export default function ContractsClient() {
                   className="itam-secondary-action-sm"
                   href={buildContractsHref({
                     status,
+                    contractType,
                     health,
                     q,
                     page: pageFromUrl - 1,
@@ -736,6 +823,7 @@ export default function ContractsClient() {
                   className="itam-secondary-action-sm"
                   href={buildContractsHref({
                     status,
+                    contractType,
                     health,
                     q,
                     page: pageFromUrl + 1,

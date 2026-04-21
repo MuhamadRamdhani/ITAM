@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet } from "../lib/api";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
+import { canManageEvidence } from "../lib/evidenceAccess";
 
 type UiConfigNormalized = {
   pageSizeOptions: number[];
@@ -28,6 +29,16 @@ type EvidenceFilesList = {
   total: number;
   page: number;
   page_size: number;
+};
+
+type MeData = {
+  roles: string[];
+};
+
+type ApiMeResponse = {
+  data?: {
+    data?: MeData;
+  } | MeData;
 };
 
 function pickInt(raw: string | null | undefined, fallback: number) {
@@ -120,12 +131,35 @@ export default function EvidencePageClient() {
   const [total, setTotal] = useState(0);
   const [pageSizeOptions, setPageSizeOptions] = useState<number[]>([10, 20, 50]);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [roles, setRoles] = useState<string[]>([]);
 
   const [searchQ, setSearchQ] = useState(q);
 
   useEffect(() => {
     setSearchQ(q);
   }, [q]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMe() {
+      try {
+        const res = await apiGet<ApiMeResponse>("/api/v1/auth/me");
+        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+        if (!active) return;
+        setRoles(Array.isArray(me?.roles) ? me.roles : []);
+      } catch {
+        if (!active) return;
+        setRoles([]);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -185,6 +219,7 @@ export default function EvidencePageClient() {
   const totalPages = total > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const canPrev = pageFromUrl > 1;
   const canNext = pageFromUrl < totalPages;
+  const canUploadEvidence = canManageEvidence(roles);
 
   function onSearchSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -235,12 +270,11 @@ export default function EvidencePageClient() {
 
         <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="mb-4 flex justify-end">
-            <Link
-              href="/evidence/upload"
-              className="itam-primary-action"
-            >
-              Upload
-            </Link>
+            {canUploadEvidence ? (
+              <Link href="/evidence/upload" className="itam-primary-action">
+                Upload
+              </Link>
+            ) : null}
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-4">

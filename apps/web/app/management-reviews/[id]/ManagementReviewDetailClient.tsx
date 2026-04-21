@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { apiGet } from '../../lib/api';
 import {
   CreateManagementReviewActionItemPayload,
   CreateManagementReviewDecisionPayload,
@@ -20,6 +21,10 @@ import {
   updateManagementReviewActionItem,
   updateManagementReviewDecision,
 } from '../../lib/management-reviews';
+import {
+  canFollowUpManagementReviewActionItems,
+  canManageManagementReviews,
+} from '../../lib/managementReviewAccess';
 import {
   IdentityOption,
   getIdentityLabel,
@@ -263,6 +268,8 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
   const [identityOptions, setIdentityOptions] = useState<IdentitySelectOption[]>([]);
   const [loadingIdentityOptions, setLoadingIdentityOptions] = useState(true);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -282,6 +289,18 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
       setIdentityOptions([]);
     } finally {
       setLoadingIdentityOptions(false);
+    }
+  }, []);
+
+  const loadAuth = useCallback(async () => {
+    setLoadingRoles(true);
+    try {
+      const response = await apiGet<{ roles?: string[] }>('/api/v1/auth/me');
+      setRoles(Array.isArray(response.data?.roles) ? response.data.roles : []);
+    } catch {
+      setRoles([]);
+    } finally {
+      setLoadingRoles(false);
     }
   }, []);
 
@@ -328,7 +347,8 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   useEffect(() => {
     loadDetail('initial');
     loadIdentityOptions();
-  }, [loadDetail, loadIdentityOptions]);
+    loadAuth();
+  }, [loadDetail, loadIdentityOptions, loadAuth]);
 
   useEffect(() => {
     if (!successMessage && !errorMessage) return;
@@ -349,6 +369,14 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   const isDraft = session?.status === 'DRAFT';
   const isCompleted = session?.status === 'COMPLETED';
   const isCancelled = session?.status === 'CANCELLED';
+  const canManage = useMemo(() => canManageManagementReviews(roles), [roles]);
+  const canFollowUp = useMemo(
+    () => canFollowUpManagementReviewActionItems(roles),
+    [roles],
+  );
+  const canEditStructure = isDraft && canManage;
+  const canManageDraftItems = isDraft && canManage;
+  const canFollowUpCompletedItems = isCompleted && canFollowUp;
 
   const identityMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -396,12 +424,15 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     if (isCancelled) {
       return 'This management review session is CANCELLED and fully read-only.';
     }
+    if (session && !canManage) {
+      return 'Read-only access: this management review session can be viewed, but structure changes are restricted for your role.';
+    }
     return null;
-  }, [isCancelled, isCompleted]);
+  }, [canManage, isCancelled, isCompleted, session]);
 
   async function handleSaveOverview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session) return;
+    if (!session || !canEditStructure) return;
 
     setSavingOverview(true);
     setErrorMessage(null);
@@ -430,7 +461,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   }
 
   async function handleComplete() {
-    if (!session) return;
+    if (!session || !canEditStructure) return;
     if (!window.confirm('Complete this management review session?')) return;
 
     setProcessingSessionAction(true);
@@ -449,7 +480,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   }
 
   async function handleCancel() {
-    if (!session) return;
+    if (!session || !canEditStructure) return;
     const cancelReason = window.prompt('Cancel reason (optional):') ?? '';
 
     if (!window.confirm('Cancel this management review session?')) return;
@@ -473,7 +504,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
   async function handleCreateDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session) return;
+    if (!session || !canManageDraftItems) return;
 
     setSubmittingDecision(true);
     setErrorMessage(null);
@@ -503,7 +534,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   }
 
   async function handleUpdateDecision(decisionId: number) {
-    if (!session) return;
+    if (!session || !canManageDraftItems) return;
     const draft = decisionDrafts[decisionId];
     if (!draft) return;
 
@@ -533,7 +564,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   }
 
   async function handleDeleteDecision(decisionId: number) {
-    if (!session) return;
+    if (!session || !canManageDraftItems) return;
     if (!window.confirm('Delete this decision?')) return;
 
     setDeletingDecisionId(decisionId);
@@ -553,7 +584,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
   async function handleCreateActionItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session) return;
+    if (!session || !canManageDraftItems) return;
 
     setSubmittingActionItem(true);
     setErrorMessage(null);
@@ -594,7 +625,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
     setSuccessMessage(null);
 
     try {
-      if (isDraft) {
+      if (canEditStructure) {
         await updateManagementReviewActionItem(session.id, item.id, {
           decision_id: draft.decision_id ? Number(draft.decision_id) : null,
           action_no: draft.action_no.trim() || null,
@@ -609,7 +640,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
         });
 
         setSuccessMessage('Action item updated successfully.');
-      } else {
+      } else if (canFollowUpCompletedItems) {
         await updateManagementReviewActionItem(session.id, item.id, {
           status: draft.status,
           progress_notes: draft.progress_notes.trim() || null,
@@ -617,6 +648,8 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
         });
 
         setSuccessMessage(`Action item ${item.action_no || item.id} updated successfully.`);
+      } else {
+        throw new Error('Forbidden');
       }
 
       await loadDetail('refresh');
@@ -628,7 +661,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
   }
 
   async function handleDeleteActionItem(actionItemId: number) {
-    if (!session) return;
+    if (!session || !canManageDraftItems) return;
     if (!window.confirm('Delete this action item?')) return;
 
     setDeletingActionItemId(actionItemId);
@@ -719,7 +752,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
 
-            {isDraft ? (
+            {canEditStructure ? (
               <>
                 <button
                   type="button"
@@ -809,7 +842,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               </label>
               <input
                 value={overviewForm.session_code}
-                disabled={!isDraft || savingOverview}
+                disabled={!canEditStructure || savingOverview}
                 onChange={(event) =>
                   setOverviewForm((current) => ({
                     ...current,
@@ -827,7 +860,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               <input
                 type="date"
                 value={overviewForm.review_date}
-                disabled={!isDraft || savingOverview}
+                disabled={!canEditStructure || savingOverview}
                 onChange={(event) =>
                   setOverviewForm((current) => ({
                     ...current,
@@ -844,7 +877,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               </label>
               <select
                 value={overviewForm.chairperson_identity_id}
-                disabled={!isDraft || savingOverview || loadingIdentityOptions}
+                disabled={!canEditStructure || savingOverview || loadingIdentityOptions}
                 onChange={(event) =>
                   setOverviewForm((current) => ({
                     ...current,
@@ -877,7 +910,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               </label>
               <input
                 value={overviewForm.title}
-                disabled={!isDraft || savingOverview}
+                disabled={!canEditStructure || savingOverview}
                 onChange={(event) =>
                   setOverviewForm((current) => ({
                     ...current,
@@ -913,7 +946,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               <textarea
                 rows={3}
                 value={overviewForm.summary}
-                disabled={!isDraft || savingOverview}
+                disabled={!canEditStructure || savingOverview}
                 onChange={(event) =>
                   setOverviewForm((current) => ({
                     ...current,
@@ -931,7 +964,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               <textarea
                 rows={3}
                 value={overviewForm.notes}
-                disabled={!isDraft || savingOverview}
+                disabled={!canEditStructure || savingOverview}
                 onChange={(event) =>
                   setOverviewForm((current) => ({
                     ...current,
@@ -945,7 +978,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
 
           <div className="border-t border-gray-200 px-5 py-4">
             <div className="flex items-center justify-end">
-              {isDraft ? (
+              {canEditStructure ? (
                 <button
                   type="submit"
                   disabled={savingOverview}
@@ -970,7 +1003,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
             <textarea
               rows={8}
               value={overviewForm.minutes}
-              disabled={!isDraft || savingOverview}
+              disabled={!canEditStructure || savingOverview}
               onChange={(event) =>
                 setOverviewForm((current) => ({
                   ...current,
@@ -1019,7 +1052,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                       key={decision.id}
                       className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
                     >
-                      {isDraft ? (
+                      {canEditStructure ? (
                         <div className="grid gap-4 md:grid-cols-2">
                           <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -1200,7 +1233,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               </div>
             )}
 
-            {isDraft ? (
+            {canEditStructure ? (
               <form onSubmit={handleCreateDecision} className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -1409,7 +1442,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                         </div>
                       </div>
 
-                      {isDraft ? (
+                      {canEditStructure ? (
                         <div className="mt-4 grid gap-4 md:grid-cols-2">
                           <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -1656,7 +1689,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
                             </button>
                           </div>
                         </div>
-                      ) : isCompleted ? (
+                      ) : canFollowUpCompletedItems ? (
                         <div className="mt-4 grid gap-4 md:grid-cols-3">
                           <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -1758,7 +1791,7 @@ export default function ManagementReviewDetailClient({ reviewId }: Props) {
               </div>
             )}
 
-            {isDraft ? (
+            {canEditStructure ? (
               <form onSubmit={handleCreateActionItem} className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">

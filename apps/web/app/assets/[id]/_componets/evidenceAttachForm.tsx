@@ -26,6 +26,7 @@ export default function EvidenceAttachForm(props: {
   targetId: number;
   maxFilesPerTarget: number; // from /config/ui
   pageSizeForCount: number; // must be valid per page_size_options
+  onChanged?: () => Promise<void> | void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -148,6 +149,10 @@ export default function EvidenceAttachForm(props: {
         await refreshCount();
 
         setOkMsg(attached > 0 ? `Attached ${attached} file.` : "Tidak ada file yang ter-attach.");
+
+        if (props.onChanged) {
+          await props.onChanged();
+        }
 
         router.refresh();
       } catch (eAny: any) {

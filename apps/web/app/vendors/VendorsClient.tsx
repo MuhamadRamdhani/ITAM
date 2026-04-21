@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPostJson } from "@/app/lib/api";
 import { SkeletonTableRow } from "@/app/lib/loadingComponents";
+import { canManageVendors } from "@/app/lib/vendorAccess";
+import Link from "next/link";
 
 type Vendor = {
   id: number;
@@ -110,6 +112,8 @@ export default function VendorsClient() {
 
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [meLoading, setMeLoading] = useState(true);
+  const [canWrite, setCanWrite] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<CreateVendorForm>(emptyCreateForm);
@@ -149,6 +153,31 @@ export default function VendorsClient() {
       setLoading(false);
     }
   }, [page, pageSize, search, status]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMe() {
+      setMeLoading(true);
+      try {
+        const res = await apiGet<{ roles?: string[] }>("/api/v1/auth/me", {
+          loadingKey: "vendors_me",
+        });
+        if (!active) return;
+        setCanWrite(canManageVendors(res?.data?.roles ?? []));
+      } catch {
+        if (active) setCanWrite(false);
+      } finally {
+        if (active) setMeLoading(false);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -215,29 +244,28 @@ export default function VendorsClient() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="rounded-3xl border border-white bg-white/80 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
+            <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
               Vendor Registry
             </div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
               Vendors
-            </div>
-            <div className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
               Registry vendor tenant-scoped untuk publisher, supplier, dan service provider.
-            </div>
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start lg:self-auto">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="itam-secondary-action"
-            >
-              Back
-            </button>
-          </div>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Back
+          </Link>
         </div>
       </div>
 
@@ -265,142 +293,154 @@ export default function VendorsClient() {
 
       <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setShowCreate((v) => !v)}
-            className="itam-primary-action"
-            disabled={submitting}
-          >
-            {showCreate ? "Hide Form" : "New Vendor"}
-          </button>
+          {meLoading ? (
+            <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
+              Loading access...
+            </span>
+          ) : canWrite ? (
+            <button
+              type="button"
+              onClick={() => setShowCreate((v) => !v)}
+              className="itam-primary-action"
+              disabled={submitting}
+            >
+              {showCreate ? "Hide Form" : "New Vendor"}
+            </button>
+          ) : (
+            <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
+              Read-only access
+            </span>
+          )}
         </div>
 
-        {showCreate ? (
+        {showCreate && canWrite ? (
           <div className="mt-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div>
-            <div className="text-lg font-semibold tracking-tight text-slate-900">Create Vendor</div>
-            <div className="mt-1 text-sm text-slate-700">
-              Tambahkan vendor tenant untuk software, hardware, cloud, atau service.
-            </div>
-          </div>
-
-          <form onSubmit={submitCreate} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700">Vendor Code</label>
-              <input
-                value={createForm.vendor_code}
-                onChange={(e) => updateCreateForm("vendor_code", e.target.value.toUpperCase())}
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                placeholder="MICROSOFT"
-                disabled={submitting}
-                required
-              />
+              <div className="text-lg font-semibold tracking-tight text-slate-900">
+                Create Vendor
+              </div>
+              <div className="mt-1 text-sm text-slate-700">
+                Tambahkan vendor tenant untuk software, hardware, cloud, atau service.
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Vendor Name</label>
-              <input
-                value={createForm.vendor_name}
-                onChange={(e) => updateCreateForm("vendor_name", e.target.value)}
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Microsoft Indonesia"
-                disabled={submitting}
-                required
-              />
-            </div>
+            <form onSubmit={submitCreate} className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Vendor Code</label>
+                <input
+                  value={createForm.vendor_code}
+                  onChange={(e) => updateCreateForm("vendor_code", e.target.value.toUpperCase())}
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  placeholder="MICROSOFT"
+                  disabled={submitting}
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Vendor Type</label>
-              <select
-                value={createForm.vendor_type}
-                onChange={(e) =>
-                  updateCreateForm(
-                    "vendor_type",
-                    e.target.value as CreateVendorForm["vendor_type"]
-                  )
-                }
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                disabled={submitting}
-              >
-                {VENDOR_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Vendor Name</label>
+                <input
+                  value={createForm.vendor_name}
+                  onChange={(e) => updateCreateForm("vendor_name", e.target.value)}
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Microsoft Indonesia"
+                  disabled={submitting}
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Status</label>
-              <select
-                value={createForm.status}
-                onChange={(e) =>
-                  updateCreateForm("status", e.target.value as "ACTIVE" | "INACTIVE")
-                }
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                disabled={submitting}
-              >
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="INACTIVE">INACTIVE</option>
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Vendor Type</label>
+                <select
+                  value={createForm.vendor_type}
+                  onChange={(e) =>
+                    updateCreateForm(
+                      "vendor_type",
+                      e.target.value as CreateVendorForm["vendor_type"]
+                    )
+                  }
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={submitting}
+                >
+                  {VENDOR_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Primary Contact Name</label>
-              <input
-                value={createForm.primary_contact_name}
-                onChange={(e) => updateCreateForm("primary_contact_name", e.target.value)}
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                disabled={submitting}
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Status</label>
+                <select
+                  value={createForm.status}
+                  onChange={(e) =>
+                    updateCreateForm("status", e.target.value as "ACTIVE" | "INACTIVE")
+                  }
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={submitting}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Primary Contact Email</label>
-              <input
-                type="email"
-                value={createForm.primary_contact_email}
-                onChange={(e) => updateCreateForm("primary_contact_email", e.target.value)}
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                disabled={submitting}
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Primary Contact Name</label>
+                <input
+                  value={createForm.primary_contact_name}
+                  onChange={(e) => updateCreateForm("primary_contact_name", e.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={submitting}
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Primary Contact Phone</label>
-              <input
-                type="tel"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                autoComplete="tel"
-                value={createForm.primary_contact_phone}
-                onChange={(e) =>
-                  updateCreateForm("primary_contact_phone", digitsOnly(e.target.value))
-                }
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                disabled={submitting}
-                placeholder="081234567890"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Primary Contact Email</label>
+                <input
+                  type="email"
+                  value={createForm.primary_contact_email}
+                  onChange={(e) => updateCreateForm("primary_contact_email", e.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={submitting}
+                />
+              </div>
 
-            <div className="md:col-span-3">
-              <label className="block text-sm font-medium text-slate-700">Notes</label>
-              <textarea
-                value={createForm.notes}
-                onChange={(e) => updateCreateForm("notes", e.target.value)}
-                className="mt-1 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                disabled={submitting}
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Primary Contact Phone</label>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="tel"
+                  value={createForm.primary_contact_phone}
+                  onChange={(e) =>
+                    updateCreateForm("primary_contact_phone", digitsOnly(e.target.value))
+                  }
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={submitting}
+                  placeholder="081234567890"
+                />
+              </div>
 
-            <div className="md:col-span-3 flex gap-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="itam-primary-action"
-              >
-                {submitting ? "Creating..." : "Create Vendor"}
-              </button>
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-slate-700">Notes</label>
+                <textarea
+                  value={createForm.notes}
+                  onChange={(e) => updateCreateForm("notes", e.target.value)}
+                  className="mt-1 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="md:col-span-3 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="itam-primary-action"
+                >
+                  {submitting ? "Creating..." : "Create Vendor"}
+                </button>
 
                 <button
                   type="button"
@@ -415,110 +455,110 @@ export default function VendorsClient() {
                 >
                   Cancel
                 </button>
-            </div>
-          </form>
+              </div>
+            </form>
           </div>
         ) : null}
 
         <div className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <form
-            onSubmit={submitFilter}
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
-          >
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search code/name/type/contact..."
-              className="w-full sm:w-72 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-              disabled={loading}
-            />
-
-            <select
-              value={status}
-              onChange={(e) => {
-                setPage(1);
-                setStatus(e.target.value);
-              }}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-              disabled={loading}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <form
+              onSubmit={submitFilter}
+              className="flex flex-col gap-2 sm:flex-row sm:items-center"
             >
-              <option value="">ALL</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="INACTIVE">INACTIVE</option>
-            </select>
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search code/name/type/contact..."
+                className="w-full sm:w-72 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={loading}
+              />
 
-            <button className="itam-primary-action-sm">
-              {loading ? "Loading..." : "Search"}
-            </button>
-          </form>
-        </div>
+              <select
+                value={status}
+                onChange={(e) => {
+                  setPage(1);
+                  setStatus(e.target.value);
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={loading}
+              >
+                <option value="">ALL</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+              </select>
 
-        <div className="mt-4 text-sm text-slate-500">Total: {total}</div>
-
-        <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-          <table className="min-w-[960px] w-full text-[13px] leading-6">
-            <thead className="bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Code</th>
-                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Name</th>
-                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Type</th>
-                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Status</th>
-                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Primary Contact</th>
-                <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Updated</th>
-                <th className="px-4 py-4 pr-6 text-right font-semibold uppercase tracking-[0.16em]">Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
-                <>
-                  <SkeletonTableRow cols={7} />
-                  <SkeletonTableRow cols={7} />
-                  <SkeletonTableRow cols={7} />
-                  <SkeletonTableRow cols={7} />
-                  <SkeletonTableRow cols={7} />
-                </>
-              ) : items.length === 0 ? (
-                <tr className="border-t border-slate-200">
-                  <td colSpan={7} className="px-4 py-8 text-slate-600">
-                    Belum ada vendor.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-200 align-top">
-                    <td className="px-4 py-5 pr-6 font-medium text-slate-900">{item.vendor_code}</td>
-                    <td className="px-4 py-5 pr-6 text-slate-900">{item.vendor_name}</td>
-                    <td className="px-4 py-5 pr-6 text-slate-900">{item.vendor_type}</td>
-                    <td className="px-4 py-5 pr-6 text-slate-900">{item.status}</td>
-                    <td className="px-4 py-5 pr-6">
-                      <div className="text-slate-900">{item.primary_contact_name || "-"}</div>
-                      <div className="text-xs text-slate-500">
-                        {item.primary_contact_email || "-"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-5 pr-6 text-slate-900">
-                      {item.updated_at
-                        ? new Date(item.updated_at).toLocaleString()
-                        : "-"}
-                    </td>
-                    <td className="px-4 py-5 pr-6 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => goToDetail(item.id)}
-                        className="itam-secondary-action-sm"
-                      >
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+              <button className="itam-primary-action-sm">
+                {loading ? "Loading..." : "Search"}
+              </button>
+            </form>
           </div>
+
+          <div className="mt-4 text-sm text-slate-500">Total: {total}</div>
+
+          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-[960px] w-full text-[13px] leading-6">
+                <thead className="bg-slate-50 text-left text-slate-500">
+                  <tr>
+                    <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Code</th>
+                    <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Name</th>
+                    <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Type</th>
+                    <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Status</th>
+                    <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Primary Contact</th>
+                    <th className="px-4 py-4 pr-6 font-semibold uppercase tracking-[0.16em]">Updated</th>
+                    <th className="px-4 py-4 pr-6 text-right font-semibold uppercase tracking-[0.16em]">Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {loading ? (
+                    <>
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                    </>
+                  ) : items.length === 0 ? (
+                    <tr className="border-t border-slate-200">
+                      <td colSpan={7} className="px-4 py-8 text-slate-600">
+                        Belum ada vendor.
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((item) => (
+                      <tr key={item.id} className="border-t border-slate-200 align-top">
+                        <td className="px-4 py-5 pr-6 font-medium text-slate-900">{item.vendor_code}</td>
+                        <td className="px-4 py-5 pr-6 text-slate-900">{item.vendor_name}</td>
+                        <td className="px-4 py-5 pr-6 text-slate-900">{item.vendor_type}</td>
+                        <td className="px-4 py-5 pr-6 text-slate-900">{item.status}</td>
+                        <td className="px-4 py-5 pr-6">
+                          <div className="text-slate-900">{item.primary_contact_name || "-"}</div>
+                          <div className="text-xs text-slate-500">
+                            {item.primary_contact_email || "-"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-5 pr-6 text-slate-900">
+                          {item.updated_at
+                            ? new Date(item.updated_at).toLocaleString()
+                            : "-"}
+                        </td>
+                        <td className="px-4 py-5 pr-6 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => goToDetail(item.id)}
+                            className="itam-secondary-action-sm"
+                          >
+                            Open
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 

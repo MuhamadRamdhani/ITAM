@@ -12,27 +12,17 @@ function isDebugEnabled(): boolean {
 }
 
 export const authDebug = {
-  /**
-   * Log refresh attempt
-   */
   refreshAttempt: (reason: string) => {
     if (isDebugEnabled()) {
       console.log(`${LOG_PREFIX} Refresh attempt:`, reason);
     }
   },
-
-  /**
-   * Log refresh success
-   */
   refreshSuccess: () => {
     if (isDebugEnabled()) {
       console.log(`${LOG_PREFIX} Refresh SUCCESS - New token acquired`);
     }
   },
 
-  /**
-   * Log refresh failure
-   */
   refreshFailure: (reason: string) => {
     if (isDebugEnabled()) {
       console.error(`${LOG_PREFIX} Refresh FAILED:`, reason);

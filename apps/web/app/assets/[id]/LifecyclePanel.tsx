@@ -206,6 +206,7 @@ function NoticeBox(props: { notice: Notice; onClose: () => void }) {
 export default function LifecyclePanel(props: {
   assetId: number;
   initialCurrentState?: CurrentState;
+  canTransition?: boolean;
 }) {
   const router = useRouter();
 
@@ -425,15 +426,23 @@ export default function LifecyclePanel(props: {
               Refresh
             </button>
 
-            <button
-              type="button"
-              onClick={openModal}
-              className="itam-primary-action-sm"
-              disabled={loading || !hasAnyOptions}
-              title={!hasAnyOptions ? "Tidak ada transition config untuk state ini" : ""}
-            >
-              Transition
-            </button>
+            {props.canTransition !== false ? (
+              <button
+                type="button"
+                onClick={openModal}
+                className="itam-primary-action-sm"
+                disabled={loading || !hasAnyOptions}
+                title={
+                  !hasAnyOptions ? "Tidak ada transition config untuk state ini" : ""
+                }
+              >
+                Transition
+              </button>
+            ) : (
+              <span className="rounded-md border px-3 py-2 text-sm text-gray-400">
+                Read only
+              </span>
+            )}
           </div>
         </div>
 
@@ -510,7 +519,7 @@ export default function LifecyclePanel(props: {
         </div>
       </div>
 
-      {isModalOpen && (
+      {isModalOpen && props.canTransition !== false && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModal} />
           <div className="relative w-full max-w-lg rounded-lg bg-white shadow-xl">

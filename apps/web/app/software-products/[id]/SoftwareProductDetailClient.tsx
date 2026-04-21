@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiGet, apiPatchJson } from "@/app/lib/api";
 import { ErrorState } from "@/app/lib/loadingComponents";
+import { canManageSoftwareProducts } from "@/app/lib/softwareProductAccess";
 
 type SoftwareProduct = {
   id: number;
@@ -157,7 +158,9 @@ export default function SoftwareProductDetailClient() {
   const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingVendors, setLoadingVendors] = useState(true);
+  const [meLoading, setMeLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [canWrite, setCanWrite] = useState(false);
 
   const [editForm, setEditForm] = useState<EditForm>(emptyForm());
   const [saving, setSaving] = useState(false);
@@ -228,6 +231,31 @@ export default function SoftwareProductDetailClient() {
   useEffect(() => {
     loadVendors();
   }, [loadVendors]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMe() {
+      setMeLoading(true);
+      try {
+        const res = await apiGet<{ roles?: string[] }>("/api/v1/auth/me", {
+          loadingKey: "software_product_detail_me",
+        });
+        if (!active) return;
+        setCanWrite(canManageSoftwareProducts(res?.data?.roles ?? []));
+      } catch {
+        if (active) setCanWrite(false);
+      } finally {
+        if (active) setMeLoading(false);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function updateForm<K extends keyof EditForm>(key: K, value: EditForm[K]) {
     setEditForm((prev) => ({ ...prev, [key]: value }));
@@ -432,6 +460,16 @@ export default function SoftwareProductDetailClient() {
               Edit Software Product
             </h2>
 
+            {meLoading ? (
+              <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Loading access...
+              </div>
+            ) : canWrite ? null : (
+              <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                Read-only access
+              </div>
+            )}
+
             {saveErr ? (
               <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {saveErr}
@@ -455,7 +493,7 @@ export default function SoftwareProductDetailClient() {
                     updateForm("product_code", e.target.value.toUpperCase())
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 />
               </div>
 
@@ -467,7 +505,7 @@ export default function SoftwareProductDetailClient() {
                   value={editForm.product_name}
                   onChange={(e) => updateForm("product_name", e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 />
               </div>
 
@@ -481,7 +519,7 @@ export default function SoftwareProductDetailClient() {
                     updateForm("publisher_vendor_id", e.target.value)
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving || loadingVendors}
+                  disabled={saving || loadingVendors || !canWrite}
                 >
                   <option value="">No publisher vendor</option>
                   {vendors.map((vendor) => (
@@ -500,7 +538,7 @@ export default function SoftwareProductDetailClient() {
                   value={editForm.category}
                   onChange={(e) => updateForm("category", e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 >
                   {CATEGORY_OPTIONS.map((item) => (
                     <option key={item} value={item}>
@@ -520,7 +558,7 @@ export default function SoftwareProductDetailClient() {
                     updateForm("deployment_model", e.target.value)
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 >
                   {DEPLOYMENT_MODEL_OPTIONS.map((item) => (
                     <option key={item} value={item}>
@@ -540,7 +578,7 @@ export default function SoftwareProductDetailClient() {
                     updateForm("licensing_metric", e.target.value)
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 >
                   {LICENSING_METRIC_OPTIONS.map((item) => (
                     <option key={item} value={item}>
@@ -560,7 +598,7 @@ export default function SoftwareProductDetailClient() {
                     updateForm("status", e.target.value as EditForm["status"])
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 >
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>
@@ -580,7 +618,7 @@ export default function SoftwareProductDetailClient() {
                     )
                   }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 >
                   <option value="VERSIONLESS">VERSIONLESS</option>
                   <option value="VERSIONED">VERSIONED</option>
@@ -595,7 +633,7 @@ export default function SoftwareProductDetailClient() {
                   value={editForm.notes}
                   onChange={(e) => updateForm("notes", e.target.value)}
                   className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 />
               </div>
 
@@ -603,7 +641,7 @@ export default function SoftwareProductDetailClient() {
                 <button
                   type="submit"
                   className="itam-primary-action"
-                  disabled={saving}
+                  disabled={saving || !canWrite}
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </button>

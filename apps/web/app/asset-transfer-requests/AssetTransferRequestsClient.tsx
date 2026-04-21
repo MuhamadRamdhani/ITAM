@@ -172,16 +172,12 @@ function normalizeListItem(raw: any): TransferRequestListItem {
       raw?.tenant_id ?? raw?.source_tenant_id ?? sourceTenant?.id
     ),
     source_tenant_name: toNullableString(
-      raw?.source_tenant_name ??
-        sourceTenant?.tenant_name ??
-        sourceTenant?.name
+      raw?.source_tenant_name ?? sourceTenant?.tenant_name ?? sourceTenant?.name
     ),
 
     target_tenant_id: toNullableNumber(raw?.target_tenant_id ?? targetTenant?.id),
     target_tenant_name: toNullableString(
-      raw?.target_tenant_name ??
-        targetTenant?.tenant_name ??
-        targetTenant?.name
+      raw?.target_tenant_name ?? targetTenant?.tenant_name ?? targetTenant?.name
     ),
 
     reason: toNullableString(raw?.reason),
@@ -239,6 +235,15 @@ export default function AssetTransferRequestsClient() {
   const page = pickInt(searchParams.get("page"), 1);
   const pageSize = pickInt(searchParams.get("page_size"), 10);
 
+  const currentTransferListHref = useMemo(() => {
+    return buildListHref({
+      q,
+      status,
+      page,
+      pageSize,
+    });
+  }, [q, status, page, pageSize]);
+
   const canCreateTransfer = useMemo(() => {
     return roles.some((role) => TRANSFER_ALLOWED_ROLES.includes(role));
   }, [roles]);
@@ -248,6 +253,8 @@ export default function AssetTransferRequestsClient() {
   const totalPages = total > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   const canPrev = page > 1;
   const canNext = page < totalPages;
+  const startIdx = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endIdx = total === 0 ? 0 : (page - 1) * pageSize + items.length;
 
   useEffect(() => {
     setQInput(q);
@@ -263,10 +270,7 @@ export default function AssetTransferRequestsClient() {
         setErr(null);
 
         const res = await apiGet<MeData>("/api/v1/auth/me");
-        const me =
-          (res as any)?.data?.data ??
-          (res as any)?.data ??
-          null;
+        const me = (res as any)?.data?.data ?? (res as any)?.data ?? null;
 
         if (!cancelled) {
           setRoles(Array.isArray(me?.roles) ? me.roles : []);
@@ -360,240 +364,246 @@ export default function AssetTransferRequestsClient() {
     );
   }
 
-  if (meLoading) {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        Loading transfer requests...
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
+
+      <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
+        <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
               MVP 2.4A
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
               Asset Transfer Requests
             </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
               Track draft, submitted, approved, rejected, and executed asset transfer requests.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="inline-flex items-center justify-center itam-secondary-action"
-            >
-              Back
-            </button>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Back
+          </button>
+        </div>
 
+        <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="mb-4 flex flex-wrap justify-end gap-3">
             <Link
               href="/assets"
-              className="inline-flex items-center justify-center itam-secondary-action"
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
               Go to Assets
             </Link>
 
             {canCreateTransfer ? (
-              <Link
-                href="/asset-transfer-requests/new"
-                className="inline-flex items-center justify-center itam-primary-action"
-              >
+              <Link href="/asset-transfer-requests/new" className="itam-primary-action">
                 New Transfer Request
               </Link>
             ) : null}
           </div>
-        </div>
 
-        {err ? (
-          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
-            {err}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        <form
-          className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
-          onSubmit={onSearchSubmit}
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <input
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              placeholder="Search request code, asset tag, asset name..."
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 md:w-96"
-            />
-
-            <select
-              value={statusInput}
-              onChange={(e) => setStatusInput(e.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <form
+              className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+              onSubmit={onSearchSubmit}
             >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  value={qInput}
+                  onChange={(e) => setQInput(e.target.value)}
+                  placeholder="Search request code, asset tag, asset name..."
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 sm:w-80"
+                />
 
-            <button type="submit" className="itam-primary-action">
-              Search
-            </button>
-          </div>
-        </form>
+                <select
+                  value={statusInput}
+                  onChange={(e) => setStatusInput(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
 
-        <div className="mt-4 text-sm text-slate-500">Total: {total}</div>
+                <button type="submit" className="itam-primary-action">
+                  Search
+                </button>
+              </div>
+            </form>
 
-        <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1040px] w-full text-[13px] leading-6">
-            <thead className="text-left text-slate-500">
-              <tr>
-                <th className="px-4 py-4 pr-6 font-medium">Request</th>
-                <th className="px-4 py-4 pr-6 font-medium">Asset</th>
-                <th className="px-4 py-4 pr-6 font-medium">Source</th>
-                <th className="px-4 py-4 pr-6 font-medium">Target</th>
-                <th className="px-4 py-4 pr-6 font-medium">Status</th>
-                <th className="px-4 py-4 pr-6 font-medium">Created</th>
-                <th className="px-4 py-4 pr-6 text-right font-medium">Action</th>
-              </tr>
-            </thead>
+            <div className="mt-5 flex items-start justify-between gap-4">
+              <div className="text-sm text-slate-600">
+                Total: {total}{" "}
+                <span className="ml-2">{total === 0 ? "(0)" : `(showing ${startIdx}–${endIdx})`}</span>
+              </div>
 
-            <tbody>
-              {listLoading ? (
-                <>
-                  <tr className="border-t border-slate-100">
-                    <td colSpan={7} className="px-4 py-8 text-slate-500">
-                      Loading transfer requests...
-                    </td>
+              <div className="text-xs text-slate-500">
+                Tip: gunakan status untuk memisahkan request aktif dan yang sudah final.
+              </div>
+            </div>
+
+            {err ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+                {err}
+              </div>
+            ) : null}
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-[1040px] w-full text-sm">
+                <thead className="text-left text-slate-500">
+                  <tr>
+                    <th className="py-3 pr-4">Request</th>
+                    <th className="py-3 pr-4">Asset</th>
+                    <th className="py-3 pr-4">Source</th>
+                    <th className="py-3 pr-4">Target</th>
+                    <th className="py-3 pr-4">Status</th>
+                    <th className="py-3 pr-4">Created</th>
+                    <th className="py-3 pr-4 text-right">Action</th>
                   </tr>
-                </>
-              ) : items.length === 0 ? (
-                <tr className="border-t border-slate-100">
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
-                    No transfer requests found.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-100">
-                    <td className="px-4 py-5 pr-6 align-top">
-                      <div className="font-medium text-slate-900">{item.request_code}</div>
-                      <div className="mt-1 text-xs text-slate-500">ID: {item.id}</div>
-                    </td>
+                </thead>
 
-                    <td className="px-4 py-5 pr-6 align-top">
-                      <div className="font-medium text-slate-900">{item.asset_tag ?? "-"}</div>
-                      <div className="mt-1 text-xs text-slate-500">{item.asset_name ?? "-"}</div>
-                    </td>
+                <tbody>
+                  {listLoading ? (
+                    <tr className="border-t border-slate-100">
+                      <td colSpan={7} className="py-8 text-slate-500">
+                        Loading transfer requests...
+                      </td>
+                    </tr>
+                  ) : items.length === 0 ? (
+                    <tr className="border-t border-slate-100">
+                      <td colSpan={7} className="py-8 text-slate-600">
+                        No transfer requests found.
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((item) => {
+                      const assetDetailHref = item.asset_id
+                        ? `/assets/${item.asset_id}?return_to=${encodeURIComponent(currentTransferListHref)}`
+                        : "";
 
-                    <td className="px-4 py-5 pr-6 align-top">
-                      <div className="text-slate-900">{item.source_tenant_name ?? "-"}</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Tenant ID: {item.source_tenant_id ?? "-"}
-                      </div>
-                    </td>
+                      return (
+                        <tr key={item.id} className="border-t border-slate-100">
+                          <td className="py-4 pr-4 align-top">
+                            <div className="font-medium text-slate-900">{item.request_code}</div>
+                            <div className="mt-1 text-xs text-slate-500">ID: {item.id}</div>
+                          </td>
 
-                    <td className="px-4 py-5 pr-6 align-top">
-                      <div className="text-slate-900">{item.target_tenant_name ?? "-"}</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Tenant ID: {item.target_tenant_id ?? "-"}
-                      </div>
-                    </td>
+                          <td className="py-4 pr-4 align-top">
+                            <div className="font-medium text-slate-900">{item.asset_tag ?? "-"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{item.asset_name ?? "-"}</div>
+                          </td>
 
-                    <td className="px-4 py-5 pr-6 align-top">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                          item.status
-                        )}`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
+                          <td className="py-4 pr-4 align-top">
+                            <div className="text-slate-900">{item.source_tenant_name ?? "-"}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Tenant ID: {item.source_tenant_id ?? "-"}
+                            </div>
+                          </td>
 
-                    <td className="px-4 py-5 pr-6 align-top text-slate-600">
-                      {formatDateTime(item.created_at)}
-                    </td>
+                          <td className="py-4 pr-4 align-top">
+                            <div className="text-slate-900">{item.target_tenant_name ?? "-"}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Tenant ID: {item.target_tenant_id ?? "-"}
+                            </div>
+                          </td>
 
-                    <td className="px-4 py-5 pr-6 text-right align-top whitespace-nowrap">
-                      <Link
-                        href={`/asset-transfer-requests/${item.id}`}
-                        className="font-medium text-cyan-700 hover:text-cyan-800"
-                      >
-                        View
-                      </Link>
+                          <td className="py-4 pr-4 align-top">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                                item.status
+                              )}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
 
-                      {item.asset_id ? (
-                        <>
-                          <span className="mx-2 text-slate-300">|</span>
-                          <Link
-                            href={`/assets/${item.asset_id}`}
-                            className="font-medium text-cyan-700 hover:text-cyan-800"
-                          >
-                            Asset
-                          </Link>
-                        </>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-            </table>
-          </div>
-        </div>
+                          <td className="whitespace-nowrap py-4 pr-4 align-top text-slate-700">
+                            {formatDateTime(item.created_at)}
+                          </td>
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-slate-500">
-            Page {page} / {totalPages}
-          </div>
+                          <td className="whitespace-nowrap py-4 pr-4 text-right align-top">
+                            <Link
+                              href={`/asset-transfer-requests/${item.id}`}
+                              className="text-cyan-700 hover:underline"
+                            >
+                              View
+                            </Link>
 
-          <div className="flex gap-2">
-            {canPrev ? (
-              <Link
-                href={buildListHref({
-                  q,
-                  status,
-                  page: page - 1,
-                  pageSize,
-                })}
-                className="itam-secondary-action-sm"
-              >
-                Prev
-              </Link>
-            ) : (
-              <span className="itam-secondary-action-sm cursor-not-allowed opacity-50">
-                Prev
-              </span>
-            )}
+                            {item.asset_id ? (
+                              <>
+                                <span className="mx-2 text-slate-300">|</span>
+                                <Link
+                                  href={assetDetailHref}
+                                  className="text-cyan-700 hover:underline"
+                                >
+                                  Asset
+                                </Link>
+                              </>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-            {canNext ? (
-              <Link
-                href={buildListHref({
-                  q,
-                  status,
-                  page: page + 1,
-                  pageSize,
-                })}
-                className="itam-secondary-action-sm"
-              >
-                Next
-              </Link>
-            ) : (
-              <span className="itam-secondary-action-sm cursor-not-allowed opacity-50">
-                Next
-              </span>
-            )}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-slate-500">
+                Page {page} / {totalPages}
+              </div>
+
+              <div className="flex gap-2">
+                {canPrev ? (
+                  <Link
+                    href={buildListHref({
+                      q,
+                      status,
+                      page: page - 1,
+                      pageSize,
+                    })}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    Prev
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
+                    Prev
+                  </span>
+                )}
+
+                {canNext ? (
+                  <Link
+                    href={buildListHref({
+                      q,
+                      status,
+                      page: page + 1,
+                      pageSize,
+                    })}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    Next
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
+                    Next
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
