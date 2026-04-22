@@ -66,6 +66,29 @@ async function loginAs(page: Page, creds: Credentials) {
   });
 }
 
+async function apiPostJson(page: Page, pathUrl: string, body: unknown) {
+  return page.evaluate(
+    async ({ url, payload }) => {
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+
+      return { status: res.status, json };
+    },
+    { url: `${API_BASE}${pathUrl}`, payload: body }
+  );
+}
+
 async function openDocuments(page: Page) {
   await page.goto("/documents");
   await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible({
@@ -243,6 +266,51 @@ test.describe.serial("Documents", () => {
     await expect(page.getByText("playwright document evidence")).toBeVisible({ timeout: 30_000 });
     await openDocument(page, doc.documentId);
     await expect(page.getByText("playwright document evidence")).toBeVisible({ timeout: 30_000 });
+  });
+
+  test("DOC-013 create document rejects blank title and blank doc type", async ({ page }) => {
+    await loginAs(page, USERS.itamManager);
+
+    const blankTitle = await apiPostJson(page, "/api/v1/documents", {
+      doc_type_code: "POLICY",
+      title: "   ",
+      content_json: { body: "invalid title" },
+    });
+    expect(blankTitle.status).toBe(400);
+    expect(blankTitle.json?.error?.code).toBe("BAD_REQUEST");
+    expect(blankTitle.json?.error?.message).toContain("title is required");
+
+    const blankType = await apiPostJson(page, "/api/v1/documents", {
+      doc_type_code: "   ",
+      title: `Playwright Document invalid type ${uniqueSuffix()}`,
+      content_json: { body: "invalid type" },
+    });
+    expect(blankType.status).toBe(400);
+    expect(blankType.json?.error?.code).toBe("BAD_REQUEST");
+    expect(blankType.json?.error?.message).toContain("doc_type_code is required");
+  });
+
+  test("DOC-014 archived document rejects new version creation", async ({ page }) => {
+    const created = await createDocumentViaUi(page, USERS.itamManager, "archive-version-guard");
+
+    await submitDocumentForReview(page);
+
+    await loginAs(page, USERS.tenantAdmin);
+    await openDocument(page, created.documentId);
+    await approvePublishArchiveDocument(page);
+
+    const versionBefore = await apiPostJson(page, `/api/v1/documents/${created.documentId}/versions`, {
+      note: "should not be added",
+      content_json: { body: `blocked version ${uniqueSuffix()}` },
+    });
+
+    expect(versionBefore.status).toBe(400);
+    expect(versionBefore.json?.error?.code).toBe("INVALID_STATE");
+    expect(String(versionBefore.json?.error?.message || "")).toContain("Allowed: DRAFT, IN_REVIEW");
+
+    await openDocument(page, created.documentId);
+    await expect(page.getByText("Current version: v1")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("cell", { name: "v1" })).toBeVisible();
   });
 
   test("DOC-012 tenant isolation blocks another tenant role from opening the document", async ({ page }) => {

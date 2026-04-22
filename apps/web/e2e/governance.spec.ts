@@ -39,6 +39,11 @@ const USERS = {
     email: "testing@bni.com",
     password: "12345678",
   },
+  superadmin: {
+    tenantCode: "default",
+    email: "admin@default.local",
+    password: "admin123",
+  },
 } satisfies Record<string, Credentials>;
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001").replace(/\/+$/, "");
@@ -120,6 +125,44 @@ async function browserJson(page: Page, path: string, init?: { method?: string; b
       }
 
       return json;
+    },
+    { apiBase: API_BASE, path, init }
+  );
+}
+
+async function browserRequest(page: Page, path: string, init?: { method?: string; body?: unknown }) {
+  return await page.evaluate(
+    async ({ apiBase, path, init }) => {
+      const headers: Record<string, string> = {};
+      let body: string | undefined;
+
+      if (init?.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(init.body);
+      }
+
+      const res = await fetch(`${apiBase}${path}`, {
+        method: init?.method || "GET",
+        credentials: "include",
+        headers,
+        body,
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return {
+        ok: res.ok,
+        status: res.status,
+        code: json?.error?.code || json?.code || null,
+        message: json?.error?.message || json?.message || null,
+        json,
+      };
     },
     { apiBase: API_BASE, path, init }
   );
@@ -250,10 +293,12 @@ async function patchStakeholderViaApi(page: Page, id: number, body: Record<strin
 }
 
 async function getIdentityDisplayName(page: Page, id: number) {
-  const res = (await browserJson(page, "/api/v1/admin/identities")) as ApiResponse<{
-    items?: IdentityItem[];
-  }>;
-  const items = Array.isArray(res?.data?.items) ? res.data.items : Array.isArray(res?.data?.data?.items) ? (res.data as any).data.items : [];
+  const res = (await browserJson(page, "/api/v1/admin/identities")) as any;
+  const items = Array.isArray(res?.data?.items)
+    ? res.data.items
+    : Array.isArray(res?.data?.data?.items)
+      ? res.data.data.items
+      : [];
   const match = items.find((row: IdentityItem) => Number(row.id) === Number(id));
   return match?.display_name || match?.name || match?.email || `Identity #${id}`;
 }
@@ -320,6 +365,48 @@ test.describe.serial("Governance", () => {
     ).rejects.toThrow(/Forbidden/);
   });
 
+  test("GOV-002B governance context validation rejects invalid payloads", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+
+    const blankTitle = await browserRequest(page, "/api/v1/governance/context", {
+      method: "POST",
+      body: {
+        title: "   ",
+        category_code: "INTERNAL",
+        priority_code: "MEDIUM",
+        status_code: "OPEN",
+        description: "Invalid title payload",
+        owner_identity_id: null,
+        review_date: futureDate(30),
+      },
+    });
+
+    expect(blankTitle.ok).toBe(false);
+    expect(blankTitle.status).toBe(400);
+    expect(blankTitle.code).toBe("VALIDATION_ERROR");
+    expect(String(blankTitle.message || "")).toContain("title is required");
+
+    const badReviewDate = await browserRequest(page, "/api/v1/governance/context", {
+      method: "POST",
+      body: {
+        title: `Invalid Review Date ${uniqueSuffix()}`,
+        category_code: "EXTERNAL",
+        priority_code: "HIGH",
+        status_code: "MONITORING",
+        description: "Invalid review date payload",
+        owner_identity_id: null,
+        review_date: "31-12-2026",
+      },
+    });
+
+    expect(badReviewDate.ok).toBe(false);
+    expect(badReviewDate.status).toBe(400);
+    expect(badReviewDate.code).toBe("VALIDATION_ERROR");
+    expect(String(badReviewDate.message || "")).toContain(
+      "review_date must be in YYYY-MM-DD format"
+    );
+  });
+
   test("GOV-003 create and edit context entries", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     const title = `Context ${uniqueSuffix()}`;
@@ -354,6 +441,85 @@ test.describe.serial("Governance", () => {
     await expect(page.locator("tbody")).toContainText("MONITORING");
   });
 
+  test("GOV-004A auditor cannot create governance context entries", async ({ page }) => {
+    await loginAs(page, USERS.auditor);
+
+    const response = await browserRequest(page, "/api/v1/governance/context", {
+      method: "POST",
+      body: {
+        title: `Forbidden Context ${uniqueSuffix()}`,
+        category_code: "INTERNAL",
+        priority_code: "MEDIUM",
+        status_code: "OPEN",
+        description: "Auditor should not create governance context",
+        owner_identity_id: null,
+        review_date: futureDate(21),
+      },
+    });
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(403);
+    expect(response.code).toBe("FORBIDDEN");
+    expect(String(response.message || "")).toContain("Forbidden");
+  });
+
+  test("GOV-004B superadmin can manage governance registers", async ({ page }) => {
+    await loginAs(page, USERS.superadmin);
+
+    await openPath(page, "/governance/scope", "Governance Scope");
+    await expect(page.getByRole("button", { name: "Create Scope Version" })).toBeVisible();
+    await expect(
+      page.getByText("Read only. Create scope version, submit, approve, and activate are restricted")
+    ).toHaveCount(0);
+
+    await openPath(page, "/governance/context", "Governance Context");
+    await expect(page.getByRole("button", { name: "Create Context Entry" })).toBeVisible();
+
+    await openPath(page, "/governance/stakeholders", "Governance Stakeholders");
+    await expect(page.getByRole("button", { name: "Create Stakeholder Entry" })).toBeVisible();
+  });
+
+  test("GOV-004C itam manager can create and edit governance context entries", async ({ page }) => {
+    await loginAs(page, USERS.itamManager);
+    const title = `ITAM Context ${uniqueSuffix()}`;
+    const updatedTitle = `${title} Updated`;
+    const id = await createContextViaApi(page, {
+      title,
+      category_code: "EXTERNAL",
+      priority_code: "HIGH",
+      status_code: "MONITORING",
+      description: "ITAM manager context entry",
+      owner_identity_id: null,
+      review_date: futureDate(18),
+    });
+    expect(Number.isFinite(id)).toBeTruthy();
+
+    await patchContextViaApi(page, id, {
+      title: updatedTitle,
+      category_code: "INTERNAL",
+      priority_code: "CRITICAL",
+      status_code: "MONITORING",
+      description: "ITAM manager updated context entry",
+      owner_identity_id: 14,
+      review_date: futureDate(33),
+    });
+
+    await openPath(page, "/governance/context", "Governance Context");
+    await expect(page.getByRole("button", { name: "Create Context Entry" })).toBeVisible();
+
+    const listRes = (await browserJson(page, "/api/v1/governance/context?page=1&page_size=50")) as any;
+    const items = Array.isArray(listRes?.data?.items)
+      ? listRes.data.items
+      : Array.isArray(listRes?.data?.data?.items)
+        ? listRes.data.data.items
+        : [];
+    const match = items.find((row: any) => Number(row?.id) === Number(id) || String(row?.title ?? "") === updatedTitle);
+    expect(match).toBeTruthy();
+    expect(String(match?.title ?? "")).toBe(updatedTitle);
+    expect(String(match?.category_code ?? "")).toBe("INTERNAL");
+    expect(String(match?.priority_code ?? "")).toBe("CRITICAL");
+  });
+
   test("GOV-004 create and edit stakeholder entries", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     const name = `Stakeholder ${uniqueSuffix()}`;
@@ -386,6 +552,47 @@ test.describe.serial("Governance", () => {
     await expect(page.locator("tbody")).toContainText(createdStakeholderName);
     await expect(page.locator("tbody")).toContainText("VENDOR");
     await expect(page.locator("tbody")).toContainText("MONITORING");
+  });
+
+  test("GOV-004D itam manager can create and edit governance stakeholder entries", async ({ page }) => {
+    await loginAs(page, USERS.itamManager);
+    const name = `ITAM Stakeholder ${uniqueSuffix()}`;
+    const updatedName = `${name} Updated`;
+    const id = await createStakeholderViaApi(page, {
+      name,
+      category_code: "EXTERNAL",
+      priority_code: "HIGH",
+      status_code: "MONITORING",
+      expectations: "ITAM manager stakeholder entry",
+      owner_identity_id: null,
+      review_date: futureDate(24),
+    });
+    expect(Number.isFinite(id)).toBeTruthy();
+
+    await patchStakeholderViaApi(page, id, {
+      name: updatedName,
+      category_code: "PARTNER",
+      priority_code: "CRITICAL",
+      status_code: "MONITORING",
+      expectations: "ITAM manager updated stakeholder entry",
+      owner_identity_id: 15,
+      review_date: futureDate(36),
+    });
+
+    await openPath(page, "/governance/stakeholders", "Governance Stakeholders");
+    await expect(page.getByRole("button", { name: "Create Stakeholder Entry" })).toBeVisible();
+
+    const listRes = (await browserJson(page, "/api/v1/governance/stakeholders?page=1&page_size=50")) as any;
+    const items = Array.isArray(listRes?.data?.items)
+      ? listRes.data.items
+      : Array.isArray(listRes?.data?.data?.items)
+        ? listRes.data.data.items
+        : [];
+    const match = items.find((row: any) => Number(row?.id) === Number(id) || String(row?.name ?? "") === updatedName);
+    expect(match).toBeTruthy();
+    expect(String(match?.name ?? "")).toBe(updatedName);
+    expect(String(match?.category_code ?? "")).toBe("PARTNER");
+    expect(String(match?.priority_code ?? "")).toBe("CRITICAL");
   });
 
   test("GOV-005 auditor has read-only access on governance pages", async ({ page }) => {
@@ -560,7 +767,7 @@ test.describe.serial("Governance", () => {
         open_stakeholder_entries?: unknown;
       };
     }>;
-    const beforeTotals = beforeRes?.data?.totals ?? beforeRes?.data?.data?.totals ?? {};
+    const beforeTotals = (beforeRes as any)?.data?.totals ?? (beforeRes as any)?.data?.data?.totals ?? {};
     const beforeContext = Number(beforeTotals?.open_context_entries ?? 0);
     const beforeStakeholders = Number(beforeTotals?.open_stakeholder_entries ?? 0);
 
@@ -593,7 +800,7 @@ test.describe.serial("Governance", () => {
         open_stakeholder_entries?: unknown;
       };
     }>;
-    const afterTotals = afterRes?.data?.totals ?? afterRes?.data?.data?.totals ?? {};
+    const afterTotals = (afterRes as any)?.data?.totals ?? (afterRes as any)?.data?.data?.totals ?? {};
     const afterContext = Number(afterTotals?.open_context_entries ?? 0);
     const afterStakeholders = Number(afterTotals?.open_stakeholder_entries ?? 0);
 

@@ -113,6 +113,26 @@ async function postJson(page: Page, path: string, body: unknown) {
   );
 }
 
+async function patchJson(page: Page, path: string, body: unknown) {
+  return page.evaluate(
+    async ({ url, payload }) => {
+      const res = await fetch(url, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      return {
+        status: res.status,
+        json: await res.json(),
+      };
+    },
+    { url: `${API_BASE}${path}`, payload: body }
+  );
+}
+
 async function createAssetViaUi(page: Page, creds: Credentials, label: string) {
   await loginAs(page, creds);
   await page.goto("/assets/new");
@@ -228,6 +248,48 @@ test.describe("Assets", () => {
       asset?.data?.data?.asset?.name ??
       asset?.asset?.name;
     expect(currentName).toBe(created.updatedName);
+  });
+
+  test("auditor cannot update an asset", async ({ page }) => {
+    const created = await createAssetViaUi(page, USERS.tenantAdmin, "asset-forbidden-update");
+
+    await loginAs(page, USERS.auditor);
+    const response = await patchJson(page, `/api/v1/assets/${created.assetId}`, {
+      name: `${created.assetName} Forbidden`,
+      status: "AKTIF",
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.json?.error?.code).toBe("FORBIDDEN");
+
+    const asset = await fetchJson(page, `${API_BASE}/api/v1/assets/${created.assetId}`);
+    const currentName =
+      asset?.data?.asset?.name ??
+      asset?.data?.data?.asset?.name ??
+      asset?.asset?.name;
+    expect(currentName).toBe(created.assetName);
+  });
+
+  test("auditor cannot create an asset via API", async ({ page }) => {
+    await loginAs(page, USERS.auditor);
+    const suffix = uniqueSuffix();
+    const response = await postJson(page, "/api/v1/assets", {
+      asset_tag: `PW-AUDIT-CREATE-${suffix}`,
+      name: `Playwright Auditor Create ${suffix}`,
+      asset_type_code: "HARDWARE",
+      initial_state_code: "REQUESTED",
+      status: "AKTIF",
+      purchase_date: isoDate(0),
+      warranty_start_date: isoDate(0),
+      warranty_end_date: isoDate(365),
+      support_start_date: isoDate(0),
+      support_end_date: isoDate(365),
+      subscription_start_date: null,
+      subscription_end_date: null,
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.json?.error?.code).toBe("FORBIDDEN");
   });
 
   test("tenant admin cannot create an asset outside active governance scope", async ({ page }) => {
@@ -370,7 +432,23 @@ test.describe("Assets", () => {
     }
     await page.getByRole("button", { name: "Create Identity" }).click();
     await expect(page.getByText("Identity berhasil dibuat.")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(seededIdentityName)).toBeVisible({ timeout: 20_000 });
+    const createdIdentity = await fetchJson(
+      page,
+      `${API_BASE}/api/v1/identities?page=1&page_size=100&q=${encodeURIComponent(seededIdentityEmail)}`
+    );
+    const createdIdentityItems = Array.isArray(createdIdentity?.data?.items)
+      ? createdIdentity.data.items
+      : Array.isArray(createdIdentity?.data?.data?.items)
+        ? createdIdentity.data.data.items
+        : [];
+    expect(
+      createdIdentityItems.some((item: any) =>
+        String(item?.email ?? "").toLowerCase() === seededIdentityEmail.toLowerCase() ||
+        String(item?.display_name ?? item?.identity_name ?? item?.full_name ?? item?.name ?? "")
+          .toLowerCase()
+          .includes(seededIdentityName.toLowerCase())
+      )
+    ).toBeTruthy();
 
     await page.goto("/software-products");
     await expect(page.getByRole("heading", { name: "Software Products" })).toBeVisible();

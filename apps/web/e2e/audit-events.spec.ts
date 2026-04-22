@@ -22,6 +22,11 @@ const USERS = {
     email: "testing@bni.com",
     password: "12345678",
   },
+  superadmin: {
+    tenantCode: "default",
+    email: "admin@default.local",
+    password: "admin123",
+  },
 } satisfies Record<string, Credentials>;
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001").replace(/\/+$/, "");
@@ -97,6 +102,49 @@ async function browserJson(page: Page, path: string, init?: { method?: string; b
   );
 }
 
+async function browserRequest(page: Page, path: string, init?: { method?: string; body?: unknown }) {
+  return await page.evaluate(
+    async ({ apiBase, path, init }) => {
+      const headers: Record<string, string> = {};
+      let body: string | undefined;
+
+      if (init?.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(init.body);
+      }
+
+      const res = await fetch(`${apiBase}${path}`, {
+        method: init?.method || "GET",
+        credentials: "include",
+        headers,
+        body,
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return {
+        ok: res.ok,
+        status: res.status,
+        headers: {
+          contentType: res.headers.get("content-type"),
+          contentDisposition: res.headers.get("content-disposition"),
+        },
+        code: json?.error?.code || json?.code || null,
+        message: json?.error?.message || json?.message || null,
+        json,
+        text,
+      };
+    },
+    { apiBase: API_BASE, path, init }
+  );
+}
+
 async function openAuditTrail(page: Page) {
   await page.goto("/audit-events");
   await expect(page.getByRole("heading", { name: "Audit Trail" })).toBeVisible({
@@ -105,7 +153,14 @@ async function openAuditTrail(page: Page) {
 }
 
 async function firstRawActor(page: Page) {
-  const text = await page.locator("tbody tr").first().locator("td").nth(1).locator("div.text-xs").textContent();
+  const text = await page
+    .locator("tbody tr")
+    .first()
+    .locator("td")
+    .nth(1)
+    .locator("div.text-xs")
+    .last()
+    .textContent();
   return String(text || "").trim();
 }
 
@@ -115,7 +170,7 @@ async function visibleRawActors(page: Page) {
   const actors: string[] = [];
   for (let i = 0; i < count; i += 1) {
     const value = String(
-      (await rows.nth(i).locator("td").nth(1).locator("div.text-xs").textContent()) || ""
+      (await rows.nth(i).locator("td").nth(1).locator("div.text-xs").last().textContent()) || ""
     ).trim();
     if (value) actors.push(value);
   }
@@ -278,5 +333,60 @@ test.describe.serial("Audit Events", () => {
     for (const row of items) {
       expect(Number(row.tenant_id)).toBe(tenantId);
     }
+  });
+
+  test("AUD-009 audit trail export supports xlsx attachments", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+
+    const response = await page.context().request.get(
+      `${API_BASE}/api/v1/audit-events/export?format=xlsx&limit=5&offset=0`
+    );
+
+    expect(response.ok()).toBe(true);
+    expect(response.status()).toBe(200);
+
+    const headers = response.headers();
+    expect(String(headers["content-disposition"] || "")).toContain("audit-events.xlsx");
+    expect(String(headers["content-type"] || "")).toContain(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    const body = await response.body();
+    expect(body.length).toBeGreaterThan(0);
+  });
+
+  test("AUD-010 invalid audit date filters are rejected", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+
+    const response = await browserRequest(
+      page,
+      "/api/v1/audit-events?date_from=31-12-2026&date_to=2026-12-31"
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(400);
+    expect(response.code).toBe("VALIDATION_ERROR");
+    expect(String(response.message || "")).toContain("date_from must be in YYYY-MM-DD format");
+  });
+
+  test("AUD-011 superadmin can open audit trail and export xlsx", async ({ page }) => {
+    await loginAs(page, USERS.superadmin);
+    await openAuditTrail(page);
+
+    await expect(page.getByRole("button", { name: "Apply Filters" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Download JSON" })).toBeVisible();
+
+    const response = await page.context().request.get(
+      `${API_BASE}/api/v1/audit-events/export?format=xlsx&limit=5&offset=0`
+    );
+
+    expect(response.ok()).toBe(true);
+    expect(response.status()).toBe(200);
+
+    const headers = response.headers();
+    expect(String(headers["content-disposition"] || "")).toContain("audit-events.xlsx");
+    expect(String(headers["content-type"] || "")).toContain(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
   });
 });

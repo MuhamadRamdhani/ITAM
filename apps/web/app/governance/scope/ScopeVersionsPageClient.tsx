@@ -459,27 +459,34 @@ export default function ScopeVersionsPageClient() {
         setCanManage(nextCanManage);
 
         if (nextCanManage) {
-          const [assetTypesRes, departmentsRes, locationsRes] = await Promise.all([
-            apiGet<any>("/api/v1/admin/asset-types", { loadingKey: "scope_asset_types" }),
-            apiGet<any>("/api/v1/admin/departments", { loadingKey: "scope_departments" }),
-            apiGet<any>("/api/v1/admin/locations", { loadingKey: "scope_locations" }),
-          ]);
+          try {
+            const [assetTypesRes, departmentsRes, locationsRes] = await Promise.all([
+              apiGet<any>("/api/v1/admin/asset-types", { loadingKey: "scope_asset_types" }),
+              apiGet<any>("/api/v1/admin/departments", { loadingKey: "scope_departments" }),
+              apiGet<any>("/api/v1/admin/locations", { loadingKey: "scope_locations" }),
+            ]);
 
-          if (!active) return;
+            if (!active) return;
 
-          const assetTypeRows = normalizeAssetTypes(assetTypesRes).filter((x) => x.active !== false);
-          const departmentRows = normalizeDepartments(departmentsRes);
-          const locationRows = normalizeLocations(locationsRes);
+            const assetTypeRows = normalizeAssetTypes(assetTypesRes).filter((x) => x.active !== false);
+            const departmentRows = normalizeDepartments(departmentsRes);
+            const locationRows = normalizeLocations(locationsRes);
 
-          setAssetTypes(assetTypeRows);
-          setDepartments(departmentRows);
-          setLocations(locationRows);
+            setAssetTypes(assetTypeRows);
+            setDepartments(departmentRows);
+            setLocations(locationRows);
 
-          if (assetTypeRows.length > 0) {
-            setSelectedAssetTypes((prev) => {
-              const next = prev.filter((x) => assetTypeRows.some((row) => row.code === x));
-              return next.length > 0 ? next : assetTypeRows.slice(0, 3).map((x) => x.code);
-            });
+            if (assetTypeRows.length > 0) {
+              setSelectedAssetTypes((prev) => {
+                const next = prev.filter((x) => assetTypeRows.some((row) => row.code === x));
+                return next.length > 0 ? next : assetTypeRows.slice(0, 3).map((x) => x.code);
+              });
+            }
+          } catch {
+            if (!active) return;
+            setAssetTypes([]);
+            setDepartments([]);
+            setLocations([]);
           }
         }
       } catch (error) {

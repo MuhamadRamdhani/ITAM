@@ -144,8 +144,8 @@ export default function EvidencePageClient() {
 
     async function loadMe() {
       try {
-        const res = await apiGet<ApiMeResponse>("/api/v1/auth/me");
-        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+        const res = await apiGet<MeData>("/api/v1/auth/me");
+        const me = res?.data ?? null;
         if (!active) return;
         setRoles(Array.isArray(me?.roles) ? me.roles : []);
       } catch {

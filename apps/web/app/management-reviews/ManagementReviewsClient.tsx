@@ -87,7 +87,7 @@ function statusBadgeClass(status: ManagementReviewSessionStatus) {
     case 'CANCELLED':
       return 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200';
     default:
-      return 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200';
+      return 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200';
   }
 }
 
@@ -300,290 +300,307 @@ export default function ManagementReviewsClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-              Management Reviews
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-gray-600">
-              Manage management review sessions, capture meeting minutes, and track
-              follow-up progress across the tenant.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => loadData('refresh')}
-              disabled={loading || refreshing}
-              className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
-
-            <Link
-              href="/management-reviews/action-items"
-              className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-            >
-              Open Action Tracker
-            </Link>
-
-            {canManage ? (
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800"
-              >
-                New Management Review
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {!loadingRoles && !canManage ? (
-          <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            Read-only access: you can view management review sessions, but creation and
-            edits are restricted.
-          </div>
-        ) : null}
-
-        {successMessage ? (
-          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {successMessage}
-          </div>
-        ) : null}
-
-        {errorMessage ? (
-          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <div className="mb-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Current page total</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">{items.length}</div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Draft on page</div>
-            <div className="mt-2 text-2xl font-semibold text-amber-700">{draftCount}</div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Completed on page</div>
-            <div className="mt-2 text-2xl font-semibold text-emerald-700">
-              {completedCount}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Cancelled on page</div>
-            <div className="mt-2 text-2xl font-semibold text-rose-700">{cancelledCount}</div>
-          </div>
-        </div>
-
-        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <form
-            onSubmit={onSubmitSearch}
-            className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto]"
-          >
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Search
-              </label>
-              <input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search by session code or title"
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(event) => onChangeStatus(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-              >
-                <option value="">All statuses</option>
-                <option value="DRAFT">DRAFT</option>
-                <option value="COMPLETED">COMPLETED</option>
-                <option value="CANCELLED">CANCELLED</option>
-              </select>
-            </div>
-
-            <div className="flex items-end gap-2">
-              <button
-                type="submit"
-                className="inline-flex h-[42px] items-center rounded-xl bg-gray-900 px-4 text-sm font-medium text-white transition hover:bg-gray-800"
-              >
-                Apply
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchInput('');
-                  setSearch('');
-                  setStatus('');
-                  setPage(1);
-                }}
-                className="inline-flex h-[42px] items-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Reset
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Session List</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Total matched sessions: {total}
-              </p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="px-5 py-10 text-sm text-gray-500">
-              Loading management reviews...
-            </div>
-          ) : items.length === 0 ? (
-            <div className="px-5 py-12">
-              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
-                <div className="text-base font-medium text-gray-900">
-                  No management review sessions found
+    <>
+      <main className="itam-page-shell">
+        <div className="itam-page-shell-inner">
+          <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
+                  Operational Workspace
                 </div>
-                <p className="mt-2 text-sm text-gray-500">
-                  Try changing the filter, or create a new management review session.
+
+                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                  Management Reviews
+                </h1>
+
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
+                  Manage management review sessions, capture meeting minutes, and track
+                  follow-up progress across the tenant.
                 </p>
-                {canManage ? (
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={openCreateModal}
-                      className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
-                    >
-                      Create Session
-                    </button>
-                  </div>
-                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+  <Link href="/" className="itam-secondary-action">
+    Back
+  </Link>
+
+  <Link
+    href="/management-reviews/action-items"
+    className="itam-secondary-action"
+  >
+    Open Action Tracker
+  </Link>
+
+  {canManage ? (
+    <button
+      type="button"
+      onClick={openCreateModal}
+      className="itam-primary-action"
+    >
+      New Management Review
+    </button>
+  ) : null}
+</div>
+            </div>
+          </div>
+
+          {!loadingRoles && !canManage ? (
+            <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Read-only access: you can view management review sessions, but creation and
+              edits are restricted.
+            </div>
+          ) : null}
+
+          {successMessage ? (
+            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {successMessage}
+            </div>
+          ) : null}
+
+          {errorMessage ? (
+            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          <div className="mt-8 grid gap-4 md:grid-cols-4">
+            <div className="rounded-[1.75rem] border border-white/80 bg-white/85 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Current page total
+              </div>
+              <div className="mt-3 text-3xl font-semibold text-slate-900">
+                {items.length}
               </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="text-left text-gray-600">
-                    <th className="px-5 py-3 font-medium">Session</th>
-                    <th className="px-5 py-3 font-medium">Review Date</th>
-                    <th className="px-5 py-3 font-medium">Chairperson</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium">Action Items</th>
-                    <th className="px-5 py-3 font-medium">Summary</th>
-                    <th className="px-5 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map((item) => (
-                    <tr key={item.id} className="align-top">
-                      <td className="px-5 py-4">
-                        <div className="font-medium text-gray-900">{item.session_code}</div>
-                        <div className="mt-1 text-sm text-gray-700">{item.title}</div>
-                      </td>
 
-                      <td className="px-5 py-4 text-gray-700">
-                        {formatDate(item.review_date)}
-                      </td>
+            <div className="rounded-[1.75rem] border border-white/80 bg-white/85 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Draft on page
+              </div>
+              <div className="mt-3 text-3xl font-semibold text-amber-700">
+                {draftCount}
+              </div>
+            </div>
 
-                      <td className="px-5 py-4 text-gray-700">
-                        {getIdentityName(item.chairperson_identity_id)}
-                      </td>
+            <div className="rounded-[1.75rem] border border-white/80 bg-white/85 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Completed on page
+              </div>
+              <div className="mt-3 text-3xl font-semibold text-emerald-700">
+                {completedCount}
+              </div>
+            </div>
 
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(
-                            item.status,
-                          )}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
+            <div className="rounded-[1.75rem] border border-white/80 bg-white/85 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Cancelled on page
+              </div>
+              <div className="mt-3 text-3xl font-semibold text-rose-700">
+                {cancelledCount}
+              </div>
+            </div>
+          </div>
 
-                      <td className="px-5 py-4 text-gray-700">
-                        <div>Total: {item.action_item_count}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          Open {item.open_action_item_count} · Done {item.done_action_item_count}
-                        </div>
-                      </td>
+          <div className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+              <form
+                onSubmit={onSubmitSearch}
+                className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_auto]"
+              >
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Search
+                  </label>
+                  <input
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Search by session code or title"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
 
-                      <td className="px-5 py-4 text-gray-700">
-                        <div>Decisions: {item.decision_count}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          Overdue: {item.overdue_action_item_count}
-                        </div>
-                      </td>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Status
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(event) => onChangeStatus(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    <option value="">All statuses</option>
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
 
-                      <td className="px-5 py-4">
-                        <Link
-                          href={`/management-reviews/${item.id}`}
-                          className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                        >
-                          View Detail
-                        </Link>
-                      </td>
+                <div className="flex items-end gap-2">
+                  <button type="submit" className="itam-primary-action">
+                    Apply
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchInput('');
+                      setSearch('');
+                      setStatus('');
+                      setPage(1);
+                    }}
+                    className="itam-secondary-action"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <h2 className="text-base font-semibold text-slate-900">Session List</h2>
+              <p className="mt-1 text-sm text-slate-500">Total matched sessions: {total}</p>
+            </div>
+
+            {loading ? (
+              <div className="px-6 py-10 text-sm text-slate-500">
+                {refreshing ? 'Refreshing...' : 'Loading management reviews...'}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="px-6 py-12">
+                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+                  <div className="text-base font-medium text-slate-900">
+                    No management review sessions found
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Try changing the filter, or create a new management review session.
+                  </p>
+                  {canManage ? (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={openCreateModal}
+                        className="itam-primary-action"
+                      >
+                        Create Session
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-600">
+                    <tr>
+                      <th className="px-6 py-3 font-medium">Session</th>
+                      <th className="px-6 py-3 font-medium">Review Date</th>
+                      <th className="px-6 py-3 font-medium">Chairperson</th>
+                      <th className="px-6 py-3 font-medium">Status</th>
+                      <th className="px-6 py-3 font-medium">Action Items</th>
+                      <th className="px-6 py-3 font-medium">Summary</th>
+                      <th className="px-6 py-3 font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
 
-          <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4">
-            <div className="text-sm text-gray-500">
-              Page {page} of {Math.max(1, totalPages)}
-            </div>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {items.map((item) => (
+                      <tr key={item.id} className="align-top">
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-slate-900">
+                            {item.session_code}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-700">{item.title}</div>
+                        </td>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Previous
-              </button>
+                        <td className="px-6 py-4 text-slate-700">
+                          {formatDate(item.review_date)}
+                        </td>
 
-              <button
-                type="button"
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage((current) => current + 1)}
-                className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
+                        <td className="px-6 py-4 text-slate-700">
+                          {getIdentityName(item.chairperson_identity_id)}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(
+                              item.status,
+                            )}`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-700">
+                          <div>Total: {item.action_item_count}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Open {item.open_action_item_count} · Done{' '}
+                            {item.done_action_item_count}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 text-slate-700">
+                          <div>Decisions: {item.decision_count}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Overdue: {item.overdue_action_item_count}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <Link
+                            href={`/management-reviews/${item.id}`}
+                            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                          >
+                            View Detail
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+              <div className="text-sm text-slate-500">
+                Page {page} of {Math.max(1, totalPages)}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+
+                <button
+                  type="button"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((current) => current + 1)}
+                  className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {createOpen && canManage ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 px-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-3xl rounded-[2rem] border border-white/80 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-slate-900">
                   New Management Review
                 </h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-slate-500">
                   Create a new management review session in DRAFT status.
                 </p>
               </div>
@@ -591,7 +608,7 @@ export default function ManagementReviewsClient() {
               <button
                 type="button"
                 onClick={closeCreateModal}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="itam-secondary-action-sm"
               >
                 Close
               </button>
@@ -600,7 +617,7 @@ export default function ManagementReviewsClient() {
             <form onSubmit={onSubmitCreate} className="px-6 py-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Session Code
                   </label>
                   <input
@@ -613,12 +630,12 @@ export default function ManagementReviewsClient() {
                       }))
                     }
                     placeholder="MR-2026-004"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Review Date
                   </label>
                   <input
@@ -631,12 +648,12 @@ export default function ManagementReviewsClient() {
                         review_date: event.target.value,
                       }))
                     }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Title
                   </label>
                   <input
@@ -649,12 +666,12 @@ export default function ManagementReviewsClient() {
                       }))
                     }
                     placeholder="Management Review Q2 2026"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Chairperson
                   </label>
                   <select
@@ -666,7 +683,7 @@ export default function ManagementReviewsClient() {
                         chairperson_identity_id: event.target.value,
                       }))
                     }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
                   >
                     <option value="">Select chairperson</option>
                     {identityOptions.map((option) => (
@@ -678,7 +695,7 @@ export default function ManagementReviewsClient() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Summary
                   </label>
                   <textarea
@@ -691,12 +708,12 @@ export default function ManagementReviewsClient() {
                       }))
                     }
                     placeholder="High-level summary of the review session"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Minutes
                   </label>
                   <textarea
@@ -709,12 +726,12 @@ export default function ManagementReviewsClient() {
                       }))
                     }
                     placeholder="Meeting notes / minutes"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
                     Notes
                   </label>
                   <textarea
@@ -727,7 +744,7 @@ export default function ManagementReviewsClient() {
                       }))
                     }
                     placeholder="Optional notes"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
               </div>
@@ -737,7 +754,7 @@ export default function ManagementReviewsClient() {
                   type="button"
                   onClick={closeCreateModal}
                   disabled={submitting}
-                  className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="itam-secondary-action"
                 >
                   Cancel
                 </button>
@@ -745,7 +762,7 @@ export default function ManagementReviewsClient() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="itam-primary-action disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? 'Creating...' : 'Create Session'}
                 </button>
@@ -754,6 +771,6 @@ export default function ManagementReviewsClient() {
           </div>
         </div>
       ) : null}
-    </main>
+    </>
   );
-} 
+}

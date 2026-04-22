@@ -361,53 +361,55 @@ export default function SoftwareProductsClient() {
   return (
     <div className="space-y-12">
       <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
-              Software Registry
-            </div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Software Products
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
-              Registry software product per tenant untuk kebutuhan software
-              operations berikutnya.
-            </p>
-          </div>
-
-          <Link
-            href="/"
-            className="itam-secondary-action"
-          >
-            Back
-          </Link>
-        </div>
+  <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="max-w-3xl">
+      <div className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700">
+        Software Registry
       </div>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+        Software Products
+      </h1>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
+        Registry software product per tenant untuk kebutuhan software
+        operations berikutnya.
+      </p>
+    </div>
 
-        <div className="mt-16 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="flex justify-end">
-            {meLoading ? (
-              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
-                Loading access...
-              </span>
-            ) : canWrite ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreate((prev) => !prev);
-                  setCreateErr(null);
-                  setCreateOk(null);
-                }}
-                className="itam-primary-action"
-              >
-                {showCreate ? "Tutup Form" : "Create Software Product"}
-              </button>
-            ) : (
-              <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
-                Read-only access
-              </span>
-            )}
-          </div>
+    <div className="shrink-0">
+      <Link
+        href="/"
+        className="itam-secondary-action"
+      >
+        Back
+      </Link>
+    </div>
+  </div>
+</div>
+
+        <div className="mt-10 rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+  <div className="mb-6 flex items-center justify-end pt-1">
+    {meLoading ? (
+      <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
+        Loading access...
+      </span>
+    ) : canWrite ? (
+      <button
+        type="button"
+        onClick={() => {
+          setShowCreate((prev) => !prev);
+          setCreateErr(null);
+          setCreateOk(null);
+        }}
+        className="itam-primary-action"
+      >
+        {showCreate ? "Tutup Form" : "Create Software Product"}
+      </button>
+    ) : (
+      <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
+        Read-only access
+      </span>
+    )}
+  </div>
 
           {(createErr || createOk) && (
             <div className="mt-4 space-y-3">

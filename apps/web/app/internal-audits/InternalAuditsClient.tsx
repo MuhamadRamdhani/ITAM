@@ -1,644 +1,621 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  CreateInternalAuditPayload,
-  IdentityOption,
-  InternalAuditListItem,
-  createInternalAudit,
-  getIdentityLabel,
-  listIdentityOptions,
-  listInternalAudits,
-} from '../lib/internal-audits';
+import Link from "next/link";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { apiGet } from "../lib/api";
+import { ErrorState, SkeletonTableRow } from "../lib/loadingComponents";
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) return error.message;
-  return 'Something went wrong.';
-}
+type AuditStatus =
+  | "DRAFT"
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | string;
 
-function statusBadgeClass(status: string) {
-  switch (status) {
-    case 'DRAFT':
-      return 'bg-gray-100 text-gray-700';
-    case 'IN_PROGRESS':
-      return 'bg-blue-100 text-blue-700';
-    case 'COMPLETED':
-      return 'bg-emerald-100 text-emerald-700';
-    case 'CANCELLED':
-      return 'bg-red-100 text-red-700';
-    default:
-      return 'bg-gray-100 text-gray-700';
-  }
-}
-
-type CreateFormState = {
+type InternalAuditItem = {
+  id: number | string;
   audit_code: string;
-  audit_title: string;
+  title: string;
   audit_type: string;
-  scope_summary: string;
-  objective: string;
-  planned_start_date: string;
-  planned_end_date: string;
-  lead_auditor_identity_id: string;
-  auditee_summary: string;
-  notes: string;
+  status: AuditStatus;
+  planned_start_date: string | null;
+  planned_end_date: string | null;
+  lead_auditor_name: string | null;
+  checklist_count: number;
+  finding_count: number;
 };
 
-const initialCreateForm: CreateFormState = {
-  audit_code: '',
-  audit_title: '',
-  audit_type: 'INTERNAL',
-  scope_summary: '',
-  objective: '',
-  planned_start_date: '',
-  planned_end_date: '',
-  lead_auditor_identity_id: '',
-  auditee_summary: '',
-  notes: '',
+type InternalAuditListData = {
+  total: number;
+  items: InternalAuditItem[];
 };
+
+type UiConfigData = {
+  page_size_options?: unknown;
+  documents_page_size_default?: unknown;
+  ui?: {
+    page_size?: {
+      options?: unknown;
+    };
+    documents?: {
+      page_size?: {
+        default?: unknown;
+      };
+    };
+  };
+};
+
+type UiConfigNormalized = {
+  pageSizeOptions: number[];
+  pageSizeDefault: number;
+};
+
+type ApiPayload<T> = T | { data?: T };
+
+type InternalAuditListResponse = {
+  total?: number | string;
+  items?: unknown[];
+};
+
+const STATUSES = [
+  { value: "ALL", label: "All" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "PLANNED", label: "Planned" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
+] as const;
+
+const AUDIT_TYPES = [
+  { value: "ALL", label: "All" },
+  { value: "INTERNAL", label: "Internal" },
+  { value: "SUPPLIER", label: "Supplier" },
+  { value: "COMPLIANCE", label: "Compliance" },
+  { value: "FOLLOW_UP", label: "Follow Up" },
+] as const;
+
+function pickInt(raw: string | null | undefined, fallback: number) {
+  const n = Number.parseInt(String(raw ?? "").trim(), 10);
+  if (!Number.isFinite(n) || Number.isNaN(n) || n <= 0) return fallback;
+  return n;
+}
+
+function fmtDate(value?: string | null) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString();
+}
+
+function fmtPeriod(start?: string | null, end?: string | null) {
+  if (!start && !end) return "-";
+  if (start && end) return `${fmtDate(start)} to ${fmtDate(end)}`;
+  if (start) return `From ${fmtDate(start)}`;
+  return `Until ${fmtDate(end)}`;
+}
+
+function statusPill(status: string) {
+  const s = String(status ?? "").toUpperCase();
+
+  if (s === "DRAFT") {
+    return "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700";
+  }
+  if (s === "PLANNED") {
+    return "rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800";
+  }
+  if (s === "IN_PROGRESS") {
+    return "rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800";
+  }
+  if (s === "COMPLETED") {
+    return "rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800";
+  }
+  if (s === "CANCELLED") {
+    return "rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800";
+  }
+
+  return "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700";
+}
+
+function getErrorMessage(error: unknown, fallback = "Failed to load internal audits") {
+  if (!error) return fallback;
+  if (error instanceof Error && error.message) return error.message;
+
+  const e = error as { error?: { message?: string }; message?: string };
+  return e?.error?.message || e?.message || fallback;
+}
+
+function unwrapApiPayload<T>(payload: ApiPayload<T> | null | undefined): T | null {
+  if (!payload) return null;
+
+  if (typeof payload === "object" && "data" in payload) {
+    const wrapped = payload as { data?: ApiPayload<T> };
+    const inner = wrapped.data;
+    if (!inner) return null;
+
+    if (typeof inner === "object" && inner !== null && "data" in inner) {
+      return (((inner as { data?: T }).data ?? null) as T | null);
+    }
+
+    return inner as T;
+  }
+
+  return payload as T;
+}
+
+function normalizeUiConfig(res: { data: ApiPayload<UiConfigData> }): UiConfigNormalized {
+  const raw = unwrapApiPayload<UiConfigData>(res?.data) ?? {};
+
+  const optionsRaw =
+    raw?.page_size_options ??
+    raw?.ui?.page_size?.options ??
+    [];
+
+  const pageSizeOptions = Array.isArray(optionsRaw)
+    ? optionsRaw
+        .map((x) => Number(x))
+        .filter((n: number) => Number.isFinite(n) && n > 0)
+    : [];
+
+  const preferred = [10, 50, 100];
+  const safeOptions =
+    pageSizeOptions.length > 0
+      ? preferred.filter((n) => pageSizeOptions.includes(n))
+      : preferred;
+
+  const finalOptions = safeOptions.length > 0 ? safeOptions : preferred;
+
+  const defaultRaw = Number(
+    raw?.documents_page_size_default ??
+      raw?.ui?.documents?.page_size?.default ??
+      finalOptions[0]
+  );
+
+  const pageSizeDefault = finalOptions.includes(defaultRaw)
+    ? defaultRaw
+    : finalOptions[0];
+
+  return { pageSizeOptions: finalOptions, pageSizeDefault };
+}
+
+function normalizeInternalAuditList(
+  res: { data: ApiPayload<InternalAuditListResponse> }
+): InternalAuditListData {
+  const raw = unwrapApiPayload<InternalAuditListResponse>(res?.data);
+
+  const items = Array.isArray(raw?.items)
+    ? raw.items.map((item: any) => ({
+        id: item?.id,
+        audit_code: String(item?.audit_code ?? item?.code ?? "-"),
+        title: String(item?.title ?? "-"),
+        audit_type: String(item?.audit_type ?? item?.type ?? "-"),
+        status: String(item?.status ?? "-"),
+        planned_start_date: item?.planned_start_date ?? item?.planned_start ?? null,
+        planned_end_date: item?.planned_end_date ?? item?.planned_end ?? null,
+        lead_auditor_name: item?.lead_auditor_name ?? item?.lead_auditor ?? null,
+        checklist_count: Number(item?.checklist_count ?? 0),
+        finding_count: Number(item?.finding_count ?? 0),
+      }))
+    : [];
+
+  return {
+    total: Number(raw?.total ?? 0),
+    items,
+  };
+}
+
+function buildInternalAuditsHref(params: {
+  q: string;
+  status: string;
+  auditType: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const p = new URLSearchParams();
+
+  if (params.q) p.set("q", params.q);
+  if (params.status && params.status !== "ALL") p.set("status", params.status);
+  if (params.auditType && params.auditType !== "ALL") {
+    p.set("audit_type", params.auditType);
+  }
+  if (params.pageSize && params.pageSize > 0) p.set("page_size", String(params.pageSize));
+  if (params.page && params.page > 0) p.set("page", String(params.page));
+
+  const qs = p.toString();
+  return qs ? `/internal-audits?${qs}` : "/internal-audits";
+}
 
 export default function InternalAuditsClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [items, setItems] = useState<InternalAuditListItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalItems, setTotalItems] = useState(0);
-
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState('ALL');
-  const [auditType, setAuditType] = useState('ALL');
+  const q = (searchParams.get("q") || "").trim();
+  const status = (searchParams.get("status") || "ALL").trim() || "ALL";
+  const auditType = (searchParams.get("audit_type") || "ALL").trim() || "ALL";
+  const pageFromUrl = pickInt(searchParams.get("page"), 1);
+  const pageSizeFromUrl = pickInt(searchParams.get("page_size"), 0);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState<CreateFormState>(initialCreateForm);
-  const [savingCreate, setSavingCreate] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [items, setItems] = useState<InternalAuditItem[]>([]);
+  const [total, setTotal] = useState(0);
 
-  const [identitySearch, setIdentitySearch] = useState('');
-  const [identities, setIdentities] = useState<IdentityOption[]>([]);
-  const [loadingIdentities, setLoadingIdentities] = useState(false);
+  const [pageSizeOptions, setPageSizeOptions] = useState<number[]>([10, 50, 100]);
+  const [pageSize, setPageSize] = useState<number>(10);
 
-  const loadAudits = useCallback(async () => {
-    try {
+  const [searchQ, setSearchQ] = useState(q);
+  const [searchStatus, setSearchStatus] = useState(status);
+  const [searchAuditType, setSearchAuditType] = useState(auditType);
+
+  useEffect(() => {
+    setSearchQ(q);
+    setSearchStatus(status);
+    setSearchAuditType(auditType);
+  }, [q, status, auditType]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
       setLoading(true);
-      setError(null);
+      setErr(null);
 
-      const data = await listInternalAudits({
-        page,
-        page_size: pageSize,
-        q: q || undefined,
-        status,
-        audit_type: auditType,
-      });
+      try {
+        const cfgRes = await apiGet<ApiPayload<UiConfigData>>("/api/v1/config/ui", {
+          loadingKey: "internal_audits_config",
+        });
 
-      setItems(data.items || []);
-      setTotalPages(data.pagination?.total_pages ?? 0);
-      setTotalItems(data.pagination?.total_items ?? 0);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
+        const cfg = normalizeUiConfig(cfgRes);
+        if (!active) return;
+
+        setPageSizeOptions(cfg.pageSizeOptions);
+
+        const effectivePageSize =
+          pageSizeFromUrl > 0 && cfg.pageSizeOptions.includes(pageSizeFromUrl)
+            ? pageSizeFromUrl
+            : cfg.pageSizeDefault;
+
+        setPageSize(effectivePageSize);
+
+        const href = new URLSearchParams();
+        if (q) href.set("q", q);
+        if (status && status !== "ALL") href.set("status", status);
+        if (auditType && auditType !== "ALL") href.set("audit_type", auditType);
+        href.set("page", String(pageFromUrl));
+        href.set("page_size", String(effectivePageSize));
+
+        const listRes = await apiGet<ApiPayload<InternalAuditListResponse>>(
+          `/api/v1/internal-audits?${href.toString()}`,
+          { loadingKey: "internal_audits_list" }
+        );
+
+        if (!active) return;
+
+        const normalized = normalizeInternalAuditList(listRes);
+        setItems(normalized.items);
+        setTotal(normalized.total);
+      } catch (error) {
+        if (!active) return;
+        setErr(getErrorMessage(error));
+        setItems([]);
+        setTotal(0);
+      } finally {
+        if (active) setLoading(false);
+      }
     }
-  }, [page, pageSize, q, status, auditType]);
 
-  const loadIdentities = useCallback(async () => {
-    try {
-      setLoadingIdentities(true);
-      const data = await listIdentityOptions({
-        page: 1,
-        page_size: 25,
-        q: identitySearch || undefined,
-      });
-      setIdentities(data.items || []);
-    } catch {
-      setIdentities([]);
-    } finally {
-      setLoadingIdentities(false);
-    }
-  }, [identitySearch]);
+    void load();
 
-  useEffect(() => {
-    void loadAudits();
-  }, [loadAudits]);
+    return () => {
+      active = false;
+    };
+  }, [q, status, auditType, pageFromUrl, pageSizeFromUrl]);
 
-  useEffect(() => {
-    if (!createOpen) return;
-    void loadIdentities();
-  }, [createOpen, loadIdentities]);
+  const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
+  const currentPage = Math.min(pageFromUrl, totalPages);
 
-  const pageSummary = useMemo(() => {
-    if (totalItems === 0) return 'No internal audits yet';
-    return `${totalItems} internal audit${totalItems > 1 ? 's' : ''}`;
-  }, [totalItems]);
-
-  async function handleCreateSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    try {
-      setSavingCreate(true);
-      setCreateError(null);
+    router.push(
+      buildInternalAuditsHref({
+        q: searchQ.trim(),
+        status: searchStatus,
+        auditType: searchAuditType,
+        page: 1,
+        pageSize,
+      })
+    );
+  }
 
-      const payload: CreateInternalAuditPayload = {
-        audit_code: createForm.audit_code.trim(),
-        audit_title: createForm.audit_title.trim(),
-        audit_type: createForm.audit_type,
-      };
+  function onReset() {
+    const nextPageSize = pageSizeOptions.includes(10) ? 10 : pageSizeOptions[0] || 10;
+    setSearchQ("");
+    setSearchStatus("ALL");
+    setSearchAuditType("ALL");
+    setPageSize(nextPageSize);
 
-      if (createForm.scope_summary.trim()) {
-        payload.scope_summary = createForm.scope_summary.trim();
-      }
-      if (createForm.objective.trim()) {
-        payload.objective = createForm.objective.trim();
-      }
-      if (createForm.planned_start_date) {
-        payload.planned_start_date = createForm.planned_start_date;
-      }
-      if (createForm.planned_end_date) {
-        payload.planned_end_date = createForm.planned_end_date;
-      }
-      if (createForm.lead_auditor_identity_id) {
-        payload.lead_auditor_identity_id = Number(createForm.lead_auditor_identity_id);
-      }
-      if (createForm.auditee_summary.trim()) {
-        payload.auditee_summary = createForm.auditee_summary.trim();
-      }
-      if (createForm.notes.trim()) {
-        payload.notes = createForm.notes.trim();
-      }
+    router.push(
+      buildInternalAuditsHref({
+        q: "",
+        status: "ALL",
+        auditType: "ALL",
+        page: 1,
+        pageSize: nextPageSize,
+      })
+    );
+  }
 
-      const result = await createInternalAudit(payload);
+  function onChangePageSize(value: string) {
+    const next = pickInt(value, pageSize);
+    setPageSize(next);
 
-      setCreateOpen(false);
-      setCreateForm(initialCreateForm);
-      router.push(`/internal-audits/${result.id}`);
-    } catch (err) {
-      setCreateError(getErrorMessage(err));
-    } finally {
-      setSavingCreate(false);
-    }
+    router.push(
+      buildInternalAuditsHref({
+        q: searchQ.trim(),
+        status: searchStatus,
+        auditType: searchAuditType,
+        page: 1,
+        pageSize: next,
+      })
+    );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
-              Internal Audit
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold text-gray-900">
-              Internal Audits
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">{pageSummary}</p>
-          </div>
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:p-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Operational Workspace
+              </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/"
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-            >
-              Back
-            </Link>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+                Internal Audits
+              </h1>
 
-            <button
-              type="button"
-              onClick={() => void loadAudits()}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-            >
-              Refresh
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCreateError(null);
-                setCreateForm(initialCreateForm);
-                setIdentitySearch('');
-                setCreateOpen(true);
-              }}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800"
-            >
-              New Internal Audit
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Search
-              </label>
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search audit code or title"
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => {
-                  setPage(1);
-                  setStatus(e.target.value);
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-              >
-                <option value="ALL">All</option>
-                <option value="DRAFT">Draft</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Audit Type
-              </label>
-              <select
-                value={auditType}
-                onChange={(e) => {
-                  setPage(1);
-                  setAuditType(e.target.value);
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-              >
-                <option value="ALL">All</option>
-                <option value="INTERNAL">Internal</option>
-                <option value="THEMATIC">Thematic</option>
-                <option value="PROCESS">Process</option>
-                <option value="LOCATION">Location</option>
-                <option value="FOLLOW_UP">Follow Up</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setPage(1);
-                void loadAudits();
-              }}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-            >
-              Apply Filter
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setPage(1);
-                setQ('');
-                setStatus('ALL');
-                setAuditType('ALL');
-              }}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {loading ? (
-            <div className="px-6 py-10 text-sm text-gray-500">Loading internal audits...</div>
-          ) : error ? (
-            <div className="px-6 py-10 text-sm text-red-600">{error}</div>
-          ) : items.length === 0 ? (
-            <div className="px-6 py-10">
-              <h2 className="text-base font-semibold text-gray-900">
-                No internal audits yet
-              </h2>
-              <p className="mt-2 text-sm text-gray-600">
-                Create your first internal audit plan to start building the audit workspace.
+              <p className="mt-3 text-sm leading-7 text-slate-600 md:text-base">
+                {total} internal audits
               </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="text-left text-gray-600">
-                    <th className="px-6 py-3 font-medium">Audit</th>
-                    <th className="px-6 py-3 font-medium">Type</th>
-                    <th className="px-6 py-3 font-medium">Status</th>
-                    <th className="px-6 py-3 font-medium">Planned Period</th>
-                    <th className="px-6 py-3 font-medium">Lead Auditor</th>
-                    <th className="px-6 py-3 font-medium">Counts</th>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/" className="itam-secondary-action">
+                Back
+              </Link>
+
+              <Link href="/internal-audits/new" className="itam-primary-action">
+                New Internal Audit
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            <form
+              className="grid grid-cols-1 gap-4 lg:grid-cols-6"
+              onSubmit={onSubmit}
+            >
+              <div className="lg:col-span-3">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Search
+                </label>
+                <input
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="Search audit code or title"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Status
+                </label>
+                <select
+                  value={searchStatus}
+                  onChange={(e) => setSearchStatus(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {STATUSES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Audit Type
+                </label>
+                <select
+                  value={searchAuditType}
+                  onChange={(e) => setSearchAuditType(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {AUDIT_TYPES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Page Size
+                </label>
+                <select
+                  value={String(pageSize)}
+                  onChange={(e) => onChangePageSize(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {pageSizeOptions.map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n} / page
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="itam-secondary-action"
+                >
+                  Reset
+                </button>
+                <button type="submit" className="itam-primary-action">
+                  Apply Filter
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div className="mt-10 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            {err ? (
+              <div className="mb-4">
+                <ErrorState
+                  error={err}
+                  onRetry={() => {
+                    window.location.reload();
+                  }}
+                />
+              </div>
+            ) : null}
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-[1200px] w-full text-sm">
+                <thead className="bg-slate-50 text-left text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Audit</th>
+                    <th className="px-5 py-3 font-medium">Type</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Planned Period</th>
+                    <th className="px-5 py-3 font-medium">Lead Auditor</th>
+                    <th className="px-5 py-3 font-medium">Counts</th>
+                    <th className="px-5 py-3 font-medium text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map((item) => (
-                    <tr key={String(item.id)} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 align-top">
-                        <Link
-                          href={`/internal-audits/${item.id}`}
-                          className="font-semibold text-gray-900 hover:underline"
-                        >
-                          {item.audit_code}
-                        </Link>
-                        <p className="mt-1 text-sm text-gray-600">{item.audit_title}</p>
-                      </td>
-                      <td className="px-6 py-4 align-top text-gray-700">{item.audit_type}</td>
-                      <td className="px-6 py-4 align-top">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(
-                            item.status
-                          )}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 align-top text-gray-700">
-                        {item.planned_start_date || '-'}{' '}
-                        <span className="text-gray-400">to</span>{' '}
-                        {item.planned_end_date || '-'}
-                      </td>
-                      <td className="px-6 py-4 align-top text-gray-700">
-                        {item.lead_auditor_name || '-'}
-                      </td>
-                      <td className="px-6 py-4 align-top text-gray-700">
-                        <div>Checklist: {item.checklist_items_count ?? 0}</div>
-                        <div>Findings: {item.findings_count ?? 0}</div>
+
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {loading ? (
+                    <>
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                      <SkeletonTableRow cols={7} />
+                    </>
+                  ) : items.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                        No internal audits found.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    items.map((item) => (
+                      <tr key={String(item.id)} className="align-top">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-slate-900">
+                            {item.audit_code}
+                          </div>
+                          <div className="mt-1 text-slate-600">{item.title}</div>
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-700">
+                          {item.audit_type || "-"}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span className={statusPill(item.status)}>
+                            {String(item.status || "-").toUpperCase()}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-700">
+                          {fmtPeriod(item.planned_start_date, item.planned_end_date)}
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-700">
+                          {item.lead_auditor_name || "-"}
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-700">
+                          <div>Checklist: {item.checklist_count}</div>
+                          <div>Findings: {item.finding_count}</div>
+                        </td>
+
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <Link
+                            href={`/internal-audits/${item.id}`}
+                            className="text-cyan-700 hover:underline"
+                          >
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
-          )}
 
-          <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4 text-sm text-gray-600">
-            <span>
-              Page {page} {totalPages > 0 ? `of ${totalPages}` : ''}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={totalPages === 0 || page >= totalPages}
-                onClick={() => setPage((prev) => prev + 1)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-slate-500">
+                Page {currentPage} / {totalPages} (page_size: {pageSize})
+              </div>
+
+              <div className="flex gap-2">
+                {currentPage > 1 ? (
+                  <Link
+                    className="itam-secondary-action-sm"
+                    href={buildInternalAuditsHref({
+                      q,
+                      status,
+                      auditType,
+                      page: currentPage - 1,
+                      pageSize,
+                    })}
+                  >
+                    Prev
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
+                    Prev
+                  </span>
+                )}
+
+                {currentPage < totalPages ? (
+                  <Link
+                    className="itam-secondary-action-sm"
+                    href={buildInternalAuditsHref({
+                      q,
+                      status,
+                      auditType,
+                      page: currentPage + 1,
+                      pageSize,
+                    })}
+                  >
+                    Next
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
+                    Next
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
-
-        {createOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    New Internal Audit
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Create the audit plan header first. Members and checklist can be added from detail page.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCreateOpen(false)}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateSubmit} className="px-6 py-5">
-                {createError ? (
-                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {createError}
-                  </div>
-                ) : null}
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Audit Code
-                    </label>
-                    <input
-                      value={createForm.audit_code}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, audit_code: e.target.value }))
-                      }
-                      required
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Audit Type
-                    </label>
-                    <select
-                      value={createForm.audit_type}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, audit_type: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    >
-                      <option value="INTERNAL">INTERNAL</option>
-                      <option value="THEMATIC">THEMATIC</option>
-                      <option value="PROCESS">PROCESS</option>
-                      <option value="LOCATION">LOCATION</option>
-                      <option value="FOLLOW_UP">FOLLOW_UP</option>
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Audit Title
-                    </label>
-                    <input
-                      value={createForm.audit_title}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, audit_title: e.target.value }))
-                      }
-                      required
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Planned Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={createForm.planned_start_date}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          planned_start_date: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Planned End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={createForm.planned_end_date}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          planned_end_date: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-end">
-                      <div className="flex-1">
-                        <label className="mb-2 block text-sm font-medium text-gray-700">
-                          Search Lead Auditor
-                        </label>
-                        <input
-                          value={identitySearch}
-                          onChange={(e) => setIdentitySearch(e.target.value)}
-                          placeholder="Search identity by name or email"
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void loadIdentities()}
-                        className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        {loadingIdentities ? 'Loading...' : 'Search'}
-                      </button>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Lead Auditor
-                      </label>
-                      <select
-                        value={createForm.lead_auditor_identity_id}
-                        onChange={(e) =>
-                          setCreateForm((prev) => ({
-                            ...prev,
-                            lead_auditor_identity_id: e.target.value,
-                          }))
-                        }
-                        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-500"
-                      >
-                        <option value="">No lead auditor yet</option>
-                        {identities.map((identity) => (
-                          <option key={String(identity.id)} value={String(identity.id)}>
-                            {getIdentityLabel(identity)}
-                            {identity.email ? ` (${identity.email})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Objective
-                    </label>
-                    <textarea
-                      value={createForm.objective}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, objective: e.target.value }))
-                      }
-                      rows={3}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Scope Summary
-                    </label>
-                    <textarea
-                      value={createForm.scope_summary}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, scope_summary: e.target.value }))
-                      }
-                      rows={3}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Auditee Summary
-                    </label>
-                    <textarea
-                      value={createForm.auditee_summary}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, auditee_summary: e.target.value }))
-                      }
-                      rows={2}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Notes
-                    </label>
-                    <textarea
-                      value={createForm.notes}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({ ...prev, notes: e.target.value }))
-                      }
-                      rows={2}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCreateOpen(false)}
-                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingCreate}
-                    className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
-                  >
-                    {savingCreate ? 'Saving...' : 'Create Internal Audit'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : null}
       </div>
     </main>
   );

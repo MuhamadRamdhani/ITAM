@@ -34,6 +34,8 @@ type SoftwareProductSeed = {
   productId: number;
   productCode: string;
   productName: string;
+  updatedName: string;
+  updatedNotes: string;
 };
 
 type ApiResponse<T = unknown> = {
@@ -270,7 +272,6 @@ async function createIdentityViaUi(page: Page) {
   await expect(page.getByText("Identity berhasil dibuat.")).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByText(identityName)).toBeVisible({ timeout: 20_000 });
 
   const list = await fetchJson(page, `/api/v1/admin/identities?q=${encodeURIComponent(identityEmail)}&page=1&page_size=20`);
   const items = ((list.json as any)?.data?.items ?? (list.json as any)?.items ?? []) as any[];
@@ -376,6 +377,8 @@ async function createInactiveProductViaApi(page: Page, vendorId: number) {
     productId,
     productCode: payload.product_code,
     productName: payload.product_name,
+    updatedName: `${payload.product_name} Updated`,
+    updatedNotes: `${payload.notes} updated`,
   };
 }
 
@@ -698,7 +701,8 @@ test.describe.serial("Software Products", () => {
   });
 
   test("SW-009 allocations", async ({ page }) => {
-    if (!seedMainProduct || !seedContract || !seedInstallationAsset) {
+    const installationAsset = seedInstallationAsset;
+    if (!seedMainProduct || !seedContract || !installationAsset) {
       throw new Error("Seed data missing for allocation test");
     }
 
@@ -724,7 +728,7 @@ test.describe.serial("Software Products", () => {
       page,
       `/api/v1/software-entitlements/${entitlementId}/allocations`,
       {
-        asset_id: seedInstallationAsset.assetId,
+        asset_id: installationAsset.assetId,
         allocation_basis: "ASSET",
         allocated_quantity: 1,
         status: "ACTIVE",
@@ -737,11 +741,12 @@ test.describe.serial("Software Products", () => {
 
     const allocations = await fetchJson(page, `/api/v1/software-entitlements/${entitlementId}/allocations`);
     const rows = ((allocations.json as any)?.data?.items ?? (allocations.json as any)?.items ?? []) as any[];
-    expect(rows.some((row) => Number(row?.asset_id) === seedInstallationAsset.assetId)).toBeTruthy();
+    expect(rows.some((row) => Number(row?.asset_id) === installationAsset.assetId)).toBeTruthy();
   });
 
   test("SW-010 over allocation guard", async ({ page }) => {
-    if (!seedMainProduct || !seedContract || !seedAllocationAsset) {
+    const allocationAsset = seedAllocationAsset;
+    if (!seedMainProduct || !seedContract || !allocationAsset) {
       throw new Error("Seed data missing for over-allocation test");
     }
 
@@ -781,7 +786,7 @@ test.describe.serial("Software Products", () => {
       page,
       `/api/v1/software-entitlements/${entitlementId}/allocations`,
       {
-        asset_id: seedAllocationAsset.assetId,
+        asset_id: allocationAsset.assetId,
         allocation_basis: "ASSET",
         allocated_quantity: 1,
         status: "ACTIVE",

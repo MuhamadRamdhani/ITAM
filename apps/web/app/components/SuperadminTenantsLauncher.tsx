@@ -48,7 +48,7 @@ export default function SuperadminTenantsLauncher() {
         Platform tenant management + summary
       </div>
       <div className="mt-5 text-sm font-semibold text-cyan-700 transition group-hover:text-cyan-800">
-        Open →
+        Open -
       </div>
     </Link>
   );

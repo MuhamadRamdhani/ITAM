@@ -784,449 +784,421 @@ export default function SoftwareEntitlementAllocationsModal({
     [loadAllocations, onChanged]
   );
 
-  if (!isOpen || !entitlement) return null;
+ if (!isOpen || !entitlement) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
-      <div className="mx-auto my-8 w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Manage Entitlement Allocations
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {entitlement.entitlement_code} -{" "}
-              {entitlement.entitlement_name || entitlement.software_product_name}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Product: {entitlement.software_product_code} -{" "}
-              {entitlement.software_product_name}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-            disabled={saving || releasingId !== null}
-          >
-            Close
-          </button>
+return (
+  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4">
+    <div className="mx-auto my-8 w-full max-w-6xl overflow-hidden rounded-3xl border border-white bg-white/95 shadow-[0_24px_90px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Manage Entitlement Allocations
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            {entitlement.entitlement_code} -{" "}
+            {entitlement.entitlement_name || entitlement.software_product_name}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Product: {entitlement.software_product_code} -{" "}
+            {entitlement.software_product_name}
+          </p>
         </div>
 
-        <div className="max-h-[calc(90vh-88px)] overflow-y-auto">
-          {summary ? (
-            <div className="grid grid-cols-1 gap-4 border-b border-gray-200 px-6 py-4 md:grid-cols-4">
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs font-medium uppercase text-gray-500">
-                  Purchased
-                </div>
-                <div className="mt-2 text-lg font-semibold text-gray-900">
-                  {summary.quantity_purchased}
-                </div>
-              </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="itam-secondary-action-sm"
+          disabled={saving || releasingId !== null}
+        >
+          Close
+        </button>
+      </div>
 
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs font-medium uppercase text-gray-500">
-                  Allocated Active
-                </div>
-                <div className="mt-2 text-lg font-semibold text-gray-900">
-                  {summary.allocated_quantity_active}
-                </div>
+      <div className="max-h-[calc(90vh-88px)] overflow-y-auto">
+        {summary ? (
+          <div className="grid grid-cols-1 gap-4 border-b border-slate-200 px-6 py-4 md:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Purchased
               </div>
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs font-medium uppercase text-gray-500">
-                  Remaining
-                </div>
-                <div className="mt-2 text-lg font-semibold text-gray-900">
-                  {summary.remaining_quantity}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs font-medium uppercase text-gray-500">
-                  Entitlement Status
-                </div>
-                <div className="mt-2 text-lg font-semibold text-gray-900">
-                  {summary.entitlement_status}
-                </div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">
+                {summary.quantity_purchased}
               </div>
             </div>
-          ) : null}
 
-          <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-5">
-            <div className="lg:col-span-2">
-              <div className="rounded-2xl border border-gray-200">
-                <div className="border-b border-gray-200 px-4 py-3">
-                  <h4 className="text-sm font-semibold text-gray-900">
-                    Create Allocation
-                  </h4>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Allocate this entitlement to an asset, installation, or assignment.
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Allocated Active
+              </div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">
+                {summary.allocated_quantity_active}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Remaining
+              </div>
+              <div className="mt-2 text-lg font-semibold text-slate-900">
+                {summary.remaining_quantity}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Entitlement Status
+              </div>
+              <div className="mt-2">
+                <span className={allocationStatusClass("ACTIVE")}>
+                  {summary.entitlement_status}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-6 px-6 py-5 lg:grid-cols-5">
+          <div className="lg:col-span-2">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+              <h4 className="text-base font-semibold text-slate-900">
+                Create Allocation
+              </h4>
+              <p className="mt-1 text-sm text-slate-600">
+                Allocate entitlement quantity to asset, installation, assignment, or manual basis.
+              </p>
+
+              {err ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {err}
+                </div>
+              ) : null}
+
+              {!entitlementActive ? (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Allocation creation is disabled until the entitlement status becomes ACTIVE.
+                </div>
+              ) : null}
+
+              {summary && summary.remaining_quantity <= 0 ? (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Remaining quantity is 0. Release an existing allocation or increase purchased quantity before creating a new allocation.
+                </div>
+              ) : null}
+
+              <form className="mt-4 space-y-4" onSubmit={handleCreate}>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Asset
+                  </label>
+                  <select
+                    value={form.asset_id}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        asset_id: e.target.value,
+                        software_installation_id: "",
+                        software_assignment_id: "",
+                      }))
+                    }
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    <option value="">
+                      {contractAssets.length ? "Select asset" : "No related asset available"}
+                    </option>
+                    {contractAssets.map((asset) => (
+                      <option key={asset.id} value={String(asset.id)}>
+                        {asset.asset_tag} - {asset.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Asset targets are sourced from Contract Assets.
                   </p>
                 </div>
 
-                <form onSubmit={handleCreate} className="space-y-4 p-4">
-                  {err ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                      {err}
-                    </div>
-                  ) : null}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Allocation Basis
+                  </label>
+                  <select
+                    value={form.allocation_basis}
+                    onChange={(e) =>
+                      handleBasisChange(e.target.value as AllocationBasis)
+                    }
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    <option value="INSTALLATION">INSTALLATION</option>
+                    <option value="ASSIGNMENT">ASSIGNMENT</option>
+                    <option value="ASSET">ASSET</option>
+                    <option value="MANUAL">MANUAL</option>
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">{basisHelpText}</p>
+                </div>
 
-                  {!entitlementActive ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      This entitlement is not ACTIVE. Allocation creation is disabled
-                      until the entitlement status becomes ACTIVE.
+                {selectedAsset ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                    <div className="font-medium text-slate-800">Selected Asset</div>
+                    <div className="mt-1">
+                      {selectedAsset.asset_tag} - {selectedAsset.name}
                     </div>
-                  ) : null}
-
-                  {summary && summary.remaining_quantity <= 0 ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      Remaining quantity is 0. Release an existing allocation or increase
-                      purchased quantity before creating a new allocation.
+                    <div className="mt-1">
+                      Asset status: {selectedAsset.status || "-"}
                     </div>
-                  ) : null}
+                  </div>
+                ) : null}
 
+                {(form.allocation_basis === "INSTALLATION" ||
+                  form.allocation_basis === "ASSIGNMENT") && (
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Asset
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Software Installation
                     </label>
                     <select
-                      value={form.asset_id}
+                      value={form.software_installation_id}
                       onChange={(e) =>
                         setForm((prev) => ({
                           ...prev,
-                          asset_id: e.target.value,
-                          software_installation_id: "",
-                          software_assignment_id: "",
+                          software_installation_id: e.target.value,
+                          software_assignment_id:
+                            prev.allocation_basis === "ASSIGNMENT" ? "" : prev.software_assignment_id,
                         }))
                       }
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+                      disabled={saving || loadingTargets}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                     >
                       <option value="">
-                        {contractAssets.length
-                          ? "Select asset"
-                          : "No related asset available"}
+                        {loadingTargets
+                          ? "Loading installations..."
+                          : filteredInstallations.length
+                          ? "Select installation"
+                          : "No eligible installation"}
                       </option>
-                      {contractAssets.map((asset) => (
-                        <option key={asset.id} value={String(asset.id)}>
-                          {asset.asset_tag} - {asset.name}
+                      {filteredInstallations.map((item) => (
+                        <option key={item.id} value={String(item.id)}>
+                          {item.software_product_code} - {item.installed_version || "-"} ({item.installation_status})
                         </option>
                       ))}
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Asset targets are sourced from Contract Assets.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Allocation Basis
-                    </label>
-                    <select
-                      value={form.allocation_basis}
-                      onChange={(e) =>
-                        handleBasisChange(e.target.value as AllocationBasis)
-                      }
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    >
-                      <option value="INSTALLATION">INSTALLATION</option>
-                      <option value="ASSIGNMENT">ASSIGNMENT</option>
-                      <option value="ASSET">ASSET</option>
-                      <option value="MANUAL">MANUAL</option>
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500">{basisHelpText}</p>
-                  </div>
-
-                  {selectedAsset ? (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
-                      <div className="font-medium text-gray-800">
-                        Selected Asset
-                      </div>
-                      <div className="mt-1">
-                        {selectedAsset.asset_tag} - {selectedAsset.name}
-                      </div>
-                      <div className="mt-1">
-                        Asset status: {selectedAsset.status || "-"}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {(form.allocation_basis === "INSTALLATION" ||
-                    form.allocation_basis === "ASSIGNMENT") && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Software Installation
-                      </label>
-                      <select
-                        value={form.software_installation_id}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            software_installation_id: e.target.value,
-                            software_assignment_id:
-                              prev.allocation_basis === "ASSIGNMENT" ? "" : prev.software_assignment_id,
-                          }))
-                        }
-                        disabled={saving || loadingTargets || !form.asset_id}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                      >
-                        <option value="">
-                          {loadingTargets
-                            ? "Loading installations..."
-                            : filteredInstallations.length
-                            ? filteredInstallations.length === 1
-                              ? "Auto-selected installation available"
-                              : "Select installation"
-                            : "No active installation available"}
-                        </option>
-                        {filteredInstallations.map((item) => (
-                          <option key={item.id} value={String(item.id)}>
-                            {item.software_product_code} - {item.software_product_name}
-                            {item.installed_version ? ` (${item.installed_version})` : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Only active installations matching this entitlement product are listed.
-                      </p>
-                    </div>
-                  )}
-
-                  {form.allocation_basis === "ASSIGNMENT" && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Software Assignment
-                      </label>
-                      <select
-                        value={form.software_assignment_id}
-                        onChange={(e) => setField("software_assignment_id", e.target.value)}
-                        disabled={saving || loadingTargets || !form.asset_id}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                      >
-                        <option value="">
-                          {loadingTargets
-                            ? "Loading assignments..."
-                            : filteredAssignments.length
-                            ? filteredAssignments.length === 1
-                              ? "Auto-selected assignment available"
-                              : "Select assignment"
-                            : "No ACTIVE assignment available"}
-                        </option>
-                        {filteredAssignments.map((item) => (
-                          <option key={item.id} value={String(item.id)}>
-                            {item.identity_code ? `${item.identity_code} - ` : ""}
-                            {item.identity_display_name} ({item.assignment_role})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Only ACTIVE assignments linked to the selected installation are listed.
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedInstallation ? (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
-                      <div className="font-medium text-gray-800">
-                        Selected Installation
-                      </div>
-                      <div className="mt-1">
-                        {selectedInstallation.software_product_code} -{" "}
-                        {selectedInstallation.software_product_name}
-                        {selectedInstallation.installed_version
-                          ? ` (${selectedInstallation.installed_version})`
-                          : ""}
-                      </div>
-                      <div className="mt-1">
-                        Installation status: {selectedInstallation.installation_status}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {selectedAssignment ? (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600">
-                      <div className="font-medium text-gray-800">
-                        Selected Assignment
-                      </div>
-                      <div className="mt-1">
-                        {selectedAssignment.identity_code
-                          ? `${selectedAssignment.identity_code} - `
-                          : ""}
-                        {selectedAssignment.identity_display_name}
-                      </div>
-                      <div className="mt-1">
-                        Role: {selectedAssignment.assignment_role}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Allocated Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={form.allocated_quantity}
-                      onChange={(e) => setField("allocated_quantity", e.target.value)}
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                    {summary ? (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Remaining quantity available: {summary.remaining_quantity}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Allocated At
-                    </label>
-                    <input
-                      type="date"
-                      value={form.allocated_at}
-                      onChange={(e) => setField("allocated_at", e.target.value)}
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Notes
-                    </label>
-                    <textarea
-                      value={form.notes}
-                      onChange={(e) => setField("notes", e.target.value)}
-                      disabled={saving}
-                      rows={4}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  {createBlockedReason ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      {createBlockedReason}
-                    </div>
-                  ) : null}
-
-                  <div className="flex justify-end border-t border-gray-200 pt-4">
-                    <button
-                      type="submit"
-                      disabled={!canSubmit}
-                      className="itam-primary-action"
-                    >
-                      {saving ? "Saving..." : "Create Allocation"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            <div className="lg:col-span-3">
-              <div className="rounded-2xl border border-gray-200">
-                <div className="border-b border-gray-200 px-4 py-3">
-                  <h4 className="text-sm font-semibold text-gray-900">
-                    Existing Allocations
-                  </h4>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Allocation history for this entitlement.
-                  </p>
-                </div>
-
-                {loading ? (
-                  <div className="px-4 py-10 text-center text-sm text-gray-500">
-                    Loading allocations...
-                  </div>
-                ) : allocations.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-sm text-gray-500">
-                    No allocation found for this entitlement.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 text-left text-gray-600">
-                        <tr>
-                          <th className="px-4 py-3 font-medium">Asset / Target</th>
-                          <th className="px-4 py-3 font-medium">Basis</th>
-                          <th className="px-4 py-3 font-medium">Quantity</th>
-                          <th className="px-4 py-3 font-medium">Status</th>
-                          <th className="px-4 py-3 font-medium">Dates</th>
-                          <th className="px-4 py-3 font-medium">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {allocations.map((item) => (
-                          <tr key={item.id} className="align-top">
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">
-                                {item.asset_tag} - {item.asset_name}
-                              </div>
-                              <div className="mt-1 text-xs text-gray-500">
-                                {item.software_assignment_id
-                                  ? `${item.identity_display_name || "-"} (${item.assignment_role || "-"})`
-                                  : item.software_installation_id
-                                  ? `Installation ${item.software_installation_id}${
-                                      item.software_installation_version
-                                        ? ` • ${item.software_installation_version}`
-                                        : ""
-                                    }`
-                                  : "Direct asset allocation"}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3 text-gray-700">
-                              {item.allocation_basis}
-                            </td>
-
-                            <td className="px-4 py-3 text-gray-700">
-                              {item.allocated_quantity}
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <span className={allocationStatusClass(item.status)}>
-                                {item.status}
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-3 text-gray-700">
-                              <div>Allocated: {formatDate(item.allocated_at)}</div>
-                              <div className="mt-1 text-xs text-gray-500">
-                                Released: {formatDate(item.released_at)}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              {item.status !== "RELEASED" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleRelease(item)}
-                                  disabled={releasingId === item.id}
-                                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  {releasingId === item.id ? "Processing..." : "Release"}
-                                </button>
-                              ) : (
-                                <span className="text-xs text-gray-400">No action</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 )}
+
+                {form.allocation_basis === "ASSIGNMENT" ? (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Software Assignment
+                    </label>
+                    <select
+                      value={form.software_assignment_id}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          software_assignment_id: e.target.value,
+                        }))
+                      }
+                      disabled={saving || loadingTargets}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                    >
+                      <option value="">
+                        {loadingTargets
+                          ? "Loading assignments..."
+                          : filteredAssignments.length
+                          ? "Select assignment"
+                          : "No eligible assignment"}
+                      </option>
+                      {filteredAssignments.map((item) => (
+                        <option key={item.id} value={String(item.id)}>
+                          {(item.identity_display_name || "-")} · {item.assignment_role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                {selectedInstallation ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                    <div className="font-medium text-slate-800">Selected Installation</div>
+                    <div className="mt-1">
+                      {selectedInstallation.software_product_code} - {selectedInstallation.software_product_name}
+                    </div>
+                    <div className="mt-1">
+                      Version: {selectedInstallation.installed_version || "-"} · Status: {selectedInstallation.installation_status}
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedAssignment ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                    <div className="font-medium text-slate-800">Selected Assignment</div>
+                    <div className="mt-1">
+                      {selectedAssignment.identity_display_name || "-"}
+                    </div>
+                    <div className="mt-1">
+                      Role: {selectedAssignment.assignment_role} · Status: {selectedAssignment.assignment_status}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Allocated Quantity
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={form.allocated_quantity}
+                    onChange={(e) => setField("allocated_quantity", e.target.value)}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                  {summary ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Remaining quantity available: {summary.remaining_quantity}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Allocated At
+                  </label>
+                  <input
+                    type="date"
+                    value={form.allocated_at}
+                    onChange={(e) => setField("allocated_at", e.target.value)}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Notes
+                  </label>
+                  <textarea
+                    value={form.notes}
+                    onChange={(e) => setField("notes", e.target.value)}
+                    disabled={saving}
+                    rows={4}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                {createBlockedReason ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    {createBlockedReason}
+                  </div>
+                ) : null}
+
+                <div className="flex justify-end border-t border-slate-200 pt-4">
+                  <button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="itam-primary-action"
+                  >
+                    {saving ? "Saving..." : "Create Allocation"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <h4 className="text-sm font-semibold text-slate-900">
+                  Existing Allocations
+                </h4>
+                <p className="mt-1 text-xs text-slate-500">
+                  Allocation history for this entitlement.
+                </p>
               </div>
+
+              {loading ? (
+                <div className="px-4 py-10 text-center text-sm text-slate-500">
+                  Loading allocations...
+                </div>
+              ) : allocations.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-slate-500">
+                  No allocation found for this entitlement.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Asset / Target</th>
+                        <th className="px-4 py-3 font-medium">Basis</th>
+                        <th className="px-4 py-3 font-medium">Quantity</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Dates</th>
+                        <th className="px-4 py-3 font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {allocations.map((item) => (
+                        <tr key={item.id} className="align-top">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-900">
+                              {item.asset_tag} - {item.asset_name}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {item.software_assignment_id
+                                ? `${item.identity_display_name || "-"} · ${item.assignment_role || "-"}`
+                                : item.software_installation_id
+                                ? `Installation · ${item.software_installation_version || "-"}`
+                                : "Direct asset/manual allocation"}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            {item.allocation_basis}
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            {item.allocated_quantity}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <span className={allocationStatusClass(item.status)}>
+                              {item.status}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            <div>Allocated: {formatDate(item.allocated_at)}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Released: {formatDate(item.released_at)}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {item.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleRelease(item)}
+                                disabled={releasingId === item.id}
+                                className="itam-secondary-action-sm"
+                              >
+                                {releasingId === item.id ? "Releasing..." : "Release"}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400">No action</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }

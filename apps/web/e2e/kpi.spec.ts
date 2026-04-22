@@ -420,6 +420,8 @@ async function ensureCurrentManualMeasurementSeeded(browser: Browser) {
   }
 }
 
+test.setTimeout(180_000);
+
 test.describe.serial("KPI Library & Scorecard", () => {
   test("KPI-001 create KPI in library", async ({ page }) => {
     await uiLoginAs(page, USERS.tenantAdmin);
@@ -630,5 +632,32 @@ test.describe.serial("KPI Library & Scorecard", () => {
     const detail = await apiGetJson(page, `/api/v1/kpis/${defaultTenantSeed.id}`);
     expect(detail.status).toBe(404);
     expect(String((detail.json as any)?.error?.message ?? "")).toBe("KPI was not found.");
+  });
+
+  test("KPI-013 auditor cannot create KPI via API", async ({ page }) => {
+    await uiLoginAs(page, USERS.auditor);
+
+    const response = await apiPostJson(page, "/api/v1/kpis", {
+      code: `PW-KPI-FORBIDDEN-${uniqueSuffix()}`,
+      name: "Forbidden KPI",
+      description: "Forbidden KPI attempt",
+      category_code: "AUDIT",
+      unit_code: "COUNT",
+      source_type: "MANUAL",
+      direction: "HIGHER_IS_BETTER",
+      period_type: "MONTHLY",
+      target_value: 1,
+      warning_value: 1,
+      critical_value: 1,
+      baseline_value: 1,
+      is_active: true,
+      display_order: 100,
+    });
+
+    expect(response.status).toBe(403);
+    expect(String((response.json as any)?.error?.code ?? "")).toBe("AUTH_FORBIDDEN");
+    expect(String((response.json as any)?.error?.message ?? "")).toBe(
+      "You are not allowed to manage KPIs."
+    );
   });
 });

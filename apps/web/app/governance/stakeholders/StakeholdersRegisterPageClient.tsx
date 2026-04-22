@@ -255,14 +255,19 @@ export default function StakeholdersRegisterPageClient() {
         setCanManage(nextCanManage);
 
         if (nextCanManage) {
-          const identitiesRes = await apiGet<any>("/api/v1/admin/identities", {
-            loadingKey: "stakeholders_identities",
-          });
+          try {
+            const identitiesRes = await apiGet<any>("/api/v1/admin/identities", {
+              loadingKey: "stakeholders_identities",
+            });
 
-          if (!active) return;
+            if (!active) return;
 
-          const identityRows = normalizeIdentities(identitiesRes);
-          setIdentities(identityRows);
+            const identityRows = normalizeIdentities(identitiesRes);
+            setIdentities(identityRows);
+          } catch {
+            if (!active) return;
+            setIdentities([]);
+          }
         }
       } catch (error) {
         if (!active) return;

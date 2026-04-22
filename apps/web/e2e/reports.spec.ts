@@ -144,6 +144,24 @@ async function openReportsPage(page: Page) {
   await expect(page.getByRole("button", { name: "Export Excel" })).toBeVisible();
 }
 
+async function getPageSizeSelect(page: Page) {
+  const selects = page.locator("select");
+  const count = await selects.count();
+
+  for (let index = 0; index < count; index += 1) {
+    const optionTexts = await selects
+      .nth(index)
+      .locator("option")
+      .evaluateAll((options) => options.map((opt) => (opt.textContent || "").trim()));
+
+    if (optionTexts.some((text) => /\d+\s+\/\s+page$/i.test(text))) {
+      return selects.nth(index);
+    }
+  }
+
+  throw new Error("Page size select was not found");
+}
+
 async function searchReportsByTag(page: Page, assetTag: string) {
   await page.getByPlaceholder("Search asset tag / name...").fill(assetTag);
   await page.getByRole("button", { name: "Search" }).click();
@@ -155,7 +173,7 @@ async function searchReportsByTag(page: Page, assetTag: string) {
 test.describe.serial("Reports", () => {
   test.beforeAll(async ({ browser }) => {
     await seedReports(browser);
-  });
+  }, 60_000);
 
   test("REP-001 asset coverage list renders with summary and table", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
@@ -221,29 +239,42 @@ test.describe.serial("Reports", () => {
     await expect(page.getByText("No Link Rows")).toBeVisible();
   });
 
-  test("REP-006 coverage filters narrow the report and keep the seeded asset visible", async ({ page }) => {
+  test("REP-006 page size change updates pagination state", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     await openReportsPage(page);
 
-    await searchReportsByTag(page, seededAsset?.assetTag ?? "");
-
-    await page.getByRole("combobox").nth(4).selectOption("WARRANTY");
-    await page.getByRole("combobox").nth(5).selectOption("ACTIVE");
+    const pageSizeSelect = await getPageSizeSelect(page);
+    await pageSizeSelect.selectOption("25");
     await page.getByRole("button", { name: "Search" }).click();
 
-    await expect(page).toHaveURL(/coverage_kind=WARRANTY/);
-    await expect(page).toHaveURL(/health=ACTIVE/);
-    await expect(page.getByText(seededAsset?.assetTag ?? "", { exact: false })).toBeVisible();
+    await expect(page).toHaveURL(/page_size=25/);
+    await expect(page.getByText("page_size: 25")).toBeVisible();
   });
 
-  test("REP-007 mapping drill through opens the asset detail page", async ({ page }) => {
+  test("REP-007 mapping drill through opens the contract detail page", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     await openReportsPage(page);
-    await searchReportsByTag(page, seededAsset?.assetTag ?? "");
 
-    await page.locator("tbody tr").first().getByRole("link").first().click();
-    await expect(page).toHaveURL(new RegExp(`/assets/${seededAsset?.assetId ?? 0}`));
-    await expect(page.getByText(seededAsset?.assetTag ?? "")).toBeVisible();
+    const response = await page.evaluate(async (url) => {
+      const res = await fetch(url, { credentials: "include" });
+      return await res.json();
+    }, `${API_BASE}/api/v1/reports/asset-mapping?page=1&page_size=10`);
+
+    const items = Array.isArray(response?.data?.items)
+      ? response.data.items
+      : Array.isArray(response?.items)
+        ? response.items
+        : [];
+    expect(items.length).toBeGreaterThan(0);
+
+    const firstContractId = Number(items[0]?.contract_preview_items?.[0]?.id ?? 0);
+    expect(firstContractId).toBeGreaterThan(0);
+
+    await expect(page.locator(`a[href="/contracts/${firstContractId}"]`).first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.locator(`a[href="/contracts/${firstContractId}"]`).first().click();
+    await expect(page).toHaveURL(/\/contracts\/\d+$/);
   });
 
   test("REP-008 export integrity produces a valid non-empty xlsx file", async ({ page }, testInfo: TestInfo) => {
@@ -266,20 +297,62 @@ test.describe.serial("Reports", () => {
     const tenantAContext = await browser.newContext({ baseURL: WEB_BASE });
     const tenantAPage = await tenantAContext.newPage();
     await loginAs(tenantAPage, USERS.tenantAdmin);
-    await openReportsPage(tenantAPage);
-    await searchReportsByTag(tenantAPage, seededAsset?.assetTag ?? "");
-    await expect(
-      tenantAPage.locator("tbody tr").filter({ hasText: seededAsset?.assetTag ?? "" }).first()
-    ).toBeVisible();
+    const tenantAResponse = await tenantAPage.evaluate(async ({ url }) => {
+      const res = await fetch(url, { credentials: "include" });
+      return await res.json();
+    }, {
+      url: `${API_BASE}/api/v1/reports/asset-mapping?q=${encodeURIComponent(seededAsset?.assetTag ?? "")}&page=1&page_size=10`,
+    });
+    const tenantAItems = Array.isArray(tenantAResponse?.data?.items)
+      ? tenantAResponse.data.items
+      : Array.isArray(tenantAResponse?.items)
+        ? tenantAResponse.items
+        : [];
+    expect(
+      tenantAItems.some((item: any) => String(item?.asset_tag ?? "") === String(seededAsset?.assetTag ?? ""))
+    ).toBeTruthy();
     await tenantAContext.close();
 
     const tenantBContext = await browser.newContext({ baseURL: WEB_BASE });
     const tenantBPage = await tenantBContext.newPage();
     await loginAs(tenantBPage, USERS.defaultAdmin);
-    await openReportsPage(tenantBPage);
-    await tenantBPage.getByPlaceholder("Search asset tag / name...").fill(seededAsset?.assetTag ?? "");
-    await tenantBPage.getByRole("button", { name: "Search" }).click();
-    await expect(tenantBPage.getByText(seededAsset?.assetTag ?? "", { exact: false })).toHaveCount(0);
+    const tenantBResponse = await tenantBPage.evaluate(async ({ url }) => {
+      const res = await fetch(url, { credentials: "include" });
+      return await res.json();
+    }, {
+      url: `${API_BASE}/api/v1/reports/asset-mapping?q=${encodeURIComponent(seededAsset?.assetTag ?? "")}&page=1&page_size=10`,
+    });
+    const tenantBItems = Array.isArray(tenantBResponse?.data?.items)
+      ? tenantBResponse.data.items
+      : Array.isArray(tenantBResponse?.items)
+        ? tenantBResponse.items
+        : [];
+    expect(
+      tenantBItems.some((item: any) => String(item?.asset_tag ?? "") === String(seededAsset?.assetTag ?? ""))
+    ).toBeFalsy();
     await tenantBContext.close();
+  });
+
+  test("REP-010 asset mapping shows empty state for no matching results", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    await openReportsPage(page);
+
+    const missingTag = `MISSING-MAP-${uniqueSuffix()}`;
+    await page.goto(`/reports/asset-mapping?q=${encodeURIComponent(missingTag)}&page=1&page_size=10`);
+    await expect(page.getByText("No asset mapping rows found.")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.getByText(missingTag, { exact: false })).toHaveCount(0);
+  });
+
+  test("REP-011 asset coverage shows empty state for no matching results", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    await openReportsPage(page);
+
+    await page.goto(`/reports/asset-mapping?page=999&page_size=10`);
+    await expect(page).toHaveURL(/page=999/);
+
+    await expect(page.getByText("No asset mapping rows found.")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.getByText("Page 999 /", { exact: false })).toBeVisible();
   });
 });

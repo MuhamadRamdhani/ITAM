@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 
 type Credentials = {
   tenantCode: string;
@@ -82,8 +82,8 @@ function uniqueSuffix() {
   return `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 }
 
-async function selectOptionTexts(locator: any) {
-  return locator.locator("option").evaluateAll((options) =>
+async function selectOptionTexts(locator: Locator) {
+  return locator.locator("option").evaluateAll((options: HTMLOptionElement[]) =>
     options.map((opt) => (opt.textContent || "").trim()).filter(Boolean)
   );
 }
@@ -185,7 +185,7 @@ async function seedAsset(browser: Browser) {
   const assetTag = `ADM-ASSET-${suffix}`;
   const assetName = `Admin Master Data Asset ${suffix}`;
 
-  const res = await apiPostJson<{ id: number }>(page, "/api/v1/assets", {
+  const res = await apiPostJson<{ id?: number; asset?: { id: number } }>(page, "/api/v1/assets", {
     asset_tag: assetTag,
     name: assetName,
     asset_type_code: "HARDWARE",

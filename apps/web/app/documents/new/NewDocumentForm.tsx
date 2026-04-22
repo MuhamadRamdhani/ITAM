@@ -11,12 +11,6 @@ type MeData = {
   roles: string[];
 };
 
-type ApiResponseShape = {
-  data?: {
-    data?: MeData;
-  } | MeData;
-};
-
 type CreateDocumentResponse = {
   document?: { id?: number | string };
   data?: {
@@ -50,11 +44,10 @@ export default function NewDocumentForm() {
 
     async function loadMe() {
       try {
-        const res = await apiGet<ApiResponseShape>("/api/v1/auth/me");
-        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+        const res = await apiGet<MeData>("/api/v1/auth/me");
 
         if (!mounted) return;
-        setCanWrite(canManageDocuments(me?.roles ?? []));
+        setCanWrite(canManageDocuments(res.data?.roles ?? []));
       } catch {
         if (!mounted) return;
         setCanWrite(false);

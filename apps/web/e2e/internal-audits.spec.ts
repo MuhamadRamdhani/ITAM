@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 type Credentials = {
   tenantCode: string;
@@ -152,9 +152,55 @@ async function browserJson<T = any>(
   );
 }
 
-async function selectOptionContainingText(select: any, text: string) {
+async function browserRequest(
+  page: Page,
+  path: string,
+  init?: {
+    method?: string;
+    body?: unknown;
+  }
+) {
+  return page.evaluate(
+    async ({ apiBase, path, init }) => {
+      const headers: Record<string, string> = {};
+      let body: string | undefined;
+
+      if (init?.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(init.body);
+      }
+
+      const res = await fetch(`${apiBase}${path}`, {
+        method: init?.method || "GET",
+        credentials: "include",
+        headers,
+        body,
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return {
+        ok: res.ok,
+        status: res.status,
+        code: json?.error?.code || json?.code || null,
+        message: json?.error?.message || json?.message || null,
+        json,
+        text,
+      };
+    },
+    { apiBase: API_BASE, path, init }
+  );
+}
+
+async function selectOptionContainingText(select: Locator, text: string) {
   const matches = await select.locator("option").evaluateAll(
-    (options, needle) =>
+    (options: HTMLOptionElement[], needle: string) =>
       options
         .map((opt) => ({
           value: (opt as HTMLOptionElement).value,
@@ -168,7 +214,7 @@ async function selectOptionContainingText(select: any, text: string) {
   await select.selectOption({ value: matches[0].value });
 }
 
-async function selectIdentityOptionByEmail(page: Page, select: any, email: string) {
+async function selectIdentityOptionByEmail(page: Page, select: Locator, email: string) {
   const identityId = await getIdentityIdByEmail(page, email);
   await select.selectOption({ value: String(identityId) });
 }
@@ -425,9 +471,9 @@ test.describe("Internal Audits", () => {
     await modalControl(memberModal, "Notes").fill("Audit member");
     await page.getByRole("button", { name: "Save Member" }).click();
 
-    await expect(page.getByText(USERS.auditor.email)).toBeVisible();
+    await expect(page.getByText(USERS.auditor.email, { exact: true })).toBeVisible();
     await expect(page.locator("span").filter({ hasText: /^LEAD_AUDITOR$/ }).first()).toBeVisible();
-    await expect(page.getByText(USERS.tenantAdmin.email)).toBeVisible();
+    await expect(page.getByText(USERS.tenantAdmin.email, { exact: true })).toBeVisible();
     await expect(page.locator("span").filter({ hasText: /^AUDITOR$/ }).first()).toBeVisible();
   });
 
@@ -831,5 +877,33 @@ test.describe("Internal Audits", () => {
 
     await loginAs(page, USERS.defaultAdmin);
     await openDetail(page, audit.id, true);
+  });
+
+  test("IA-013 invalid planned dates are rejected", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const leadAuditorIdentityId = await getIdentityIdByEmail(page, USERS.auditor.email);
+
+    const response = await browserRequest(page, "/api/v1/internal-audits", {
+      method: "POST",
+      body: {
+        audit_code: `IA-INVALID-${uniqueSuffix()}`,
+        audit_title: `Invalid Audit ${uniqueSuffix()}`,
+        audit_type: "INTERNAL",
+        lead_auditor_identity_id: leadAuditorIdentityId,
+        scope_summary: "Invalid audit scope",
+        objective: "Invalid audit objective",
+        planned_start_date: toDateInput(7),
+        planned_end_date: toDateInput(1),
+        auditee_summary: "Invalid auditee summary",
+        notes: "Invalid audit notes",
+      },
+    });
+
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(400);
+    expect(response.code).toBe("INVALID_DATE_RANGE");
+    expect(String(response.message || "")).toContain(
+      "planned_start_date must be on or before planned_end_date."
+    );
   });
 });

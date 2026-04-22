@@ -15,7 +15,7 @@ export default async function SuperadminTenantDetailPage(props: {
               Tenant Detail
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              MVP0.2 — tenant summary + update.
+              MVP0.2 - tenant summary + update.
             </p>
           </div>
 

@@ -85,8 +85,8 @@ type AssetCoverageItem = {
 
   contract_health_rollup: ContractHealthRollup;
   contract_codes_preview: string[];
-  vendor_names_preview: string[];
 
+  vendor_names_preview: string[];
   contract_preview_items: ContractPreviewItem[];
   vendor_preview_items: VendorPreviewItem[];
 };
@@ -208,9 +208,7 @@ function buildReportHref(params: {
   }
 
   const qs = p.toString();
-  return qs
-    ? `/reports/asset-coverage?view=coverage&${qs}`
-    : "/reports/asset-coverage?view=coverage";
+  return qs ? `/reports/asset-coverage?${qs}` : "/reports/asset-coverage";
 }
 
 function buildExportQuery(params: {
@@ -328,15 +326,15 @@ function contractImpactPill(value: ContractHealthRollup | string) {
 
 function normalizeAssetTypes(res: any): ConfigItem[] {
   const raw =
-    (res as any)?.data?.items ??
-    (res as any)?.data?.data?.items ??
-    (res as any)?.data?.data ??
+    res?.data?.items ??
+    res?.data?.data?.items ??
+    res?.data?.data ??
     [];
   return Array.isArray(raw) ? raw : [];
 }
 
 function normalizeSummary(res: any): AssetCoverageSummaryData {
-  const raw = (res as any)?.data?.data ?? (res as any)?.data ?? {};
+  const raw = res?.data?.data ?? res?.data ?? {};
   return {
     active_count: Number(raw.active_count ?? 0),
     expiring_count: Number(raw.expiring_count ?? 0),
@@ -381,7 +379,7 @@ function normalizeVendorPreviewItems(value: any): VendorPreviewItem[] {
 }
 
 function normalizeList(res: any): AssetCoverageListData {
-  const raw = (res as any)?.data?.data ?? (res as any)?.data ?? {};
+  const raw = res?.data?.data ?? res?.data ?? {};
   const items = Array.isArray(raw.items)
     ? raw.items.map((item: any) => ({
         asset_id: Number(item.asset_id ?? 0),
@@ -526,7 +524,8 @@ function previewText(values: string[], limit = 2) {
 
 function renderContractPreview(
   items: ContractPreviewItem[],
-  fallback: string[]
+  fallback: string[],
+  returnTo: string
 ): ReactNode {
   if (items.length > 0) {
     const visible = items.slice(0, 2);
@@ -538,26 +537,27 @@ function renderContractPreview(
           {visible.map((item) => (
             <Link
               key={item.id}
-              href={`/contracts/${item.id}`}
-              className="text-xs text-blue-700 hover:underline"
+              href={`/contracts/${item.id}?return_to=${encodeURIComponent(returnTo)}`}
+              className="text-cyan-700 hover:underline"
             >
               {item.code}
             </Link>
           ))}
         </div>
         {remaining > 0 ? (
-          <div className="mt-1 text-xs text-gray-500">+{remaining} more</div>
+          <div className="mt-1 text-xs text-slate-500">+{remaining} more</div>
         ) : null}
       </>
     );
   }
 
-  return <div className="mt-1 text-xs text-gray-500">{previewText(fallback)}</div>;
+  return <div className="mt-1 text-xs text-slate-500">{previewText(fallback)}</div>;
 }
 
 function renderVendorPreview(
   items: VendorPreviewItem[],
-  fallback: string[]
+  fallback: string[],
+  returnTo: string
 ): ReactNode {
   if (items.length > 0) {
     const visible = items.slice(0, 2);
@@ -569,21 +569,51 @@ function renderVendorPreview(
           {visible.map((item) => (
             <Link
               key={item.id}
-              href={`/vendors/${item.id}`}
-              className="text-xs text-blue-700 hover:underline"
+              href={`/vendors/${item.id}?return_to=${encodeURIComponent(returnTo)}`}
+              className="text-cyan-700 hover:underline"
             >
               {item.name}
             </Link>
           ))}
         </div>
         {remaining > 0 ? (
-          <div className="mt-1 text-xs text-gray-500">+{remaining} more</div>
+          <div className="mt-1 text-xs text-slate-500">+{remaining} more</div>
         ) : null}
       </>
     );
   }
 
-  return <div className="mt-1 text-xs text-gray-500">{previewText(fallback)}</div>;
+  return <div className="mt-1 text-xs text-slate-500">{previewText(fallback)}</div>;
+}
+
+function StatCard(props: {
+  label: string;
+  value: number | string;
+  tone?: "default" | "green" | "amber" | "rose" | "cyan";
+}) {
+  const tone = props.tone || "default";
+
+  const toneClass =
+    tone === "green"
+      ? "border-green-200 text-green-800"
+      : tone === "amber"
+        ? "border-amber-200 text-amber-800"
+        : tone === "rose"
+          ? "border-rose-200 text-rose-800"
+          : tone === "cyan"
+            ? "border-cyan-200 text-cyan-800"
+            : "border-slate-200 text-slate-900";
+
+  return (
+    <div
+      className={`rounded-3xl border bg-white/85 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] ${toneClass}`}
+    >
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {props.label}
+      </div>
+      <div className="mt-3 text-2xl font-semibold">{props.value}</div>
+    </div>
+  );
 }
 
 export default function AssetCoverageReportClient() {
@@ -641,6 +671,11 @@ export default function AssetCoverageReportClient() {
     const candidate = pickInt(searchParams.get("page_size"), pageSizeDefault);
     return pageSizeOptions.includes(candidate) ? candidate : pageSizeDefault;
   }, [searchParams, pageSizeDefault, pageSizeOptions]);
+
+  const currentReportHref = useMemo(() => {
+    const qs = searchParams.toString();
+    return qs ? `/reports/asset-coverage?${qs}` : "/reports/asset-coverage";
+  }, [searchParams]);
 
   const [qInput, setQInput] = useState("");
   const [typeCodeInput, setTypeCodeInput] = useState("");
@@ -1020,9 +1055,9 @@ export default function AssetCoverageReportClient() {
 
   if (bootLoading) {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-7xl px-6 py-8">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
+      <main className="itam-page-shell">
+        <div className="itam-page-shell-inner">
+          <div className="rounded-3xl border border-white bg-white/80 p-6 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             Loading asset coverage report...
           </div>
         </div>
@@ -1031,560 +1066,510 @@ export default function AssetCoverageReportClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Asset Coverage Report
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Monitoring coverage warranty, support, dan subscription per asset
-              dengan konteks contract dan vendor.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-                Coverage
-              </span>
-              <Link
-                href="/reports/asset-coverage?view=mapping"
-                className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:p-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Reports
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+                Asset Coverage Report
+              </h1>
+
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+                Monitoring coverage warranty, support, dan subscription per asset
+                dengan konteks contract dan vendor.
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="rounded-full bg-cyan-600 px-3 py-2 text-xs font-semibold text-white">
+                  Coverage
+                </span>
+                <Link
+                  href="/reports/asset-mapping"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Mapping
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={onExportExcel}
+                disabled={exporting}
+                className="itam-secondary-action"
               >
-                Mapping
+                {exporting ? "Exporting..." : "Export Excel"}
+              </button>
+
+              <Link href="/" className="itam-secondary-action">
+                Back
               </Link>
             </div>
           </div>
+        </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onExportExcel}
-              disabled={exporting}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+        <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            <form
+              className="grid grid-cols-1 gap-4 lg:grid-cols-6"
+              onSubmit={onSearchSubmit}
             >
-              {exporting ? "Exporting..." : "Export Excel"}
-            </button>
+              <div className="lg:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Search
+                </label>
+                <input
+                  value={qInput}
+                  onChange={(e) => setQInput(e.target.value)}
+                  placeholder="Search asset tag / name..."
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
 
-            <Link
-              href="/"
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Back
-            </Link>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Asset Type
+                </label>
+                <select
+                  value={typeCodeInput}
+                  onChange={(e) => setTypeCodeInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="">All types</option>
+                  {assetTypesItems.map((t) => (
+                    <option key={t.code} value={t.code}>
+                      {t.label} ({t.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Coverage
+                </label>
+                <select
+                  value={coverageKindInput}
+                  onChange={(e) => setCoverageKindInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {COVERAGE_KIND_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Coverage Health
+                </label>
+                <select
+                  value={healthInput}
+                  onChange={(e) => setHealthInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {HEALTH_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Vendor
+                </label>
+                <select
+                  value={vendorIdInput}
+                  onChange={(e) => setVendorIdInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                  disabled={optionsLoading}
+                >
+                  <option value="">
+                    {optionsLoading ? "Loading vendors..." : "All vendors"}
+                  </option>
+                  {vendor_id && !vendorHasCurrentValue ? (
+                    <option value={vendor_id}>Selected Vendor #{vendor_id}</option>
+                  ) : null}
+                  {vendorOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.vendor_code} - {item.vendor_name}
+                      {item.status ? ` (${item.status})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Contract
+                </label>
+                <select
+                  value={contractIdInput}
+                  onChange={(e) => setContractIdInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                  disabled={optionsLoading}
+                >
+                  <option value="">
+                    {optionsLoading ? "Loading contracts..." : "All contracts"}
+                  </option>
+                  {contractIdInput && !contractHasCurrentValue ? (
+                    <option value={contractIdInput}>
+                      Selected Contract #{contractIdInput}
+                    </option>
+                  ) : null}
+                  {filteredContractOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.contract_code} - {item.contract_name}
+                      {item.vendor_name ? ` | ${item.vendor_name}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Contract Impact
+                </label>
+                <select
+                  value={contractHealthInput}
+                  onChange={(e) => setContractHealthInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {CONTRACT_HEALTH_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Link Status
+                </label>
+                <select
+                  value={linkStatusInput}
+                  onChange={(e) => setLinkStatusInput(e.target.value as LinkStatusFilter)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {LINK_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Expiring In Days
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={expiringInput}
+                  onChange={(e) => setExpiringInput(e.target.value)}
+                  placeholder="e.g. 30"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Page Size
+                </label>
+                <select
+                  value={pageSizeInput}
+                  onChange={(e) => setPageSizeInput(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {pageSizeOptions.map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n} / page
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="itam-secondary-action"
+                >
+                  Reset
+                </button>
+
+                <button
+                  type="submit"
+                  className="itam-primary-action"
+                >
+                  Search
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
-        {err ? (
-          <div className="mt-6">
-            <ErrorState
-              error={err}
-              onRetry={() => {
-                window.location.reload();
-              }}
-            />
-          </div>
-        ) : null}
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-5">
+          <StatCard label="Active Coverage" value={summary.active_count} tone="green" />
+          <StatCard label="Expiring Coverage" value={summary.expiring_count} tone="amber" />
+          <StatCard label="Expired Coverage" value={summary.expired_count} tone="rose" />
+          <StatCard label="No Coverage" value={summary.no_coverage_count} />
+          <StatCard label="No End Date" value={summary.no_end_date_count} />
 
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <form
-            className="grid grid-cols-1 gap-3 lg:grid-cols-8"
-            onSubmit={onSearchSubmit}
-          >
-            <div className="lg:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Search
-              </label>
-              <input
-                value={qInput}
-                onChange={(e) => setQInput(e.target.value)}
-                placeholder="Search asset tag / name..."
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Asset Type
-              </label>
-              <select
-                value={typeCodeInput}
-                onChange={(e) => setTypeCodeInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                <option value="">All types</option>
-                {assetTypesItems.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.label} ({t.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Coverage
-              </label>
-              <select
-                value={coverageKindInput}
-                onChange={(e) => setCoverageKindInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                {COVERAGE_KIND_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Coverage Health
-              </label>
-              <select
-                value={healthInput}
-                onChange={(e) => setHealthInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                {HEALTH_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Vendor
-              </label>
-              <select
-                value={vendorIdInput}
-                onChange={(e) => setVendorIdInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                disabled={optionsLoading}
-              >
-                <option value="">
-                  {optionsLoading ? "Loading vendors..." : "All vendors"}
-                </option>
-                {vendor_id && !vendorHasCurrentValue ? (
-                  <option value={vendor_id}>Selected Vendor #{vendor_id}</option>
-                ) : null}
-                {vendorOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.vendor_code} - {item.vendor_name}
-                    {item.status ? ` (${item.status})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Contract
-              </label>
-              <select
-                value={contractIdInput}
-                onChange={(e) => setContractIdInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                disabled={optionsLoading}
-              >
-                <option value="">
-                  {optionsLoading ? "Loading contracts..." : "All contracts"}
-                </option>
-                {contractIdInput && !contractHasCurrentValue ? (
-                  <option value={contractIdInput}>
-                    Selected Contract #{contractIdInput}
-                  </option>
-                ) : null}
-                {filteredContractOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.contract_code} - {item.contract_name}
-                    {item.vendor_name ? ` | ${item.vendor_name}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Contract Impact
-              </label>
-              <select
-                value={contractHealthInput}
-                onChange={(e) => setContractHealthInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                {CONTRACT_HEALTH_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Link Status
-              </label>
-              <select
-                value={linkStatusInput}
-                onChange={(e) => setLinkStatusInput(e.target.value as LinkStatusFilter)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                {LINK_STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Expiring In Days
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={expiringInput}
-                onChange={(e) => setExpiringInput(e.target.value)}
-                placeholder="e.g. 30"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Page Size
-              </label>
-              <select
-                value={pageSizeInput}
-                onChange={(e) => setPageSizeInput(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                {pageSizeOptions.map((n) => (
-                  <option key={n} value={String(n)}>
-                    {n} / page
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="lg:col-span-8 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={onReset}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Reset
-              </button>
-
-              <button
-                type="submit"
-                className="itam-primary-action"
-              >
-                Search
-              </button>
-            </div>
-          </form>
+          <StatCard
+            label="Linked Contract Rows"
+            value={summary.rows_with_linked_contract}
+            tone="cyan"
+          />
+          <StatCard label="No Link Rows" value={summary.rows_without_linked_contract} />
+          <StatCard
+            label="Active Contract"
+            value={summary.rows_with_active_contract}
+            tone="green"
+          />
+          <StatCard
+            label="Expiring Contract"
+            value={summary.rows_with_expiring_contract}
+            tone="amber"
+          />
+          <StatCard
+            label="Expired Contract"
+            value={summary.rows_with_expired_contract}
+            tone="rose"
+          />
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-5">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Active Coverage
+        <div className="mt-10 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-slate-500">Total rows: {total}</div>
+              <div className="text-sm text-slate-500">
+                Contract no end date rows:{" "}
+                <span className="font-medium text-slate-700">
+                  {summary.rows_with_no_end_date_contract}
+                </span>
+              </div>
             </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading ? "-" : summary.active_count}
-            </div>
-          </div>
 
-          <div className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-amber-700">
-              Expiring Coverage
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-amber-800">
-              {summaryLoading ? "-" : summary.expiring_count}
-            </div>
-          </div>
+            {err ? (
+              <div className="mb-4">
+                <ErrorState
+                  error={err}
+                  onRetry={() => {
+                    window.location.reload();
+                  }}
+                />
+              </div>
+            ) : null}
 
-          <div className="rounded-lg border border-rose-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-rose-700">
-              Expired Coverage
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-rose-800">
-              {summaryLoading ? "-" : summary.expired_count}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              No Coverage
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading ? "-" : summary.no_coverage_count}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              No End Date
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading ? "-" : summary.no_end_date_count}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-5">
-          <div className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-blue-700">
-              Linked Contract Rows
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-blue-800">
-              {summaryLoading ? "-" : summary.rows_with_linked_contract}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              No Link Rows
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading ? "-" : summary.rows_without_linked_contract}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-green-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-green-700">
-              Active Contract
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-green-800">
-              {summaryLoading ? "-" : summary.rows_with_active_contract}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-amber-700">
-              Expiring Contract
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-amber-800">
-              {summaryLoading ? "-" : summary.rows_with_expiring_contract}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-rose-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium uppercase tracking-wide text-rose-700">
-              Expired Contract
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-rose-800">
-              {summaryLoading ? "-" : summary.rows_with_expired_contract}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500">
-            <div>Total rows: {total}</div>
-            <div>
-              Contract no end date rows:{" "}
-              <span className="font-medium text-gray-700">
-                {summaryLoading ? "-" : summary.rows_with_no_end_date_contract}
-              </span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-gray-500">
-                <tr>
-                  <th className="py-2 pr-4">Asset Tag</th>
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Type / State</th>
-                  <th className="py-2 pr-4">Coverage</th>
-                  <th className="py-2 pr-4">Start Date</th>
-                  <th className="py-2 pr-4">End Date</th>
-                  <th className="py-2 pr-4">Coverage Health</th>
-                  <th className="py-2 pr-4">Days</th>
-                  <th className="py-2 pr-4">Linked Contracts</th>
-                  <th className="py-2 pr-4">Vendors</th>
-                  <th className="py-2 pr-4">Contract Impact</th>
-                  <th className="py-2 pr-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listLoading ? (
-                  <>
-                    <SkeletonTableRow cols={12} />
-                    <SkeletonTableRow cols={12} />
-                    <SkeletonTableRow cols={12} />
-                  </>
-                ) : items.length === 0 ? (
-                  <tr className="border-t">
-                    <td colSpan={12} className="py-6 text-gray-600">
-                      Tidak ada data asset coverage.
-                    </td>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-[1700px] w-full text-sm">
+                <thead className="bg-slate-50 text-left text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Asset Tag</th>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Type / State</th>
+                    <th className="px-4 py-3 font-medium">Coverage</th>
+                    <th className="px-4 py-3 font-medium">Start Date</th>
+                    <th className="px-4 py-3 font-medium">End Date</th>
+                    <th className="px-4 py-3 font-medium">Coverage Health</th>
+                    <th className="px-4 py-3 font-medium">Days</th>
+                    <th className="px-4 py-3 font-medium">Linked Contracts</th>
+                    <th className="px-4 py-3 font-medium">Vendors</th>
+                    <th className="px-4 py-3 font-medium">Contract Impact</th>
+                    <th className="px-4 py-3 font-medium text-right">Action</th>
                   </tr>
-                ) : (
-                  items.map((item) => (
-                    <tr
-                      key={`${item.asset_id}-${item.coverage_kind}-${item.start_date ?? "null"}-${item.end_date ?? "null"}`}
-                      className="border-t align-top"
-                    >
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        <Link
-                          href={`/assets/${item.asset_id}`}
-                          className="text-blue-700 hover:underline"
-                        >
-                          {item.asset_tag}
-                        </Link>
-                      </td>
+                </thead>
 
-                      <td className="py-3 pr-4">
-                        <div className="font-medium text-gray-900">{item.name}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          Status: {item.status || "-"}
-                        </div>
-                      </td>
-
-                      <td className="py-3 pr-4">
-                        <div className="text-gray-900">
-                          {item.asset_type?.label
-                            ? `${item.asset_type.label} (${item.asset_type.code})`
-                            : "-"}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          State:{" "}
-                          {item.state?.label
-                            ? `${item.state.label} (${item.state.code})`
-                            : "-"}
-                        </div>
-                      </td>
-
-                      <td className="py-3 pr-4">
-                        <span className={coverageKindPill(item.coverage_kind)}>
-                          {coverageKindLabel(item.coverage_kind)}
-                        </span>
-                      </td>
-
-                      <td className="py-3 pr-4">{fmtDate(item.start_date)}</td>
-                      <td className="py-3 pr-4">{fmtDate(item.end_date)}</td>
-
-                      <td className="py-3 pr-4">
-                        <span className={healthPill(item.coverage_health)}>
-                          {item.coverage_health}
-                        </span>
-                      </td>
-
-                      <td className="py-3 pr-4">{fmtDays(item.days_to_expiry)}</td>
-
-                      <td className="py-3 pr-4">
-                        <div className="font-medium text-gray-900">
-                          {item.linked_contracts_count} contract
-                          {item.linked_contracts_count === 1 ? "" : "s"}
-                        </div>
-                        {renderContractPreview(
-                          item.contract_preview_items,
-                          item.contract_codes_preview
-                        )}
-                      </td>
-
-                      <td className="py-3 pr-4">
-                        <div className="font-medium text-gray-900">
-                          {item.linked_vendors_count} vendor
-                          {item.linked_vendors_count === 1 ? "" : "s"}
-                        </div>
-                        {renderVendorPreview(
-                          item.vendor_preview_items,
-                          item.vendor_names_preview
-                        )}
-                      </td>
-
-                      <td className="py-3 pr-4">
-                        <div>
-                          <span className={contractImpactPill(item.contract_health_rollup)}>
-                            {contractImpactLabel(item.contract_health_rollup)}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.has_active_contract ? "A" : "-"} /{" "}
-                          {item.has_expiring_contract ? "E" : "-"} /{" "}
-                          {item.has_expired_contract ? "X" : "-"} /{" "}
-                          {item.has_no_end_date_contract ? "N" : "-"}
-                        </div>
-                      </td>
-
-                      <td className="py-3 pr-4 text-right whitespace-nowrap">
-                        <Link
-                          href={`/assets/${item.asset_id}`}
-                          className="text-blue-700 hover:underline"
-                        >
-                          View Asset
-                        </Link>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {listLoading ? (
+                    <>
+                      <SkeletonTableRow cols={12} />
+                      <SkeletonTableRow cols={12} />
+                      <SkeletonTableRow cols={12} />
+                      <SkeletonTableRow cols={12} />
+                      <SkeletonTableRow cols={12} />
+                    </>
+                  ) : items.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
+                        Tidak ada data asset coverage.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    items.map((item) => (
+                      <tr
+                        key={`${item.asset_id}-${item.coverage_kind}-${item.start_date ?? "null"}-${item.end_date ?? "null"}`}
+                        className="align-top"
+                      >
+                        <td className="px-4 py-4 font-mono text-xs">
+                          <Link
+                            href={`/assets/${item.asset_id}?return_to=${encodeURIComponent(currentReportHref)}`}
+                            className="text-cyan-700 hover:underline"
+                          >
+                            {item.asset_tag}
+                          </Link>
+                        </td>
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-gray-500">
-              Page {page} / {totalPages} (page_size: {pageSize})
+                        <td className="px-4 py-4">
+                          <div className="font-medium text-slate-900">{item.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Status: {item.status || "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">
+                          <div>
+                            {item.asset_type?.label
+                              ? `${item.asset_type.label} (${item.asset_type.code})`
+                              : "-"}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            State:{" "}
+                            {item.state?.label
+                              ? `${item.state.label} (${item.state.code})`
+                              : "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span className={coverageKindPill(item.coverage_kind)}>
+                            {coverageKindLabel(item.coverage_kind)}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4">{fmtDate(item.start_date)}</td>
+                        <td className="px-4 py-4">{fmtDate(item.end_date)}</td>
+
+                        <td className="px-4 py-4">
+                          <span className={healthPill(item.coverage_health)}>
+                            {item.coverage_health}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4">{fmtDays(item.days_to_expiry)}</td>
+
+                        <td className="px-4 py-4">
+                          <div className="font-medium text-slate-900">
+                            {item.linked_contracts_count} contract
+                            {item.linked_contracts_count === 1 ? "" : "s"}
+                          </div>
+                          {renderContractPreview(
+                            item.contract_preview_items,
+                            item.contract_codes_preview,
+                            currentReportHref
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="font-medium text-slate-900">
+                            {item.linked_vendors_count} vendor
+                            {item.linked_vendors_count === 1 ? "" : "s"}
+                          </div>
+                          {renderVendorPreview(
+                            item.vendor_preview_items,
+                            item.vendor_names_preview,
+                            currentReportHref
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div>
+                            <span className={contractImpactPill(item.contract_health_rollup)}>
+                              {contractImpactLabel(item.contract_health_rollup)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {item.has_active_contract ? "A" : "-"} /{" "}
+                            {item.has_expiring_contract ? "E" : "-"} /{" "}
+                            {item.has_expired_contract ? "X" : "-"} /{" "}
+                            {item.has_no_end_date_contract ? "N" : "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-right whitespace-nowrap">
+                          <Link
+                            href={`/assets/${item.asset_id}?return_to=${encodeURIComponent(currentReportHref)}`}
+                            className="text-cyan-700 hover:underline"
+                          >
+                            View Asset
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            <div className="flex gap-2">
-              {canPrev ? (
-                <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  href={buildReportHref({
-                    q,
-                    type_code,
-                    coverage_kind,
-                    health,
-                    vendor_id,
-                    contract_id,
-                    contract_health,
-                    link_status,
-                    expiring_in_days,
-                    page: page - 1,
-                    pageSize,
-                  })}
-                >
-                  Prev
-                </Link>
-              ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
-                  Prev
-                </span>
-              )}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-slate-500">
+                Page {page} / {totalPages} (page_size: {pageSize})
+              </div>
 
-              {canNext ? (
-                <Link
-                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  href={buildReportHref({
-                    q,
-                    type_code,
-                    coverage_kind,
-                    health,
-                    vendor_id,
-                    contract_id,
-                    contract_health,
-                    link_status,
-                    expiring_in_days,
-                    page: page + 1,
-                    pageSize,
-                  })}
-                >
-                  Next
-                </Link>
-              ) : (
-                <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
-                  Next
-                </span>
-              )}
+              <div className="flex gap-2">
+                {canPrev ? (
+                  <Link
+                    className="itam-secondary-action-sm"
+                    href={buildReportHref({
+                      q,
+                      type_code,
+                      coverage_kind,
+                      health,
+                      vendor_id,
+                      contract_id,
+                      contract_health,
+                      link_status,
+                      expiring_in_days,
+                      page: page - 1,
+                      pageSize,
+                    })}
+                  >
+                    Prev
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
+                    Prev
+                  </span>
+                )}
+
+                {canNext ? (
+                  <Link
+                    className="itam-secondary-action-sm"
+                    href={buildReportHref({
+                      q,
+                      type_code,
+                      coverage_kind,
+                      health,
+                      vendor_id,
+                      contract_id,
+                      contract_health,
+                      link_status,
+                      expiring_in_days,
+                      page: page + 1,
+                      pageSize,
+                    })}
+                  >
+                    Next
+                  </Link>
+                ) : (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-400">
+                    Next
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatchJson, apiPostJson } from "@/app/lib/api";
 import { ErrorState } from "@/app/lib/loadingComponents";
@@ -283,7 +284,12 @@ async function apiDelete(path: string) {
 }
 
 export default function ContractDetailClient(props: { contractId: string }) {
+  const searchParams = useSearchParams();
   const contractIdNum = useMemo(() => Number(props.contractId), [props.contractId]);
+  const backHref = useMemo(() => {
+    const value = searchParams.get("return_to")?.trim() || "";
+    return value.startsWith("/") ? value : "/contracts";
+  }, [searchParams]);
 
   const [loading, setLoading] = useState(true);
   const [loadingVendors, setLoadingVendors] = useState(true);
@@ -802,289 +808,279 @@ export default function ContractDetailClient(props: { contractId: string }) {
   );
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.10),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(14,165,233,0.08),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.06),_transparent_22%)]" />
-      <div className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full bg-cyan-300/12 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-0 left-0 h-72 w-72 rounded-full bg-sky-300/8 blur-3xl" />
-      <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
-        <div className="flex items-start justify-between gap-4">
+  <main className="itam-page-shell">
+    <div className="itam-page-shell-inner">
+      {err ? (
+        <div className="mt-4">
+          <ErrorState
+            error={err}
+            onRetry={() => {
+              window.location.reload();
+            }}
+          />
+        </div>
+      ) : null}
+
+      {success ? (
+        <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {success}
+        </div>
+      ) : null}
+
+      <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:p-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
               Contracts
             </div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
               Contract Detail
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-700">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
               Lihat, ubah, dan kelola relasi dokumen, asset, dan evidence untuk contract.
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <Link
-              href="/contracts"
-              className="itam-secondary-action"
-            >
-              Back
-            </Link>
-          </div>
+          <Link href={backHref} className="itam-secondary-action">
+            Back
+          </Link>
         </div>
+      </div>
 
-        {err ? (
-          <div className="mt-4">
-            <ErrorState
-              error={err}
-              onRetry={() => {
-                window.location.reload();
-              }}
-            />
-          </div>
-        ) : null}
-
-        {success ? (
-          <div className="mt-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {success}
-          </div>
-        ) : null}
-
-        {loading ? (
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="text-sm text-slate-600">Loading contract...</div>
-          </div>
-        ) : !detail ? (
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="text-sm text-slate-600">Contract not found.</div>
-          </div>
-        ) : (
-          <>
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Status
-                </div>
-                <div className="mt-2">
-                  <span className={statusPill(detail.status)}>{detail.status}</span>
-                </div>
+      {loading ? (
+        <div className="mt-6 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="text-sm text-slate-600">Loading contract...</div>
+        </div>
+      ) : !detail ? (
+        <div className="mt-6 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="text-sm text-slate-600">Contract not found.</div>
+        </div>
+      ) : (
+        <>
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
+            <div className="rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Status
               </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Health
-                </div>
-                <div className="mt-2">
-                  <span className={healthPill(detail.contract_health || "")}>
-                    {detail.contract_health || "-"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Vendor
-                </div>
-                <div className="mt-2 text-sm font-medium text-slate-900">
-                  {detail.vendor_name || "-"}
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  {detail.vendor_code || "-"}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Updated
-                </div>
-                <div className="mt-2 text-sm font-medium text-slate-900">
-                  {fmtDateTime(detail.updated_at)}
-                </div>
+              <div className="mt-3">
+                <span className={statusPill(detail.status)}>{detail.status}</span>
               </div>
             </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-              <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onSave}>
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Vendor</div>
-                  <select
-                    value={form.vendor_id}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, vendor_id: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving || loadingVendors}
-                    required
-                  >
-                    <option value="">
-                      {loadingVendors ? "Loading vendors..." : "Select vendor"}
+            <div className="rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Health
+              </div>
+              <div className="mt-3">
+                <span className={healthPill(detail.contract_health || "")}>
+                  {detail.contract_health || "-"}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Vendor
+              </div>
+              <div className="mt-3 text-base font-semibold text-slate-900">
+                {detail.vendor_name || "-"}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{detail.vendor_code || "-"}</div>
+            </div>
+
+            <div className="rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Updated
+              </div>
+              <div className="mt-3 text-sm font-medium text-slate-900">
+                {fmtDateTime(detail.updated_at)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onSave}>
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">Vendor</div>
+                <select
+                  value={form.vendor_id}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, vendor_id: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving || loadingVendors}
+                  required
+                >
+                  <option value="">
+                    {loadingVendors ? "Loading vendors..." : "Select vendor"}
+                  </option>
+                  {activeVendorOptions.map((v) => (
+                    <option key={String(v.id)} value={String(v.id)}>
+                      {v.vendor_code} - {v.vendor_name}
                     </option>
-                    {activeVendorOptions.map((v) => (
-                      <option key={String(v.id)} value={String(v.id)}>
-                        {v.vendor_code} - {v.vendor_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Contract Code</div>
-                  <input
-                    value={form.contract_code}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, contract_code: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <div className="mb-1 text-sm font-medium text-gray-700">Contract Name</div>
-                  <input
-                    value={form.contract_name}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, contract_name: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Contract Type</div>
-                  <select
-                    value={form.contract_type}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, contract_type: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  >
-                    {CONTRACT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Status</div>
-                  <select
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, status: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  >
-                    {CONTRACT_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Start Date</div>
-                  <input
-                    type="date"
-                    value={form.start_date}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, start_date: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">End Date</div>
-                  <input
-                    type="date"
-                    value={form.end_date}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, end_date: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Renewal Notice Days</div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.renewal_notice_days}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        renewal_notice_days: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">
-                    Owner Identity ID (optional)
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.owner_identity_id}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        owner_identity_id: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <div className="mb-1 text-sm font-medium text-gray-700">Notes</div>
-                  <textarea
-                    rows={5}
-                    value={form.notes}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, notes: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="md:col-span-2 flex justify-end gap-2">
-                  <Link
-                    href="/contracts"
-                    className="itam-secondary-action"
-                  >
-                    Back to Contracts
-                  </Link>
-                  <button
-                    type="submit"
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-                    disabled={saving}
-                  >
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </form>
-
-              <div className="mt-4 text-xs text-slate-500">
-                Created: {fmtDateTime(detail.created_at)} · Updated: {fmtDateTime(detail.updated_at)} · End Date:{" "}
-                {fmtDate(detail.end_date)}
+                  ))}
+                </select>
               </div>
-            </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">Contract Code</div>
+                <input
+                  value={form.contract_code}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, contract_code: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                  required
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <div className="mb-1 text-sm font-medium text-slate-700">Contract Name</div>
+                <input
+                  value={form.contract_name}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, contract_name: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">Contract Type</div>
+                <select
+                  value={form.contract_type}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, contract_type: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                >
+                  {CONTRACT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">Status</div>
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, status: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                >
+                  {CONTRACT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">Start Date</div>
+                <input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, start_date: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">End Date</div>
+                <input
+                  type="date"
+                  value={form.end_date}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, end_date: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">Renewal Notice Days</div>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.renewal_notice_days}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewal_notice_days: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-medium text-slate-700">
+                  Owner Identity ID (optional)
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.owner_identity_id}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      owner_identity_id: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <div className="mb-1 text-sm font-medium text-slate-700">Notes</div>
+                <textarea
+                  rows={5}
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="md:col-span-2 flex justify-end gap-2">
+                <Link href={backHref} className="itam-secondary-action">
+                  Back
+                </Link>
+                <button
+                  type="submit"
+                  className="itam-primary-action"
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-4 text-xs text-slate-500">
+              Created: {fmtDateTime(detail.created_at)} · Updated: {fmtDateTime(detail.updated_at)} · End Date:{" "}
+              {fmtDate(detail.end_date)}
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Related Documents</h2>
@@ -1105,7 +1101,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={onAttachDocument}>
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Document</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Document</div>
                   <select
                     value={attachDocumentForm.document_id}
                     onChange={(e) =>
@@ -1130,7 +1126,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </div>
 
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Note (optional)</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Note (optional)</div>
                   <input
                     value={attachDocumentForm.note}
                     onChange={(e) =>
@@ -1148,7 +1144,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <div className="md:col-span-2 flex justify-end">
                   <button
                     type="submit"
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="itam-primary-action"
                     disabled={linkingDocument || !attachableDocuments.length}
                   >
                     {linkingDocument ? "Attaching..." : "Attach Document"}
@@ -1158,11 +1154,11 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               {showCreateDocument ? (
                 <form
-                  className="mt-4 grid grid-cols-1 gap-3 border-t border-gray-200 pt-4 md:grid-cols-2"
+                  className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 md:grid-cols-2"
                   onSubmit={onCreateAndAttachDocument}
                 >
                   <div>
-                    <div className="mb-1 text-sm font-medium text-gray-700">Document Type</div>
+                    <div className="mb-1 text-sm font-medium text-slate-700">Document Type</div>
                     <input
                       value={createDocumentForm.doc_type_code}
                       onChange={(e) =>
@@ -1182,7 +1178,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-sm font-medium text-gray-700">Title</div>
+                    <div className="mb-1 text-sm font-medium text-slate-700">Title</div>
                     <input
                       value={createDocumentForm.title}
                       onChange={(e) =>
@@ -1199,7 +1195,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   </div>
 
                   <div className="md:col-span-2">
-                    <div className="mb-1 text-sm font-medium text-gray-700">Relation Note (optional)</div>
+                    <div className="mb-1 text-sm font-medium text-slate-700">Relation Note (optional)</div>
                     <input
                       value={createDocumentForm.relation_note}
                       onChange={(e) =>
@@ -1232,7 +1228,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     </button>
                     <button
                       type="submit"
-                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                      className="itam-primary-action"
                       disabled={
                         creatingDocument ||
                         !createDocumentForm.doc_type_code.trim() ||
@@ -1308,8 +1304,10 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </table>
               </div>
             </div>
+          </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Related Assets</h2>
@@ -1321,7 +1319,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]" onSubmit={onSearchAssets}>
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Search Asset</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Search Asset</div>
                   <input
                     value={assetSearch}
                     onChange={(e) => setAssetSearch(e.target.value)}
@@ -1334,7 +1332,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <div className="flex items-end">
                   <button
                     type="submit"
-                    className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
+                    className="itam-secondary-action-sm"
                     disabled={loadingAssetsCatalog}
                   >
                     {loadingAssetsCatalog ? "Searching..." : "Search"}
@@ -1345,7 +1343,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   <button
                     type="button"
                     onClick={onClearAssetSearch}
-                    className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
+                    className="itam-secondary-action-sm"
                     disabled={loadingAssetsCatalog}
                   >
                     Reset
@@ -1355,7 +1353,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={onAttachAsset}>
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Asset</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Asset</div>
                   <select
                     value={attachAssetForm.asset_id}
                     onChange={(e) =>
@@ -1387,7 +1385,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </div>
 
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Note (optional)</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Note (optional)</div>
                   <input
                     value={attachAssetForm.note}
                     onChange={(e) =>
@@ -1405,7 +1403,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <div className="md:col-span-2 flex justify-end">
                   <button
                     type="submit"
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="itam-primary-action"
                     disabled={linkingAsset || !attachableAssets.length}
                   >
                     {linkingAsset ? "Attaching..." : "Attach Asset"}
@@ -1478,8 +1476,10 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </table>
               </div>
             </div>
+          </div>
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Related Evidence</h2>
@@ -1500,7 +1500,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={onAttachEvidence}>
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Evidence File</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Evidence File</div>
                   <select
                     value={attachEvidenceForm.evidence_file_id}
                     onChange={(e) =>
@@ -1525,7 +1525,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </div>
 
                 <div>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Note (optional)</div>
+                  <div className="mb-1 text-sm font-medium text-slate-700">Note (optional)</div>
                   <input
                     value={attachEvidenceForm.note}
                     onChange={(e) =>
@@ -1543,7 +1543,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 <div className="md:col-span-2 flex justify-end">
                   <button
                     type="submit"
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="itam-primary-action"
                     disabled={linkingEvidence || !attachableEvidenceFiles.length}
                   >
                     {linkingEvidence ? "Attaching..." : "Attach Evidence"}
@@ -1553,11 +1553,11 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
               {showUploadEvidence ? (
                 <form
-                  className="mt-4 grid grid-cols-1 gap-3 border-t border-gray-200 pt-4 md:grid-cols-2"
+                  className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 md:grid-cols-2"
                   onSubmit={onUploadAndAttachEvidence}
                 >
                   <div>
-                    <div className="mb-1 text-sm font-medium text-gray-700">New Evidence File</div>
+                    <div className="mb-1 text-sm font-medium text-slate-700">New Evidence File</div>
                     <input
                       key={uploadEvidenceInputKey}
                       type="file"
@@ -1577,7 +1577,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                   </div>
 
                   <div>
-                    <div className="mb-1 text-sm font-medium text-gray-700">Note (optional)</div>
+                    <div className="mb-1 text-sm font-medium text-slate-700">Note (optional)</div>
                     <input
                       value={uploadEvidenceForm.note}
                       onChange={(e) =>
@@ -1607,7 +1607,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
                     </button>
                     <button
                       type="submit"
-                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                      className="itam-primary-action"
                       disabled={uploadingEvidenceFile || !uploadEvidenceForm.file}
                     >
                       {uploadingEvidenceFile ? "Uploading..." : "Upload & Attach"}
@@ -1666,16 +1666,14 @@ export default function ContractDetailClient(props: { contractId: string }) {
                 </table>
               </div>
             </div>
+          </div>
 
-            <div className="mt-6">
-              <SoftwareEntitlementsPanel contractId={detail.id} />
-            </div>
-          </>
-        )}
-      </div>
-    </main>
-  );
+          <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <SoftwareEntitlementsPanel contractId={detail.id} />
+          </div>
+        </>
+      )}
+    </div>
+  </main>
+);
 }
-
-
-

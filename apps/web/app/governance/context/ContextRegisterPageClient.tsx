@@ -253,14 +253,19 @@ export default function ContextRegisterPageClient() {
         setCanManage(nextCanManage);
 
         if (nextCanManage) {
-          const identitiesRes = await apiGet<any>("/api/v1/admin/identities", {
-            loadingKey: "context_identities",
-          });
+          try {
+            const identitiesRes = await apiGet<any>("/api/v1/admin/identities", {
+              loadingKey: "context_identities",
+            });
 
-          if (!active) return;
+            if (!active) return;
 
-          const identityRows = normalizeIdentities(identitiesRes);
-          setIdentities(identityRows);
+            const identityRows = normalizeIdentities(identitiesRes);
+            setIdentities(identityRows);
+          } catch {
+            if (!active) return;
+            setIdentities([]);
+          }
         }
       } catch (error) {
         if (!active) return;

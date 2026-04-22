@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPatchJson } from "@/app/lib/api";
 import { canManageVendors } from "@/app/lib/vendorAccess";
 import Link from "next/link";
@@ -77,6 +77,15 @@ function mapVendorToForm(v: Vendor): VendorForm {
 
 export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const rawReturnTo = searchParams.get("return_to")?.trim() || "";
+  const backHref = useMemo(() => {
+    if (!rawReturnTo) return "/vendors";
+    if (!rawReturnTo.startsWith("/")) return "/vendors";
+    if (rawReturnTo.startsWith("//")) return "/vendors";
+    return rawReturnTo;
+  }, [rawReturnTo]);
 
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [form, setForm] = useState<VendorForm | null>(null);
@@ -191,11 +200,11 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
           </div>
 
           <Link
-            href="/vendors"
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            Back
-          </Link>
+  href={backHref}
+  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+>
+  Back
+</Link>
         </div>
       </div>
 

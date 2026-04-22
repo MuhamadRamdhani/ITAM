@@ -11,7 +11,7 @@ export default function SuperadminTenantsPage() {
               Superadmin Tenants
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              MVP0.2 — platform tenant management.
+              MVP0.2 - platform tenant management.
             </p>
           </div>
 

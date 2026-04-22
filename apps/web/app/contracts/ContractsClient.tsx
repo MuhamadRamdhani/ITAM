@@ -395,6 +395,7 @@ export default function ContractsClient() {
       router.push(
         buildContractsHref({
           status,
+          contractType,
           health,
           q,
           page: pageFromUrl,
@@ -408,316 +409,316 @@ export default function ContractsClient() {
     }
   }
 
-  return (
-    <div className="relative z-10 space-y-12">
-      <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6 lg:p-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-3xl">
-            <div className="inline-flex rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
-              Contracts
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-              Contracts
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-700">
-              Registry kontrak tenant dengan vendor untuk monitoring masa berlaku dan pengelolaan operasional.
-            </p>
+return (
+  <div className="relative z-10 space-y-12">
+    <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:p-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            Contracts
           </div>
-
-          <Link href="/" className="itam-secondary-action md:self-end">
-            Back
-          </Link>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+            Contracts
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+            Registry kontrak tenant dengan vendor untuk monitoring masa berlaku dan pengelolaan operasional.
+          </p>
         </div>
+
+        <Link href="/" className="itam-secondary-action md:self-end">
+          Back
+        </Link>
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-5">
+      <div className="mb-4 flex justify-end">
+        {meLoading ? (
+          <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
+            Loading access...
+          </span>
+        ) : canWrite ? (
+          <button
+            type="button"
+            onClick={() => setShowCreate((v) => !v)}
+            className="itam-primary-action"
+            disabled={submitting}
+          >
+            {showCreate ? "Close Form" : "New Contract"}
+          </button>
+        ) : (
+          <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
+            Read-only access
+          </span>
+        )}
       </div>
 
-      <div className="mt-16 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
-          <div className="flex justify-end">
-            {meLoading ? (
-              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
-                Loading access...
-              </span>
-            ) : canWrite ? (
+      {showCreate && canWrite ? (
+        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onCreateSubmit}>
+            <div className="md:col-span-2">
+              <div className="mb-2 text-sm font-medium text-slate-700">Vendor</div>
+              <select
+                value={form.vendor_id}
+                onChange={(e) => setForm((prev) => ({ ...prev, vendor_id: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting || loadingVendors}
+                required
+              >
+                <option value="">
+                  {loadingVendors ? "Loading vendors..." : "Select vendor"}
+                </option>
+                {activeVendorOptions.map((v) => (
+                  <option key={String(v.id)} value={String(v.id)}>
+                    {v.vendor_code} - {v.vendor_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Contract Code</div>
+              <input
+                value={form.contract_code}
+                onChange={(e) => setForm((prev) => ({ ...prev, contract_code: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                placeholder="MS-EA-2026"
+                disabled={submitting}
+                required
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Contract Name</div>
+              <input
+                value={form.contract_name}
+                onChange={(e) => setForm((prev) => ({ ...prev, contract_name: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                placeholder="Microsoft Enterprise Agreement 2026"
+                disabled={submitting}
+                required
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Contract Type</div>
+              <select
+                value={form.contract_type}
+                onChange={(e) => setForm((prev) => ({ ...prev, contract_type: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              >
+                {CONTRACT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Status</div>
+              <select
+                value={form.status}
+                onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              >
+                {STATUSES.filter((s) => s !== "ALL").map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Start Date</div>
+              <input
+                type="date"
+                value={form.start_date}
+                onChange={(e) => setForm((prev) => ({ ...prev, start_date: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">End Date</div>
+              <input
+                type="date"
+                value={form.end_date}
+                onChange={(e) => setForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Renewal Notice Days</div>
+              <input
+                type="number"
+                min={0}
+                value={form.renewal_notice_days}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, renewal_notice_days: e.target.value }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Owner Identity ID (optional)</div>
+              <input
+                type="number"
+                min={1}
+                value={form.owner_identity_id}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, owner_identity_id: e.target.value }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <div className="mb-2 text-sm font-medium text-slate-700">Notes</div>
+              <textarea
+                rows={4}
+                value={form.notes}
+                onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="md:col-span-2 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowCreate((v) => !v)}
+                onClick={() => setShowCreate(false)}
+                className="itam-secondary-action"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
                 className="itam-primary-action"
                 disabled={submitting}
               >
-                {showCreate ? "Close Form" : "New Contract"}
+                {submitting ? "Saving..." : "Save Contract"}
               </button>
-            ) : (
-              <span className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
-                Read-only access
-              </span>
-            )}
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-slate-500 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {STATUSES.map((s) => (
+              <Link
+                key={s}
+                href={buildContractsHref({
+                  status: s,
+                  contractType,
+                  health,
+                  q,
+                  page: 1,
+                  pageSize,
+                })}
+                className={
+                  status === s
+                    ? "border-b-2 border-cyan-600 pb-1 text-cyan-700"
+                    : "pb-1 hover:text-slate-900"
+                }
+              >
+                {s}
+              </Link>
+            ))}
           </div>
 
-          {showCreate && canWrite ? (
-            <form className="mt-4 mb-6 grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={onCreateSubmit}>
-              <div className="md:col-span-2">
-                <div className="mb-2 text-sm font-medium text-slate-700">Vendor</div>
-                <select
-                  value={form.vendor_id}
-                  onChange={(e) => setForm((prev) => ({ ...prev, vendor_id: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting || loadingVendors}
-                  required
-                >
-                  <option value="">
-                    {loadingVendors ? "Loading vendors..." : "Select vendor"}
-                  </option>
-                  {activeVendorOptions.map((v) => (
-                    <option key={String(v.id)} value={String(v.id)}>
-                      {v.vendor_code} - {v.vendor_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Contract Code</div>
-                <input
-                  value={form.contract_code}
-                  onChange={(e) => setForm((prev) => ({ ...prev, contract_code: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  placeholder="MS-EA-2026"
-                  disabled={submitting}
-                  required
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Contract Name</div>
-                <input
-                  value={form.contract_name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, contract_name: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  placeholder="Microsoft Enterprise Agreement 2026"
-                  disabled={submitting}
-                  required
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Contract Type</div>
-                <select
-                  value={form.contract_type}
-                  onChange={(e) => setForm((prev) => ({ ...prev, contract_type: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                >
-                  {CONTRACT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Status</div>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                >
-                  {STATUSES.filter((s) => s !== "ALL").map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Start Date</div>
-                <input
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => setForm((prev) => ({ ...prev, start_date: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">End Date</div>
-                <input
-                  type="date"
-                  value={form.end_date}
-                  onChange={(e) => setForm((prev) => ({ ...prev, end_date: e.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Renewal Notice Days</div>
-                <input
-                  type="number"
-                  min={0}
-                  value={form.renewal_notice_days}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, renewal_notice_days: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-700">Owner Identity ID (optional)</div>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.owner_identity_id}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, owner_identity_id: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <div className="mb-2 text-sm font-medium text-slate-700">Notes</div>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  rows={4}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="md:col-span-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreate(false)}
-                  className="itam-secondary-action"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="itam-primary-action"
-                  disabled={submitting}
-                >
-                  {submitting ? "Saving..." : "Save Contract"}
-                </button>
-              </div>
-            </form>
-          ) : null}
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap text-sm font-medium text-slate-500 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {STATUSES.map((s) => (
-                <Link
-                  key={s}
-                  href={buildContractsHref({
-                    status: s,
-                    contractType,
+          <form
+            className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end"
+            onSubmit={onSearchSubmit}
+          >
+            <select
+              value={contractType}
+              onChange={(e) =>
+                router.push(
+                  buildContractsHref({
+                    status,
+                    contractType: e.target.value,
                     health,
                     q,
                     page: 1,
                     pageSize,
-                  })}
-                  className={
-                    status === s
-                      ? "border-b-2 border-cyan-600 pb-1 text-cyan-700"
-                      : "pb-1 hover:text-slate-900"
-                  }
-                >
-                  {s}
-                </Link>
-              ))}
-            </div>
-
-            <form
-              className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end"
-              onSubmit={onSearchSubmit}
+                  })
+                )
+              }
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             >
-              <select
-                value={contractType}
-                onChange={(e) =>
-                  router.push(
-                    buildContractsHref({
-                      status,
-                      contractType: e.target.value,
-                      health,
-                      q,
-                      page: 1,
-                      pageSize,
-                    })
-                  )
-                }
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-              >
-                {CONTRACT_TYPES_FILTER.map((t) => (
-                  <option key={t} value={t === "ALL" ? "" : t}>
-                    {t === "ALL" ? "All Types" : t}
-                  </option>
-                ))}
-              </select>
+              {CONTRACT_TYPES_FILTER.map((t) => (
+                <option key={t} value={t === "ALL" ? "" : t}>
+                  {t === "ALL" ? "All Types" : t}
+                </option>
+              ))}
+            </select>
 
-              <select
-                value={health}
-                onChange={(e) =>
-                  router.push(
-                    buildContractsHref({
-                      status,
-                      contractType,
-                      health: e.target.value,
-                      q,
-                      page: 1,
-                      pageSize,
-                    })
-                  )
-                }
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-              >
-                <option value="">All Health</option>
-                {HEALTHS.filter(Boolean).map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
+            <select
+              value={health}
+              onChange={(e) =>
+                router.push(
+                  buildContractsHref({
+                    status,
+                    contractType,
+                    health: e.target.value,
+                    q,
+                    page: 1,
+                    pageSize,
+                  })
+                )
+              }
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            >
+              <option value="">All Health</option>
+              {HEALTHS.filter(Boolean).map((h) => (
+                <option key={h} value={h}>
+                  {h}
+                </option>
+              ))}
+            </select>
 
-              <input
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="Search code, name, vendor..."
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 sm:w-64 lg:w-80"
-              />
+            <input
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Search code, name, vendor..."
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 sm:w-64 lg:w-80"
+            />
 
-              <button className="itam-primary-action-sm">
-                Search
-              </button>
-            </form>
+            <button className="itam-primary-action-sm">Search</button>
+          </form>
+        </div>
+
+        <div className="mt-4 text-sm text-slate-500">
+          Total: {total}{" "}
+          <span className="ml-2">{total === 0 ? "(0)" : `(showing ${startIdx}–${endIdx})`}</span>
+        </div>
+
+        {err ? (
+          <div className="mt-4">
+            <ErrorState
+              error={err}
+              onRetry={() => {
+                window.location.reload();
+              }}
+            />
           </div>
+        ) : null}
 
-          <div className="mt-4 text-sm text-slate-500">
-            Total: {total}{" "}
-            <span className="ml-2">{total === 0 ? "(0)" : `(showing ${startIdx}–${endIdx})`}</span>
-          </div>
-
-          {err ? (
-            <div className="mt-4">
-              <ErrorState
-                error={err}
-                onRetry={() => {
-                  window.location.reload();
-                }}
-              />
-            </div>
-          ) : null}
-
-          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
-            <div className="overflow-x-auto">
+        <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
             <table className="min-w-[1080px] w-full text-[13px] leading-6">
               <thead className="text-left text-slate-500">
                 <tr>
@@ -741,47 +742,35 @@ export default function ContractsClient() {
                     <SkeletonTableRow cols={8} />
                   </>
                 ) : items.length === 0 ? (
-                  <tr className="border-t">
+                  <tr className="border-t border-slate-200">
                     <td colSpan={8} className="px-4 py-8 text-slate-600">
-                      Tidak ada contracts.
+                      Tidak ada contract.
                     </td>
                   </tr>
                 ) : (
-                  items.map((c) => (
-                    <tr key={String(c.id)} className="border-t border-slate-200">
-                      <td className="whitespace-nowrap px-4 py-5 pr-6 font-mono text-xs text-slate-700">
-                        {c.contract_code}
+                  items.map((row) => (
+                    <tr key={String(row.id)} className="border-t border-slate-200">
+                      <td className="px-4 py-4 pr-6 font-mono text-xs text-slate-700">
+                        {row.contract_code}
                       </td>
-                      <td className="px-4 py-5 pr-6">
-                        <div className="font-medium text-slate-900">{c.contract_name}</div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          Start: {fmtDate(c.start_date)}
-                        </div>
+                      <td className="px-4 py-4 pr-6 text-slate-900">{row.contract_name}</td>
+                      <td className="px-4 py-4 pr-6 text-slate-900">
+                        <div>{row.vendor_name || "-"}</div>
+                        <div className="text-xs text-slate-500">{row.vendor_code || "-"}</div>
                       </td>
-                      <td className="px-4 py-5 pr-6">
-                        <div className="text-slate-900">{c.vendor_name || "-"}</div>
-                        <div className="mt-1 text-xs text-slate-500">{c.vendor_code || "-"}</div>
+                      <td className="px-4 py-4 pr-6 text-slate-900">{row.contract_type}</td>
+                      <td className="px-4 py-4 pr-6">
+                        <span className={statusPill(row.status)}>{row.status}</span>
                       </td>
-                      <td className="px-4 py-5 pr-6">{c.contract_type}</td>
-                      <td className="px-4 py-5 pr-6">
-                        <span className={statusPill(c.status)}>{c.status}</span>
+                      <td className="px-4 py-4 pr-6">
+                        <span className={healthPill(row.contract_health || "")}>
+                          {row.contract_health || "-"}
+                        </span>
                       </td>
-                      <td className="px-4 py-5 pr-6">
-                        <div className="flex flex-col gap-1">
-                          <span className={healthPill(c.contract_health || "")}>
-                            {c.contract_health || "-"}
-                          </span>
-                          {typeof c.days_to_expiry === "number" ? (
-                            <span className="text-xs text-slate-500">
-                              {c.days_to_expiry} day(s)
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-5 pr-6">{fmtDate(c.end_date)}</td>
-                      <td className="whitespace-nowrap px-4 py-5 pr-6 text-right">
-                        <Link className="itam-secondary-action-sm" href={`/contracts/${c.id}`}>
-                          View
+                      <td className="px-4 py-4 pr-6 text-slate-900">{fmtDate(row.end_date)}</td>
+                      <td className="px-4 py-4 pr-6 text-right">
+                        <Link href={`/contracts/${row.id}`} className="itam-secondary-action-sm">
+                          Open
                         </Link>
                       </td>
                     </tr>
@@ -789,62 +778,60 @@ export default function ContractsClient() {
                 )}
               </tbody>
             </table>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-slate-500">
-              Page {pageFromUrl} / {totalPages} (page_size: {pageSize})
-            </div>
-
-            <div className="flex gap-2">
-              {canPrev ? (
-                <Link
-                  className="itam-secondary-action-sm"
-                  href={buildContractsHref({
-                    status,
-                    contractType,
-                    health,
-                    q,
-                    page: pageFromUrl - 1,
-                    pageSize,
-                  })}
-                >
-                  Prev
-                </Link>
-              ) : (
-                <span className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
-                  Prev
-                </span>
-              )}
-
-              {canNext ? (
-                <Link
-                  className="itam-secondary-action-sm"
-                  href={buildContractsHref({
-                    status,
-                    contractType,
-                    health,
-                    q,
-                    page: pageFromUrl + 1,
-                    pageSize,
-                  })}
-                >
-                  Next
-                </Link>
-              ) : (
-                <span className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
-                  Next
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-3 text-xs text-slate-500">
-            Tip: gunakan <b>Health</b> untuk memantau kontrak yang akan segera habis masa berlakunya.
-          </div>
           </div>
         </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-slate-500">
+            Page {pageFromUrl} / {totalPages} (page_size: {pageSize})
+          </div>
+
+          <div className="flex gap-2">
+            {canPrev ? (
+              <Link
+                className="itam-secondary-action-sm"
+                href={buildContractsHref({
+                  status,
+                  contractType,
+                  health,
+                  q,
+                  page: pageFromUrl - 1,
+                  pageSize,
+                })}
+              >
+                Prev
+              </Link>
+            ) : (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
+                Prev
+              </span>
+            )}
+
+            {canNext ? (
+              <Link
+                className="itam-secondary-action-sm"
+                href={buildContractsHref({
+                  status,
+                  contractType,
+                  health,
+                  q,
+                  page: pageFromUrl + 1,
+                  pageSize,
+                })}
+              >
+                Next
+              </Link>
+            ) : (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-400">
+                Next
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  </div>
+);
+
+
 }

@@ -27,6 +27,11 @@ const USERS = {
     email: "testing@bni.com",
     password: "12345678",
   },
+  superadmin: {
+    tenantCode: "default",
+    email: "admin@default.local",
+    password: "admin123",
+  },
   expiredTenant: {
     tenantCode: "kai",
     email: "dhani@kai.com",
@@ -134,6 +139,21 @@ test.describe("Auth & Dashboard", () => {
     await expect(page.getByText("ITAM_MANAGER")).toBeVisible();
     await expect(page.getByRole("link", { name: "+ New Asset" })).toBeVisible();
     await expect(page.getByRole("link", { name: "+ New Document" })).toBeVisible();
+    await expectDashboardLoaded(page);
+  });
+
+  test("login success for superadmin shows admin launchers and hides tenant banner", async ({
+    page,
+  }) => {
+    await loginAs(page, USERS.superadmin);
+
+    await expect(page.getByText("admin@default.local")).toBeVisible();
+    await expect(page.getByText("MASTER")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Superadmin Tenants" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Admin Users" })).toBeVisible();
+    await expect(page.getByText("Tenant Subscription Alert")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "+ New Asset" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "+ New Document" })).toHaveCount(0);
     await expectDashboardLoaded(page);
   });
 

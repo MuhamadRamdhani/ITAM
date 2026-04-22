@@ -886,721 +886,694 @@ export default function SoftwareEntitlementsPanel({
   );
 
   return (
-    <>
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Software Entitlements
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              License ownership and entitlement lines recorded under this contract.
-            </p>
-          </div>
-
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={() => void openCreateModal()}
-              className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
-            >
-              Add Entitlement
-            </button>
-          ) : null}
-        </div>
-
-        {err ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {err}
-          </div>
-        ) : null}
-
-        {summaryErr ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {summaryErr}
-          </div>
-        ) : null}
-
-        {consumptionErr ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {consumptionErr}
-          </div>
-        ) : null}
-
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Entitlements
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading
-                ? "..."
-                : formatInteger(summary.totals.entitlements_count, "0")}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Purchased Quantity
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading
-                ? "..."
-                : formatInteger(summary.totals.quantity_purchased, "0")}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Allocated Active
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading
-                ? "..."
-                : formatInteger(summary.totals.allocated_active, "0")}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Remaining Quantity
-            </div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {summaryLoading
-                ? "..."
-                : formatInteger(summary.totals.remaining_quantity, "0")}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-            <div className="text-sm font-medium text-gray-700">
-              Compliance Breakdown
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <span className={complianceRiskPillClass("OK")}>
-                OK: {formatInteger(summary.totals.status_counts.OK, "0")}
-              </span>
-              <span className={complianceRiskPillClass("FULLY_ALLOCATED")}>
-                Fully Allocated:{" "}
-                {formatInteger(summary.totals.status_counts.FULLY_ALLOCATED, "0")}
-              </span>
-              <span className={complianceRiskPillClass("OVER_ALLOCATED")}>
-                Over Allocated:{" "}
-                {formatInteger(summary.totals.status_counts.OVER_ALLOCATED, "0")}
-              </span>
-              <span className={complianceRiskPillClass("INACTIVE_ENTITLEMENT")}>
-                Inactive:{" "}
-                {formatInteger(
-                  summary.totals.status_counts.INACTIVE_ENTITLEMENT,
-                  "0"
-                )}
-              </span>
-              <span className={complianceRiskPillClass("EXPIRED_ENTITLEMENT")}>
-                Expired:{" "}
-                {formatInteger(
-                  summary.totals.status_counts.EXPIRED_ENTITLEMENT,
-                  "0"
-                )}
-              </span>
-            </div>
-          </div>
-
-          <p className="mt-3 text-xs text-gray-500">
-            Official compliance status is based on entitlement quantity versus active
-            allocations. Installation and assignment counts are supporting indicators.
+  <>
+    <section className="rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Software Entitlements
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            License ownership and entitlement lines recorded under this contract.
           </p>
         </div>
 
-        <div className="mt-6 border-t border-gray-100 pt-6">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">
-              Consumption / ELP Snapshot
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Baseline operational usage and effective license position derived from
-              installations or assignments based on licensing metric.
-            </p>
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => void openCreateModal()}
+            className="itam-secondary-action"
+            disabled={loading}
+          >
+            Add Entitlement
+          </button>
+        ) : null}
+      </div>
+
+      {err ? (
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {err}
+        </div>
+      ) : null}
+
+      {summaryErr ? (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {summaryErr}
+        </div>
+      ) : null}
+
+      {consumptionErr ? (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {consumptionErr}
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Entitlements
           </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Consumed Usage
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-gray-900">
-                {consumptionLoading
-                  ? "..."
-                  : formatInteger(consumption.totals.consumed_quantity_usage, "0")}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                ELP by Allocation
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-gray-900">
-                {consumptionLoading
-                  ? "..."
-                  : formatInteger(consumption.totals.elp_by_allocation, "0")}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                ELP by Usage
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-gray-900">
-                {consumptionLoading
-                  ? "..."
-                  : formatInteger(consumption.totals.elp_by_usage, "0")}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Under Consumed
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-gray-900">
-                {consumptionLoading
-                  ? "..."
-                  : formatInteger(
-                      consumption.totals.status_counts.UNDER_CONSUMED,
-                      "0"
-                    )}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                Potential Overuse
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-gray-900">
-                {consumptionLoading
-                  ? "..."
-                  : formatInteger(
-                      consumption.totals.status_counts.POTENTIAL_OVERUSE,
-                      "0"
-                    )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-              <div className="text-sm font-medium text-gray-700">
-                Consumption Breakdown
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <span className={consumptionStatusPillClass("NO_ACTIVITY")}>
-                  No Activity:{" "}
-                  {formatInteger(consumption.totals.status_counts.NO_ACTIVITY, "0")}
-                </span>
-                <span className={consumptionStatusPillClass("UNDER_CONSUMED")}>
-                  Under Consumed:{" "}
-                  {formatInteger(
-                    consumption.totals.status_counts.UNDER_CONSUMED,
-                    "0"
-                  )}
-                </span>
-                <span className={consumptionStatusPillClass("BALANCED")}>
-                  Balanced:{" "}
-                  {formatInteger(consumption.totals.status_counts.BALANCED, "0")}
-                </span>
-                <span className={consumptionStatusPillClass("POTENTIAL_OVERUSE")}>
-                  Potential Overuse:{" "}
-                  {formatInteger(
-                    consumption.totals.status_counts.POTENTIAL_OVERUSE,
-                    "0"
-                  )}
-                </span>
-                <span className={consumptionStatusPillClass("INACTIVE_ENTITLEMENT")}>
-                  Inactive:{" "}
-                  {formatInteger(
-                    consumption.totals.status_counts.INACTIVE_ENTITLEMENT,
-                    "0"
-                  )}
-                </span>
-                <span className={consumptionStatusPillClass("EXPIRED_ENTITLEMENT")}>
-                  Expired:{" "}
-                  {formatInteger(
-                    consumption.totals.status_counts.EXPIRED_ENTITLEMENT,
-                    "0"
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <p className="mt-3 text-xs text-gray-500">
-              Consumption basis uses assignment counts for user-oriented metrics and
-              installation counts for other metrics. This is a baseline ELP snapshot,
-              not a vendor-specific licensing engine.
-            </p>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.entitlements_count, "0")}
           </div>
         </div>
 
-        {loading ? (
-          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
-            Loading software entitlements...
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Purchased Quantity
           </div>
-        ) : items.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center">
-            <p className="text-sm font-medium text-gray-700">
-              No software entitlements found for this contract.
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              Add the first entitlement line to start tracking software license rights.
-            </p>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.quantity_purchased, "0")}
           </div>
-        ) : (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-gray-600">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Entitlement</th>
-                  <th className="px-4 py-3 font-medium">Software Product</th>
-                  <th className="px-4 py-3 font-medium">Publisher</th>
-                  <th className="px-4 py-3 font-medium">Metric</th>
-                  <th className="px-4 py-3 font-medium text-right">Purchased</th>
-                  <th className="px-4 py-3 font-medium text-right">Allocated</th>
-                  <th className="px-4 py-3 font-medium text-right">Remaining</th>
-                  <th className="px-4 py-3 font-medium text-right">Installations</th>
-                  <th className="px-4 py-3 font-medium text-right">Assignments</th>
-                  <th className="px-4 py-3 font-medium">Basis</th>
-                  <th className="px-4 py-3 font-medium text-right">Consumed Usage</th>
-                  <th className="px-4 py-3 font-medium text-right">ELP Allocation</th>
-                  <th className="px-4 py-3 font-medium text-right">ELP Usage</th>
-                  <th className="px-4 py-3 font-medium text-right">Variance</th>
-                  <th className="px-4 py-3 font-medium">Validity</th>
-                  <th className="px-4 py-3 font-medium">Entitlement Status</th>
-                  <th className="px-4 py-3 font-medium">Compliance</th>
-                  <th className="px-4 py-3 font-medium">Consumption</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {items.map((item) => {
-                  const compliance = summaryByEntitlementId.get(Number(item.id));
-                  const usage = consumptionByEntitlementId.get(Number(item.id));
+        </div>
 
-                  return (
-                    <tr key={item.id} className="align-top">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">
-                          {item.entitlement_code || "-"}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.entitlement_name || "-"}
-                        </div>
-                      </td>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Allocated Active
+          </div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.allocated_active, "0")}
+          </div>
+        </div>
 
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">
-                          <Link
-                            href={`/software-products/${item.software_product_id}`}
-                            className="hover:underline"
-                          >
-                            {item.software_product_name || "-"}
-                          </Link>
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.software_product_code || "-"}
-                        </div>
-                      </td>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Remaining Quantity
+          </div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.remaining_quantity, "0")}
+          </div>
+        </div>
+      </div>
 
-                      <td className="px-4 py-3 text-gray-700">
-                        {item.publisher_vendor_name || "-"}
-                      </td>
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="text-sm font-semibold text-slate-900">
+          Compliance Breakdown
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+            OK:{" "}
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.status_counts.OK, "0")}
+          </span>
+          <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-800">
+            Fully Allocated:{" "}
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.status_counts.FULLY_ALLOCATED, "0")}
+          </span>
+          <span className="rounded-full bg-rose-50 px-2.5 py-1 font-medium text-rose-700">
+            Over Allocated:{" "}
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.status_counts.OVER_ALLOCATED, "0")}
+          </span>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+            Inactive:{" "}
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.status_counts.INACTIVE_ENTITLEMENT, "0")}
+          </span>
+          <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
+            Expired:{" "}
+            {summaryLoading
+              ? "..."
+              : formatInteger(summary.totals.status_counts.EXPIRED_ENTITLEMENT, "0")}
+          </span>
+        </div>
 
-                      <td className="px-4 py-3 text-gray-700">
-                        {item.licensing_metric || "-"}
-                      </td>
+        <p className="mt-3 text-xs text-slate-500">
+          Official compliance status is based on entitlement quantity versus active allocations.
+          Installation and assignment counts are supporting indicators.
+        </p>
+      </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {formatInteger(item.quantity_purchased, "0")}
-                      </td>
+      <div className="mt-6 border-t border-slate-200 pt-6">
+        <h3 className="text-lg font-semibold text-slate-900">
+          Consumption / ELP Snapshot
+        </h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Baseline operational usage and effective license position derived from
+          installations or assignments based on licensing metric.
+        </p>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {summaryLoading
-                          ? "..."
-                          : compliance
-                          ? formatInteger(compliance.allocated_active, "0")
-                          : "-"}
-                      </td>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Consumed Usage
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.consumed_quantity_usage, "0")}
+            </div>
+          </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {summaryLoading
-                          ? "..."
-                          : compliance
-                          ? formatInteger(compliance.remaining_quantity, "0")
-                          : "-"}
-                      </td>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              ELP by Allocation
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.elp_by_allocation, "0")}
+            </div>
+          </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {consumptionLoading
-                          ? "..."
-                          : usage
-                          ? formatInteger(usage.active_installation_count, "0")
-                          : compliance
-                          ? formatInteger(compliance.active_installation_count, "0")
-                          : "-"}
-                      </td>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              ELP by Usage
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">
+              {consumptionLoading
+                ? "..."
+                : formatSignedInteger(consumption.totals.elp_by_usage)}
+            </div>
+          </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {consumptionLoading
-                          ? "..."
-                          : usage
-                          ? formatInteger(usage.active_assignment_count, "0")
-                          : compliance
-                          ? formatInteger(compliance.active_assignment_count, "0")
-                          : "-"}
-                      </td>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Under Consumed
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.UNDER_CONSUMED, "0")}
+            </div>
+          </div>
 
-                      <td className="px-4 py-3 text-gray-700">
-                        {consumptionLoading ? "..." : usage?.consumption_basis || "-"}
-                      </td>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Potential Overuse
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.POTENTIAL_OVERUSE, "0")}
+            </div>
+          </div>
+        </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {consumptionLoading
-                          ? "..."
-                          : usage
-                          ? formatInteger(usage.consumed_quantity_usage, "0")
-                          : "-"}
-                      </td>
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-sm font-semibold text-slate-900">
+            Consumption Breakdown
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+              No Activity:{" "}
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.NO_ACTIVITY, "0")}
+            </span>
+            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700">
+              Under Consumed:{" "}
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.UNDER_CONSUMED, "0")}
+            </span>
+            <span className="rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+              Balanced:{" "}
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.BALANCED, "0")}
+            </span>
+            <span className="rounded-full bg-rose-50 px-2.5 py-1 font-medium text-rose-700">
+              Potential Overuse:{" "}
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.POTENTIAL_OVERUSE, "0")}
+            </span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+              Inactive:{" "}
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.INACTIVE_ENTITLEMENT, "0")}
+            </span>
+            <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700">
+              Expired:{" "}
+              {consumptionLoading
+                ? "..."
+                : formatInteger(consumption.totals.status_counts.EXPIRED_ENTITLEMENT, "0")}
+            </span>
+          </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {consumptionLoading
-                          ? "..."
-                          : usage
-                          ? formatInteger(usage.elp_by_allocation, "0")
-                          : "-"}
-                      </td>
+          <p className="mt-3 text-xs text-slate-500">
+            Consumption basis uses assignment counts for user-oriented metrics and installation
+            counts for other metrics. This is a baseline ELP snapshot, not a vendor-specific
+            licensing engine.
+          </p>
+        </div>
+      </div>
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {consumptionLoading
-                          ? "..."
-                          : usage
-                          ? formatInteger(usage.elp_by_usage, "0")
-                          : "-"}
-                      </td>
+      {loading ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+          Loading software entitlements...
+        </div>
+      ) : items.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center">
+          <p className="text-sm font-medium text-slate-700">
+            No software entitlements found for this contract.
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Add the first entitlement line to start tracking software license rights.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-4 py-3 font-medium">Entitlement</th>
+                <th className="px-4 py-3 font-medium">Software Product</th>
+                <th className="px-4 py-3 font-medium">Publisher</th>
+                <th className="px-4 py-3 font-medium">Metric</th>
+                <th className="px-4 py-3 font-medium text-right">Purchased</th>
+                <th className="px-4 py-3 font-medium text-right">Allocated</th>
+                <th className="px-4 py-3 font-medium text-right">Remaining</th>
+                <th className="px-4 py-3 font-medium text-right">Installations</th>
+                <th className="px-4 py-3 font-medium text-right">Assignments</th>
+                <th className="px-4 py-3 font-medium">Basis</th>
+                <th className="px-4 py-3 font-medium text-right">Consumed Usage</th>
+                <th className="px-4 py-3 font-medium text-right">ELP Allocation</th>
+                <th className="px-4 py-3 font-medium text-right">ELP Usage</th>
+                <th className="px-4 py-3 font-medium">Dates</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Compliance</th>
+                <th className="px-4 py-3 font-medium">Consumption</th>
+                <th className="px-4 py-3 font-medium">Updated</th>
+                <th className="px-4 py-3 font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {items.map((item) => {
+                const compliance = summary.items.find(
+                  (row) => Number(row.entitlement_id) === Number(item.id)
+                );
+                const usage = consumption.items.find(
+                  (row) => Number(row.entitlement_id) === Number(item.id)
+                );
 
-                      <td className="px-4 py-3 text-right text-gray-700">
-                        {consumptionLoading
-                          ? "..."
-                          : usage
-                          ? formatSignedInteger(usage.allocation_usage_variance)
-                          : "-"}
-                      </td>
+                return (
+                  <tr key={item.id} className="align-top">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-900">
+                        {item.entitlement_code}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {item.entitlement_name || "-"}
+                      </div>
+                    </td>
 
-                      <td className="px-4 py-3 text-gray-700">
-                        <div>Start: {formatDate(item.start_date)}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          End: {formatDate(item.end_date)}
-                        </div>
-                      </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <div>{item.software_product_name}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {item.software_product_code}
+                      </div>
+                    </td>
 
-                      <td className="px-4 py-3">
-                        <span className={entitlementStatusPillClass(item.status)}>
-                          {item.status}
+                    <td className="px-4 py-3 text-slate-700">
+                      {item.publisher_vendor_name || "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-700">
+                      {item.licensing_metric}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {formatInteger(item.quantity_purchased, "0")}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {summaryLoading
+                        ? "..."
+                        : compliance
+                        ? formatInteger(compliance.allocated_active, "0")
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {summaryLoading
+                        ? "..."
+                        : compliance
+                        ? formatInteger(compliance.remaining_quantity, "0")
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {summaryLoading
+                        ? "..."
+                        : compliance
+                        ? formatInteger(compliance.active_installation_count, "0")
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {summaryLoading
+                        ? "..."
+                        : compliance
+                        ? formatInteger(compliance.active_assignment_count, "0")
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-700">
+                      {consumptionLoading ? "..." : usage?.consumption_basis || "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {consumptionLoading
+                        ? "..."
+                        : usage
+                        ? formatInteger(usage.consumed_quantity_usage, "0")
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {consumptionLoading
+                        ? "..."
+                        : usage
+                        ? formatSignedInteger(usage.elp_by_allocation)
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {consumptionLoading
+                        ? "..."
+                        : usage
+                        ? formatSignedInteger(usage.elp_by_usage)
+                        : "-"}
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-700">
+                      <div>Start: {formatDate(item.start_date)}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        End: {formatDate(item.end_date)}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <span className={entitlementStatusPillClass(item.status)}>
+                        {item.status}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {summaryLoading ? (
+                        <span className="text-xs text-slate-400">Loading...</span>
+                      ) : compliance ? (
+                        <span className={complianceRiskPillClass(compliance.risk_status)}>
+                          {complianceRiskLabel(compliance.risk_status)}
                         </span>
-                      </td>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
 
-                      <td className="px-4 py-3">
-                        {summaryLoading ? (
-                          <span className="text-xs text-gray-400">Loading...</span>
-                        ) : compliance ? (
-                          <span
-                            className={complianceRiskPillClass(compliance.risk_status)}
-                          >
-                            {complianceRiskLabel(compliance.risk_status)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
+                    <td className="px-4 py-3">
+                      {consumptionLoading ? (
+                        <span className="text-xs text-slate-400">Loading...</span>
+                      ) : usage ? (
+                        <span
+                          className={consumptionStatusPillClass(
+                            usage.consumption_status
+                          )}
+                        >
+                          {consumptionStatusLabel(usage.consumption_status)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
 
-                      <td className="px-4 py-3">
-                        {consumptionLoading ? (
-                          <span className="text-xs text-gray-400">Loading...</span>
-                        ) : usage ? (
-                          <span
-                            className={consumptionStatusPillClass(
-                              usage.consumption_status
-                            )}
-                          >
-                            {consumptionStatusLabel(usage.consumption_status)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {formatDateTime(item.updated_at)}
+                    </td>
 
-                      <td className="px-4 py-3 text-gray-700">
-                        {formatDateTime(item.updated_at)}
-                      </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openAllocationsModal(item)}
+                          className="itam-secondary-action-sm"
+                        >
+                          Manage Allocations
+                        </button>
 
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col gap-2">
+                        {canEdit ? (
                           <button
                             type="button"
-                            onClick={() => openAllocationsModal(item)}
-                            className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            onClick={() => void openEditModal(item)}
+                            className="itam-secondary-action-sm"
                           >
-                            Manage Allocations
+                            Edit
                           </button>
+                        ) : (
+                          <span className="text-xs text-slate-400">No action</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-                          {canEdit ? (
-                            <button
-                              type="button"
-                              onClick={() => void openEditModal(item)}
-                              className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                            >
-                              Edit
-                            </button>
-                          ) : (
-                            <span className="text-xs text-gray-400">No action</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {isOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="w-full max-w-4xl rounded-3xl border border-white bg-white/95 shadow-[0_24px_90px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {mode === "create"
+                    ? "Add Software Entitlement"
+                    : "Edit Software Entitlement"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {mode === "create"
+                    ? "Create a software entitlement line for this contract."
+                    : "Update the software entitlement line for this contract."}
+                </p>
+              </div>
 
-        {isOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-4xl rounded-2xl bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {mode === "create"
-                      ? "Add Software Entitlement"
-                      : "Edit Software Entitlement"}
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {mode === "create"
-                      ? "Create a software entitlement line for this contract."
-                      : "Update the software entitlement line for this contract."}
-                  </p>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="itam-secondary-action-sm"
+                disabled={saving}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="px-6 py-5">
+              {modalErr ? (
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {modalErr}
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Software Product
+                  </label>
+                  <select
+                    value={form.software_product_id}
+                    onChange={(e) => setField("software_product_id", e.target.value)}
+                    disabled={loadingProducts || saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    <option value="">
+                      {loadingProducts
+                        ? "Loading software products..."
+                        : "Select software product"}
+                    </option>
+                    {activeProducts.map((product) => (
+                      <option key={product.id} value={String(product.id)}>
+                        {product.product_code} - {product.product_name}
+                        {product.publisher_vendor_name
+                          ? ` (${product.publisher_vendor_name})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Entitlement Code
+                  </label>
+                  <input
+                    type="text"
+                    value={form.entitlement_code}
+                    onChange={(e) =>
+                      setField("entitlement_code", e.target.value.toUpperCase())
+                    }
+                    disabled={saving}
+                    placeholder="e.g. MS-EA-USER-2026"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Entitlement Name
+                  </label>
+                  <input
+                    type="text"
+                    value={form.entitlement_name}
+                    onChange={(e) => setField("entitlement_name", e.target.value)}
+                    disabled={saving}
+                    placeholder="Descriptive entitlement name"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Licensing Metric
+                  </label>
+                  <select
+                    value={form.licensing_metric}
+                    onChange={(e) =>
+                      setField("licensing_metric", e.target.value as LicensingMetric)
+                    }
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    {LICENSING_METRIC_OPTIONS.map((metric) => (
+                      <option key={metric} value={metric}>
+                        {metric}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Quantity Purchased
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.quantity_purchased}
+                    onChange={(e) => setField("quantity_purchased", e.target.value)}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.start_date}
+                    onChange={(e) => setField("start_date", e.target.value)}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.end_date}
+                    onChange={(e) => setField("end_date", e.target.value)}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Status
+                  </label>
+                  <select
+                    value={form.status}
+                    onChange={(e) =>
+                      setField("status", e.target.value as EntitlementStatus)
+                    }
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Notes
+                  </label>
+                  <textarea
+                    value={form.notes}
+                    onChange={(e) => setField("notes", e.target.value)}
+                    disabled={saving}
+                    rows={4}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-200 pt-4">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="itam-secondary-action"
                   disabled={saving}
                 >
-                  Close
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="itam-primary-action"
+                  disabled={saving || !form.software_product_id || !form.entitlement_code}
+                >
+                  {saving
+                    ? "Saving..."
+                    : mode === "create"
+                    ? "Create Entitlement"
+                    : "Save Changes"}
                 </button>
               </div>
-
-              <form onSubmit={handleSubmit} className="px-6 py-5">
-                {modalErr ? (
-                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {modalErr}
-                  </div>
-                ) : null}
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Software Product
-                    </label>
-                    <select
-                      value={form.software_product_id}
-                      onChange={(e) => setField("software_product_id", e.target.value)}
-                      disabled={loadingProducts || saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    >
-                      <option value="">
-                        {loadingProducts
-                          ? "Loading software products..."
-                          : "Select software product"}
-                      </option>
-                      {activeProducts.map((product) => (
-                        <option key={product.id} value={String(product.id)}>
-                          {product.product_code} - {product.product_name}
-                          {product.publisher_vendor_name
-                            ? ` (${product.publisher_vendor_name})`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Entitlement Code
-                    </label>
-                    <input
-                      type="text"
-                      value={form.entitlement_code}
-                      onChange={(e) =>
-                        setField("entitlement_code", e.target.value.toUpperCase())
-                      }
-                      disabled={saving}
-                      placeholder="e.g. M365-E3-2026-001"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Entitlement Name
-                    </label>
-                    <input
-                      type="text"
-                      value={form.entitlement_name}
-                      onChange={(e) => setField("entitlement_name", e.target.value)}
-                      disabled={saving}
-                      placeholder="e.g. Microsoft 365 E3 Annual Subscription"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Licensing Metric
-                    </label>
-                    <select
-                      value={form.licensing_metric}
-                      onChange={(e) =>
-                        setField("licensing_metric", e.target.value as LicensingMetric)
-                      }
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    >
-                      {LICENSING_METRIC_OPTIONS.map((metric) => (
-                        <option key={metric} value={metric}>
-                          {metric}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Quantity Purchased
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={form.quantity_purchased}
-                      onChange={(e) => setField("quantity_purchased", e.target.value)}
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={form.start_date}
-                      onChange={(e) => setField("start_date", e.target.value)}
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={form.end_date}
-                      onChange={(e) => setField("end_date", e.target.value)}
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Status
-                    </label>
-                    <select
-                      value={form.status}
-                      onChange={(e) =>
-                        setField("status", e.target.value as EntitlementStatus)
-                      }
-                      disabled={saving}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Notes
-                    </label>
-                    <textarea
-                      value={form.notes}
-                      onChange={(e) => setField("notes", e.target.value)}
-                      disabled={saving}
-                      rows={4}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    disabled={saving}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={saving || !form.software_product_id || !form.entitlement_code}
-                  >
-                    {saving
-                      ? "Saving..."
-                      : mode === "create"
-                      ? "Create Entitlement"
-                      : "Save Changes"}
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
-        ) : null}
-      </section>
+        </div>
+      ) : null}
+    </section>
 
-      <SoftwareEntitlementAllocationsModal
-        contractId={normalizedContractId}
-        entitlement={selectedEntitlement}
-        isOpen={allocationModalOpen}
-        onClose={() => {
-          setAllocationModalOpen(false);
-          setSelectedEntitlement(null);
-        }}
-        onChanged={async () => {
-          await refreshPanel();
-        }}
-      />
-    </>
-  );
+    <SoftwareEntitlementAllocationsModal
+      contractId={normalizedContractId}
+      entitlement={selectedEntitlement}
+      isOpen={allocationModalOpen}
+      onClose={() => {
+        setAllocationModalOpen(false);
+        setSelectedEntitlement(null);
+      }}
+      onChanged={async () => {
+        await refreshPanel();
+      }}
+    />
+  </>
+);
 }

@@ -130,6 +130,44 @@ async function browserJson(page: Page, path: string, init?: { method?: string; b
   );
 }
 
+async function browserRequest(page: Page, path: string, init?: { method?: string; body?: unknown }) {
+  return await page.evaluate(
+    async ({ apiBase, path, init }) => {
+      const headers: Record<string, string> = {};
+      let body: string | undefined;
+
+      if (init?.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        body = JSON.stringify(init.body);
+      }
+
+      const res = await fetch(`${apiBase}${path}`, {
+        method: init?.method || "GET",
+        credentials: "include",
+        headers,
+        body,
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return {
+        ok: res.ok,
+        status: res.status,
+        code: json?.error?.code || json?.code || null,
+        message: json?.error?.message || json?.message || null,
+        json,
+      };
+    },
+    { apiBase: API_BASE, path, init }
+  );
+}
+
 async function browserLogin(page: Page, creds: Credentials) {
   return await page.evaluate(
     async ({ apiBase, creds }) => {
@@ -203,6 +241,43 @@ async function browserUploadEvidenceText(
       }
 
       return json;
+    },
+    { apiBase: API_BASE, fileName, content, mimeType }
+  );
+}
+
+async function browserUploadEvidenceTextWithStatus(
+  page: Page,
+  fileName: string,
+  content: string,
+  mimeType = "text/plain"
+) {
+  return await page.evaluate(
+    async ({ apiBase, fileName, content, mimeType }) => {
+      const fd = new FormData();
+      fd.append("file", new Blob([content], { type: mimeType }), fileName);
+
+      const res = await fetch(`${apiBase}/api/v1/evidence/files`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return {
+        ok: res.ok,
+        status: res.status,
+        code: json?.error?.code || json?.code || null,
+        message: json?.error?.message || json?.message || null,
+        json,
+      };
     },
     { apiBase: API_BASE, fileName, content, mimeType }
   );
@@ -582,5 +657,43 @@ test.describe.serial("Evidence", () => {
     expect(duplicateResult.code).toBe("DUPLICATE_RELATION");
 
     console.log("[EVID-008] done");
+  });
+
+  test("EVID-009 auditor cannot upload evidence via API", async ({ page }) => {
+    await loginAs(page, USERS.auditor);
+
+    const uploadResult = await browserUploadEvidenceTextWithStatus(
+      page,
+      `auditor-upload-${uniqueSuffix()}.txt`,
+      `auditor upload blocked ${uniqueSuffix()}`
+    );
+
+    expect(uploadResult.ok).toBe(false);
+    expect(uploadResult.status).toBe(403);
+    expect(uploadResult.code).toBe("FORBIDDEN");
+    expect(String(uploadResult.message || "")).toContain("Forbidden");
+  });
+
+  test("EVID-010 invalid evidence target type is rejected", async ({ page }) => {
+    await loginAs(page, USERS.itamManager);
+
+    const uploadRes = await browserUploadEvidenceText(page, `invalid-target-${uniqueSuffix()}.txt`, `target validation ${uniqueSuffix()}`);
+    const evidenceFile: EvidenceFile | null = uploadRes?.data?.file ?? uploadRes?.file ?? null;
+    expect(evidenceFile?.id).toBeTruthy();
+
+    const attachResult = await browserRequest(page, "/api/v1/evidence/links", {
+      method: "POST",
+      body: {
+        target_type: "NOT_A_TARGET",
+        target_id: 1,
+        evidence_file_id: evidenceFile!.id,
+        note: "invalid target type",
+      },
+    });
+
+    expect(attachResult.ok).toBe(false);
+    expect(attachResult.status).toBe(400);
+    expect(attachResult.code).toBe("BAD_REQUEST");
+    expect(String(attachResult.message || "")).toContain("Invalid target_type");
   });
 });

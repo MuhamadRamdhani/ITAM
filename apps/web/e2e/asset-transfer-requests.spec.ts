@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 
 type Credentials = {
   tenantCode: string;
@@ -27,7 +27,7 @@ type TransferRequestSeed = {
   requestId: number;
   requestCode: string;
   assetId: number;
-  assetTag: string;
+  assetTag?: string;
 };
 
 const USERS = {
@@ -155,9 +155,9 @@ function normalizeTenantOptions(payload: any): TenantOption[] {
     .filter((item) => Number.isFinite(item.id) && item.id > 0 && item.tenant_name);
 }
 
-async function selectOptionContainingText(select: any, text: string) {
+async function selectOptionContainingText(select: Locator, text: string) {
   const matches = await select.locator("option").evaluateAll(
-    (options, needle) =>
+    (options: HTMLOptionElement[], needle: string) =>
       options
         .map((opt) => ({
           value: (opt as HTMLOptionElement).value,
@@ -414,33 +414,37 @@ async function ensureSeed(browser: Browser) {
   rejectedAsset = await createAssetViaUi(page, "rejected");
   executedAsset = await createAssetViaUi(page, "executed");
 
-  draftRequest = await createTransferRequestViaApi(page, draftAsset.assetId, targetTenant.id, "Draft request");
+  const draftRequestCreated = await createTransferRequestViaApi(page, draftAsset.assetId, targetTenant.id, "Draft request");
+  draftRequest = draftRequestCreated;
 
-  submittedRequest = await createTransferRequestViaApi(
+  const submittedRequestCreated = await createTransferRequestViaApi(
     page,
     submittedAsset.assetId,
     targetTenant.id,
     "Submitted request"
   );
-  await submitTransferRequestViaApi(page, submittedRequest.requestId);
+  submittedRequest = submittedRequestCreated;
+  await submitTransferRequestViaApi(page, submittedRequestCreated.requestId);
 
-  rejectedRequest = await createTransferRequestViaApi(
+  const rejectedRequestCreated = await createTransferRequestViaApi(
     page,
     rejectedAsset.assetId,
     targetTenant.id,
     "Rejected request"
   );
-  await submitTransferRequestViaApi(page, rejectedRequest.requestId);
-  await decideTransferRequestViaApi(page, rejectedRequest.requestId, "REJECT", "Reject seed request");
+  rejectedRequest = rejectedRequestCreated;
+  await submitTransferRequestViaApi(page, rejectedRequestCreated.requestId);
+  await decideTransferRequestViaApi(page, rejectedRequestCreated.requestId, "REJECT", "Reject seed request");
 
-  executedRequest = await createTransferRequestViaApi(
+  const executedRequestCreated = await createTransferRequestViaApi(
     page,
     executedAsset.assetId,
     targetTenant.id,
     "Executed request"
   );
-  await submitTransferRequestViaApi(page, executedRequest.requestId);
-  await decideTransferRequestViaApi(page, executedRequest.requestId, "APPROVE", "Approve seed request");
+  executedRequest = executedRequestCreated;
+  await submitTransferRequestViaApi(page, executedRequestCreated.requestId);
+  await decideTransferRequestViaApi(page, executedRequestCreated.requestId, "APPROVE", "Approve seed request");
 
   await context.close();
 }

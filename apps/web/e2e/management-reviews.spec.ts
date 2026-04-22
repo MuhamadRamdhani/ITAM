@@ -602,6 +602,48 @@ test.describe("Management Reviews", () => {
     expect(invalidResponse.json?.error?.code).toBe("VALIDATION_ERROR");
   });
 
+  test("MR-013 action item validation", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const review = await createManagementReviewViaApi(page, {
+      title: "MR-013 Action Item Validation",
+    });
+    const ownerIdentityId = await getIdentityIdByEmail(page, USERS.tenantAdmin.email);
+
+    const missingOwnerResponse = await apiPostJson(
+      page,
+      `/api/v1/management-reviews/${review.id}/action-items`,
+      {
+        action_no: "ACT-VALID-001",
+        title: "Missing owner should fail",
+        description: "This payload intentionally omits owner_identity_id",
+        due_date: toDateInput(7),
+        status: "OPEN",
+      },
+    );
+
+    expect(missingOwnerResponse.status).toBeGreaterThanOrEqual(400);
+    expect(missingOwnerResponse.json?.error?.code).toBe("VALIDATION_ERROR");
+
+    const actionItem = await createActionItemViaApi(page, review.id, {
+      action_no: "ACT-VALID-002",
+      title: "Action item for update validation",
+      owner_identity_id: ownerIdentityId,
+      due_date: toDateInput(7),
+      status: "OPEN",
+    });
+
+    const emptyTitleResponse = await apiPatchJson(
+      page,
+      `/api/v1/management-reviews/${review.id}/action-items/${actionItem.id}`,
+      {
+        title: "",
+      },
+    );
+
+    expect(emptyTitleResponse.status).toBeGreaterThanOrEqual(400);
+    expect(emptyTitleResponse.json?.error?.code).toBe("VALIDATION_ERROR");
+  });
+
   test("MR-009 tracker update", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     const review = await createManagementReviewViaApi(page, {
@@ -683,5 +725,25 @@ test.describe("Management Reviews", () => {
     await expect(
       page.getByText(/Management review session not found|Forbidden|not found/i),
     ).toBeVisible();
+  });
+
+  test("MR-014 invalid management review session date is rejected", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const chairpersonIdentityId = await getIdentityIdByEmail(page, USERS.tenantAdmin.email);
+    const response = await apiPostJson(page, "/api/v1/management-reviews", {
+      session_code: `MR-INVALID-${uniqueSuffix()}`,
+      title: `Invalid Management Review ${uniqueSuffix()}`,
+      review_date: "31-12-2026",
+      chairperson_identity_id: chairpersonIdentityId,
+      summary: "Invalid summary",
+      minutes: "Invalid minutes",
+      notes: "Invalid notes",
+    });
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.json?.error?.code || response.json?.code).toBe("VALIDATION_ERROR");
+    expect(String(response.json?.error?.message || response.json?.message || "")).toContain(
+      "review_date must be in YYYY-MM-DD format",
+    );
   });
 });

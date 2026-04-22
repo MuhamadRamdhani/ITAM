@@ -937,4 +937,23 @@ test.describe("CAPA", () => {
     expect(detail.status).toBe(200);
     expect(detail.json?.data?.is_overdue).toBeTruthy();
   });
+
+  test("CAPA-037 auditor cannot create CAPA via API", async ({ page }) => {
+    await loginAs(page, USERS.auditor);
+
+    const response = await apiPostJson(page, "/api/v1/capa", {
+      capa_code: `CAPA-FORBIDDEN-${uniqueSuffix()}`,
+      title: "Forbidden CAPA",
+      source_type: "OTHER",
+      severity: "LOW",
+      owner_identity_id: await getIdentityIdByEmail(page, USERS.auditor.email),
+      due_date: toDateInput(10),
+      nonconformity_summary: "Forbidden CAPA attempt",
+      notes: "Forbidden CAPA attempt",
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.json?.error?.code).toBe("AUTH_FORBIDDEN");
+    expect(String(response.json?.error?.message || "")).toBe("Forbidden");
+  });
 });

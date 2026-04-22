@@ -372,7 +372,7 @@ export default function InternalAuditDetailClient({
         listInternalAuditChecklistSections(resolvedAuditId),
         listInternalAuditChecklistItems(resolvedAuditId),
         listInternalAuditFindings(resolvedAuditId),
-        listIdentityOptions({ page: 1, page_size: 50 }),
+        listIdentityOptions({ page: 1, page_size: 200 }),
       ]);
 
       setDetail(detailData);

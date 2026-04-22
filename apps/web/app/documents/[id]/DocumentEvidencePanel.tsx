@@ -59,11 +59,11 @@ function getErrorMessage(error: unknown, fallback = "Failed to load document evi
   return e?.error?.message || e?.message || fallback;
 }
 
-function normalizeUiConfig(res: { data?: { data?: UiConfig } | UiConfig }): UiConfig {
+function normalizeUiConfig(res: any): UiConfig {
   return (res?.data?.data ?? res?.data ?? {}) as UiConfig;
 }
 
-function normalizeEvidenceList(res: { data?: { data?: EvidenceLinksList } | EvidenceLinksList }): EvidenceLinksList {
+function normalizeEvidenceList(res: any): EvidenceLinksList {
   const raw = res?.data?.data ?? res?.data ?? {};
   return {
     items: Array.isArray(raw?.items) ? (raw.items as DocumentEvidenceLink[]) : [],

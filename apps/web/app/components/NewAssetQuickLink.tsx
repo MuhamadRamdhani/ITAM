@@ -9,12 +9,6 @@ type MeData = {
   roles: string[];
 };
 
-type ApiResponseShape = {
-  data?: {
-    data?: MeData;
-  } | MeData;
-};
-
 export default function NewAssetQuickLink() {
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,11 +18,10 @@ export default function NewAssetQuickLink() {
 
     async function loadMe() {
       try {
-        const res = await apiGet<ApiResponseShape>("/api/v1/auth/me");
-        const me = res?.data && "data" in res.data ? res.data.data ?? null : res?.data ?? null;
+        const res = await apiGet<MeData>("/api/v1/auth/me");
 
         if (!mounted) return;
-        setRoles(Array.isArray(me?.roles) ? me.roles : []);
+        setRoles(Array.isArray(res.data?.roles) ? res.data.roles : []);
       } catch {
         if (!mounted) return;
         setRoles([]);

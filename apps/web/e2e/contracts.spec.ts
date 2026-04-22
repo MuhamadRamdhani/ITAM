@@ -23,6 +23,8 @@ type ContractSeed = {
   vendorId: number;
   vendorCode: string;
   vendorName: string;
+  updatedName: string;
+  updatedNotes: string;
 };
 
 const USERS = {
@@ -679,5 +681,49 @@ test.describe.serial("Contracts", () => {
     });
 
     expect(denied.status).toBe(403);
+  });
+
+  test("CONT-013 invalid date transition", async ({ page }) => {
+    if (!seedContract) throw new Error("Seed contract is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    const before = await fetchJson(page, `/api/v1/contracts/${seedContract.contractId}`);
+    const beforeRow = before?.data ?? before?.data?.data ?? before?.contract ?? null;
+    expect(Number(beforeRow?.id ?? seedContract.contractId)).toBeGreaterThan(0);
+
+    const invalid = await apiPatchJson(page, `/api/v1/contracts/${seedContract.contractId}`, {
+      start_date: addDays(10),
+      end_date: addDays(5),
+    });
+
+    expect(invalid.status).toBeGreaterThanOrEqual(400);
+    expect(String(invalid.json?.message || invalid.json?.error?.message || "")).toContain(
+      "end_date cannot be earlier than start_date"
+    );
+
+    const after = await fetchJson(page, `/api/v1/contracts/${seedContract.contractId}`);
+    const afterRow = after?.data ?? after?.data?.data ?? after?.contract ?? null;
+    expect(String(afterRow?.start_date ?? "")).toBe(String(beforeRow?.start_date ?? ""));
+    expect(String(afterRow?.end_date ?? "")).toBe(String(beforeRow?.end_date ?? ""));
+  });
+
+  test("CONT-014 auditor cannot update contract", async ({ page }) => {
+    if (!seedContract) throw new Error("Seed contract is missing");
+    await loginAs(page, USERS.auditor);
+
+    const before = await fetchJson(page, `/api/v1/contracts/${seedContract.contractId}`);
+    const beforeRow = before?.data ?? before?.data?.data ?? before?.contract ?? null;
+    const previousName = String(beforeRow?.contract_name ?? seedContract.contractName ?? "");
+
+    const denied = await apiPatchJson(page, `/api/v1/contracts/${seedContract.contractId}`, {
+      contract_name: `${previousName} Forbidden`,
+    });
+
+    expect(denied.status).toBe(403);
+    expect(denied.json?.error?.code).toBe("FORBIDDEN");
+
+    const after = await fetchJson(page, `/api/v1/contracts/${seedContract.contractId}`);
+    const afterRow = after?.data ?? after?.data?.data ?? after?.contract ?? null;
+    expect(String(afterRow?.contract_name ?? "")).toBe(previousName);
   });
 });
