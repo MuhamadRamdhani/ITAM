@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { apiGet, apiPatchJson, apiPostJson } from "@/app/lib/api";
+import { apiDelete, apiGet, apiPatchJson, apiPostJson } from "@/app/lib/api";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 import SoftwareEntitlementAllocationsModal from "./SoftwareEntitlementAllocationsModal";
 
 type EntitlementStatus = "ACTIVE" | "INACTIVE" | "EXPIRED";
@@ -651,6 +653,11 @@ export default function SoftwareEntitlementsPanel({
   const [selectedEntitlement, setSelectedEntitlement] =
     useState<SoftwareEntitlementItem | null>(null);
   const [allocationModalOpen, setAllocationModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SoftwareEntitlementItem | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 
   const normalizedContractId = useMemo(() => String(contractId), [contractId]);
@@ -760,6 +767,50 @@ export default function SoftwareEntitlementsPanel({
       loadConsumptionSummary(),
     ]);
   }, [loadComplianceSummary, loadConsumptionSummary, loadEntitlements]);
+
+  const openDeleteConfirm = useCallback((item: SoftwareEntitlementItem) => {
+    setDeleteTarget(item);
+  }, []);
+
+  const closeDeleteConfirm = useCallback(() => {
+    if (deleteLoading) return;
+    setDeleteTarget(null);
+  }, [deleteLoading]);
+
+  const confirmDeleteEntitlement = useCallback(async () => {
+    if (!deleteTarget || deleteLoading) return;
+
+    setDeleteLoading(true);
+    setErr(null);
+    setSummaryErr(null);
+    setConsumptionErr(null);
+
+    try {
+      await apiDelete(
+        `/api/v1/contracts/${encodeURIComponent(normalizedContractId)}/software-entitlements/${deleteTarget.id}`
+      );
+      setDeleteTarget(null);
+      setToast({
+        type: "success",
+        message: "Software entitlement deleted.",
+      });
+      await refreshPanel();
+    } catch (e: any) {
+      if (e?.code === "SOFTWARE_ENTITLEMENT_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Software entitlement masih dipakai oleh allocation.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: e?.message || "Failed to delete software entitlement.",
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [deleteLoading, deleteTarget, normalizedContractId, refreshPanel]);
 
   const openCreateModal = useCallback(async () => {
     setMode("create");
@@ -887,6 +938,21 @@ export default function SoftwareEntitlementsPanel({
 
   return (
   <>
+    <ActionToast
+      open={Boolean(toast)}
+      type={toast?.type || "success"}
+      message={toast?.message || ""}
+      onClose={() => setToast(null)}
+    />
+    <ConfirmDangerDialog
+      open={Boolean(deleteTarget)}
+      title="Delete software entitlement"
+      description={`Software entitlement ${deleteTarget?.entitlement_code || deleteTarget?.entitlement_name || ""} akan dihapus permanen jika tidak sedang dipakai oleh allocation.`}
+      confirmLabel="Delete Entitlement"
+      loading={deleteLoading}
+      onCancel={closeDeleteConfirm}
+      onConfirm={() => void confirmDeleteEntitlement()}
+    />
     <section className="rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -1328,13 +1394,24 @@ export default function SoftwareEntitlementsPanel({
                         </button>
 
                         {canEdit ? (
-                          <button
-                            type="button"
-                            onClick={() => void openEditModal(item)}
-                            className="itam-secondary-action-sm"
-                          >
-                            Edit
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void openEditModal(item)}
+                              className="itam-secondary-action-sm"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => openDeleteConfirm(item)}
+                              className="itam-secondary-action-sm border-rose-200 text-rose-700 hover:bg-rose-50"
+                              disabled={deleteLoading && deleteTarget?.id === item.id}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-400">No action</span>
                         )}

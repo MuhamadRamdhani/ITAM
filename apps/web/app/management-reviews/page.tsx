@@ -1,5 +1,10 @@
-import ManagementReviewsClient from './ManagementReviewsClient';
+import ManagementReviewsClient from "./ManagementReviewsClient";
+import { WorkspacePage } from "../components/WorkspaceLayout";
 
 export default function ManagementReviewsPage() {
-  return <ManagementReviewsClient />;
+  return (
+    <WorkspacePage>
+      <ManagementReviewsClient />
+    </WorkspacePage>
+  );
 }

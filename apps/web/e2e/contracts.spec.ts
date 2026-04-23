@@ -50,8 +50,8 @@ const USERS = {
   },
 } satisfies Record<string, Credentials>;
 
-const WEB_BASE = (process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001").replace(/\/+$/, "");
+const WEB_BASE = (process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3001").replace(/\/+$/, "");
 
 let seedVendor: VendorSeed | null = null;
 let seedContract: ContractSeed | null = null;
@@ -98,17 +98,37 @@ async function loginAs(page: Page, creds: Credentials) {
     throw new Error("Failed to read recaptcha token");
   }
 
-  const loginResponse = await page.context().request.post(`${API_BASE}/api/v1/auth/login`, {
-    data: {
-      tenant_code: creds.tenantCode,
-      email: creds.email,
-      password: creds.password,
-      recaptcha_token: recaptchaToken,
+  const loginResponse = await page.evaluate(
+    async ({ apiBase, payload }) => {
+      const res = await fetch(`${apiBase}/api/v1/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      return { status: res.status, json };
     },
-  });
-  expect(loginResponse.ok()).toBeTruthy();
+    {
+      apiBase: API_BASE,
+      payload: {
+        tenant_code: creds.tenantCode,
+        email: creds.email,
+        password: creds.password,
+        recaptcha_token: recaptchaToken,
+      },
+    }
+  );
+
+  expect(loginResponse.status).toBe(200);
 
   await page.goto("/");
+  await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "ITAM SaaS" })).toBeVisible();
 }
 
@@ -336,6 +356,44 @@ async function createSoftwareProductViaApi(page: Page) {
     productId,
     productCode: `PW-SP-CT-${suffix}`,
     productName: `Playwright Contract Software ${suffix}`,
+  };
+}
+
+async function createEntitlementViaApi(
+  page: Page,
+  contractId: number,
+  productId: number,
+  opts?: Partial<{
+    entitlementCode: string;
+    entitlementName: string;
+    quantityPurchased: number;
+  }>
+) {
+  const suffix = uniqueSuffix();
+  const entitlementCode = opts?.entitlementCode || `PW-ENT-CT-${suffix}`;
+  const entitlementName = opts?.entitlementName || `Playwright Contract Entitlement ${suffix}`;
+  const quantityPurchased = opts?.quantityPurchased ?? 5;
+
+  const res = await apiPostJson(page, `/api/v1/contracts/${contractId}/software-entitlements`, {
+    software_product_id: productId,
+    entitlement_code: entitlementCode,
+    entitlement_name: entitlementName,
+    licensing_metric: "PER_USER",
+    quantity_purchased: quantityPurchased,
+    start_date: addDays(-1),
+    end_date: addDays(10),
+    status: "ACTIVE",
+    notes: "Playwright contract entitlement",
+  });
+  expect(res.status).toBe(201);
+
+  const entitlementId = Number(res.json?.data?.id ?? 0);
+  expect(entitlementId).toBeGreaterThan(0);
+
+  return {
+    entitlementId,
+    entitlementCode,
+    entitlementName,
   };
 }
 
@@ -772,6 +830,53 @@ test.describe.serial("Contracts", () => {
     await expect(page.getByText("Contract is still in use").first()).toBeVisible({
       timeout: 20_000,
     });
+  });
+
+  test("CONT-020 contract entitlement delete is available in contract detail and refreshes list", async ({ page }) => {
+    if (!seedContract) throw new Error("Seed contract is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    const product = await createSoftwareProductViaApi(page);
+    const entitlement = await createEntitlementViaApi(page, seedContract.contractId, product.productId, {
+      entitlementCode: `PW-ENT-DEL-${uniqueSuffix()}`,
+      entitlementName: `Playwright Delete Entitlement ${uniqueSuffix()}`,
+      quantityPurchased: 2,
+    });
+
+    await openContractDetail(page, seedContract.contractId);
+    const entitlementRow = page.locator("tbody tr").filter({ hasText: entitlement.entitlementCode }).first();
+    await expect(entitlementRow).toBeVisible({ timeout: 20_000 });
+    await expect(entitlementRow.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    await entitlementRow.getByRole("button", { name: "Delete" }).click();
+    const confirmModal = page.locator("div.fixed.inset-0.z-50").first();
+    await expect(confirmModal.getByRole("button", { name: "Delete Entitlement" })).toBeVisible();
+    const deleteResponsePromise = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "DELETE" &&
+        resp.url().includes(`/api/v1/contracts/${seedContract.contractId}/software-entitlements/`)
+    );
+    await confirmModal.getByRole("button", { name: "Delete Entitlement" }).click();
+    const deleteResponse = await deleteResponsePromise;
+    expect(deleteResponse.status(), await deleteResponse.text()).toBe(200);
+
+    await expect(page.getByText("Software entitlement deleted.")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(entitlementRow).toHaveCount(0);
+
+    const list = await fetchJson(page, `/api/v1/contracts/${seedContract.contractId}/software-entitlements?page=1&page_size=100`);
+    const codes = (list?.data?.items ?? []).map((row: any) => String(row?.entitlement_code ?? ""));
+    expect(codes).not.toContain(entitlement.entitlementCode);
+  });
+
+  test("CONT-021 auditor cannot manage contract entitlements", async ({ page }) => {
+    if (!seedContract) throw new Error("Seed contract is missing");
+    await loginAs(page, USERS.auditor);
+
+    await openContractDetail(page, seedContract.contractId);
+    await expect(page.getByRole("button", { name: "Add Entitlement" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
   });
 
   test("CONT-011 asset unlink", async ({ page }) => {

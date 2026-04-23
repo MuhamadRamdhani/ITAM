@@ -7,6 +7,7 @@ import { apiGet } from "../lib/api";
 import { canCreateOrEditAsset } from "../lib/assetAccess";
 import { canCreateAssetTransfer } from "../lib/assetTransferAccess";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
+import { WorkspaceCard, WorkspaceSection } from "../components/WorkspaceLayout";
 
 type MeData = {
   tenant_id: number;
@@ -296,14 +297,14 @@ export default function AssetsClient() {
 
   if (meLoading || configLoading) {
     return (
-      <div className="rounded-3xl border border-white bg-white/80 p-4 text-sm text-slate-600 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      <div className="itam-page-card-soft p-4 text-sm text-slate-600">
         Loading assets...
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       {err ? (
         <ErrorState
           error={err}
@@ -313,8 +314,17 @@ export default function AssetsClient() {
         />
       ) : null}
 
-      <div className="rounded-3xl border border-white bg-white/85 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-        <div className="mb-4 flex justify-end">
+      <WorkspaceSection className="space-y-8">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Workspace Tools
+            </div>
+            <div className="mt-1 text-sm text-slate-600">
+              Filter, search, and create assets without leaving the workspace.
+            </div>
+          </div>
+
           {canCreateAsset ? (
             <Link href="/assets/new" className="itam-primary-action">
               New Asset
@@ -322,13 +332,13 @@ export default function AssetsClient() {
           ) : null}
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="rounded-[1.5rem] border border-slate-200/80 bg-white p-4 md:p-5">
           <form className="w-full" onSubmit={onSearchSubmit}>
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[220px_220px_140px_minmax(0,1fr)_auto] xl:items-end">
               <select
                 value={typeCodeInput}
                 onChange={(e) => setTypeCodeInput(e.target.value)}
-                className="w-full sm:w-[220px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               >
                 <option value="">All types</option>
                 {assetTypesItems.map((t) => (
@@ -341,7 +351,7 @@ export default function AssetsClient() {
               <select
                 value={stateCodeInput}
                 onChange={(e) => setStateCodeInput(e.target.value)}
-                className="w-full sm:w-[220px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               >
                 <option value="">All states</option>
                 {statesItems.map((s) => (
@@ -354,7 +364,7 @@ export default function AssetsClient() {
               <select
                 value={pageSizeInput}
                 onChange={(e) => setPageSizeInput(e.target.value)}
-                className="w-full sm:w-[140px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               >
                 {pageSizeOptions.map((n) => (
                   <option key={n} value={String(n)}>
@@ -367,12 +377,12 @@ export default function AssetsClient() {
                 value={qInput}
                 onChange={(e) => setQInput(e.target.value)}
                 placeholder="Search tag/name..."
-                className="min-w-0 w-full sm:flex-1 sm:min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="min-w-0 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
               />
 
               <button
                 type="submit"
-                className="itam-primary-action w-full shrink-0 sm:w-auto"
+                className="itam-primary-action w-full shrink-0 xl:w-auto"
               >
                 Search
               </button>
@@ -380,159 +390,159 @@ export default function AssetsClient() {
           </form>
 
           <div className="mt-4 text-sm text-slate-500">Total: {total}</div>
+        </div>
 
-          <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-slate-500">
-                  <tr>
-                    <th className="px-4 py-4 pr-6">Asset Tag</th>
-                    <th className="px-4 py-4 pr-6">Name</th>
-                    <th className="px-4 py-4 pr-6">Type</th>
-                    <th className="px-4 py-4 pr-6">State</th>
-                    <th className="px-4 py-4 pr-6 text-right">Action</th>
+        <WorkspaceCard>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500">
+                <tr>
+                  <th className="px-4 py-4 pr-6">Asset Tag</th>
+                  <th className="px-4 py-4 pr-6">Name</th>
+                  <th className="px-4 py-4 pr-6">Type</th>
+                  <th className="px-4 py-4 pr-6">State</th>
+                  <th className="px-4 py-4 pr-6 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listLoading ? (
+                  <>
+                    <SkeletonTableRow cols={5} />
+                    <SkeletonTableRow cols={5} />
+                    <SkeletonTableRow cols={5} />
+                  </>
+                ) : items.length === 0 ? (
+                  <tr className="border-t border-slate-200">
+                    <td colSpan={5} className="px-4 py-6 text-slate-600">
+                      Tidak ada assets.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {listLoading ? (
-                    <>
-                      <SkeletonTableRow cols={5} />
-                      <SkeletonTableRow cols={5} />
-                      <SkeletonTableRow cols={5} />
-                    </>
-                  ) : items.length === 0 ? (
-                    <tr className="border-t border-slate-200">
-                      <td colSpan={5} className="px-4 py-6 text-slate-600">
-                        Tidak ada assets.
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((a) => {
-                      const assetDetailHref = `/assets/${a.id}?return_to=${encodeURIComponent(
-                        currentAssetsHref
-                      )}`;
-                      const assetEditHref = `/assets/${a.id}/edit?return_to=${encodeURIComponent(
-                        currentAssetsHref
-                      )}`;
-                      const transferHref = `/asset-transfer-requests/new?asset_id=${a.id}&return_to=${encodeURIComponent(
-                        currentAssetsHref
-                      )}`;
+                ) : (
+                  items.map((a) => {
+                    const assetDetailHref = `/assets/${a.id}?return_to=${encodeURIComponent(
+                      currentAssetsHref
+                    )}`;
+                    const assetEditHref = `/assets/${a.id}/edit?return_to=${encodeURIComponent(
+                      currentAssetsHref
+                    )}`;
+                    const transferHref = `/asset-transfer-requests/new?asset_id=${a.id}&return_to=${encodeURIComponent(
+                      currentAssetsHref
+                    )}`;
 
-                      return (
-                        <tr key={String(a.id)} className="border-t border-slate-200">
-                          <td className="px-4 py-5 pr-6 font-mono text-xs">
-                            <Link
-                              className="text-blue-700 hover:underline"
-                              href={assetDetailHref}
-                            >
-                              {a.asset_tag}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-5 pr-6">{a.name}</td>
-                          <td className="px-4 py-5 pr-6">
-                            {a.asset_type?.label
-                              ? `${a.asset_type.label} (${a.asset_type.code})`
-                              : "-"}
-                          </td>
-                          <td className="px-4 py-5 pr-6">
-                            {a.state?.label
-                              ? `${a.state.label} (${a.state.code})`
-                              : "-"}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-5 pr-6 text-right">
-                            <Link
-                              className="text-cyan-700 hover:underline"
-                              href={assetDetailHref}
-                            >
-                              View
-                            </Link>
+                    return (
+                      <tr key={String(a.id)} className="border-t border-slate-200">
+                        <td className="px-4 py-5 pr-6 font-mono text-xs">
+                          <Link
+                            className="text-blue-700 hover:underline"
+                            href={assetDetailHref}
+                          >
+                            {a.asset_tag}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-5 pr-6">{a.name}</td>
+                        <td className="px-4 py-5 pr-6">
+                          {a.asset_type?.label
+                            ? `${a.asset_type.label} (${a.asset_type.code})`
+                            : "-"}
+                        </td>
+                        <td className="px-4 py-5 pr-6">
+                          {a.state?.label
+                            ? `${a.state.label} (${a.state.code})`
+                            : "-"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-5 pr-6 text-right">
+                          <Link
+                            className="text-cyan-700 hover:underline"
+                            href={assetDetailHref}
+                          >
+                            View
+                          </Link>
 
-                            {canCreateAssetTransfer(roles) ? (
-                              <>
-                                <span className="mx-2 text-slate-300">|</span>
-                                <Link
-                                  className="text-cyan-700 hover:underline"
-                                  href={transferHref}
-                                >
-                                  Transfer
-                                </Link>
-                              </>
-                            ) : null}
+                          {canCreateAssetTransfer(roles) ? (
+                            <>
+                              <span className="mx-2 text-slate-300">|</span>
+                              <Link
+                                className="text-cyan-700 hover:underline"
+                                href={transferHref}
+                              >
+                                Transfer
+                              </Link>
+                            </>
+                          ) : null}
 
-                            {canCreateAsset ? (
-                              <>
-                                <span className="mx-2 text-slate-300">|</span>
-                                <Link
-                                  className="text-cyan-700 hover:underline"
-                                  href={assetEditHref}
-                                >
-                                  Edit
-                                </Link>
-                              </>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          {canCreateAsset ? (
+                            <>
+                              <span className="mx-2 text-slate-300">|</span>
+                              <Link
+                                className="text-cyan-700 hover:underline"
+                                href={assetEditHref}
+                              >
+                                Edit
+                              </Link>
+                            </>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </WorkspaceCard>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-slate-500">
+            Page {page} / {totalPages} (page_size: {pageSize})
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-slate-500">
-              Page {page} / {totalPages} (page_size: {pageSize})
-            </div>
+          <div className="flex gap-2">
+            {canPrev ? (
+              <Link
+                className="itam-secondary-action-sm"
+                href={buildAssetsHref({
+                  q,
+                  type_code,
+                  state_code,
+                  page: page - 1,
+                  pageSize,
+                  returnTo,
+                })}
+              >
+                Prev
+              </Link>
+            ) : (
+              <span className="itam-secondary-action-sm cursor-not-allowed bg-slate-50 text-slate-400 opacity-60">
+                Prev
+              </span>
+            )}
 
-            <div className="flex gap-2">
-              {canPrev ? (
-                <Link
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  href={buildAssetsHref({
-                    q,
-                    type_code,
-                    state_code,
-                    page: page - 1,
-                    pageSize,
-                    returnTo,
-                  })}
-                >
-                  Prev
-                </Link>
-              ) : (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400">
-                  Prev
-                </span>
-              )}
-
-              {canNext ? (
-                <Link
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  href={buildAssetsHref({
-                    q,
-                    type_code,
-                    state_code,
-                    page: page + 1,
-                    pageSize,
-                    returnTo,
-                  })}
-                >
-                  Next
-                </Link>
-              ) : (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400">
-                  Next
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-3 text-xs text-slate-500">
-            Tip: filter type/state diambil dari config master (tenant scoped).
+            {canNext ? (
+              <Link
+                className="itam-secondary-action-sm"
+                href={buildAssetsHref({
+                  q,
+                  type_code,
+                  state_code,
+                  page: page + 1,
+                  pageSize,
+                  returnTo,
+                })}
+              >
+                Next
+              </Link>
+            ) : (
+              <span className="itam-secondary-action-sm cursor-not-allowed bg-slate-50 text-slate-400 opacity-60">
+                Next
+              </span>
+            )}
           </div>
         </div>
-      </div>
+
+        <div className="text-xs text-slate-500">
+          Tip: filter type/state diambil dari config master (tenant scoped).
+        </div>
+      </WorkspaceSection>
     </div>
   );
 }

@@ -301,8 +301,7 @@ export default function ManagementReviewsClient() {
 
   return (
     <>
-      <main className="itam-page-shell">
-        <div className="itam-page-shell-inner">
+      <div className="space-y-8">
           <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="max-w-3xl">
@@ -595,8 +594,7 @@ export default function ManagementReviewsClient() {
               </div>
             </div>
           </div>
-        </div>
-      </main>
+      </div>
 
       {createOpen && canManage ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">

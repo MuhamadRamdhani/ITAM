@@ -119,6 +119,32 @@ export async function getAssetById(app, tenantId, assetId) {
   };
 }
 
+export async function getAssetByIdForDelete(app, tenantId, assetId) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      a.id,
+      a.tenant_id,
+      a.asset_tag,
+      a.name,
+      a.asset_type_id,
+      a.current_state_id,
+      a.status,
+      a.location_id,
+      a.owner_department_id,
+      a.current_custodian_identity_id
+    FROM public.assets a
+    WHERE a.tenant_id = $1
+      AND a.id = $2
+    FOR UPDATE
+    LIMIT 1
+    `,
+    [tenantId, assetId]
+  );
+
+  return rows[0] ?? null;
+}
+
 export async function insertAsset(app, row) {
   const { rows } = await app.pg.query(
     `
@@ -192,6 +218,110 @@ export async function updateAsset(app, tenantId, assetId, patch) {
   );
 
   return rows[0]?.id != null ? toInt(rows[0].id) : null;
+}
+
+export async function countAssetDeleteDependencies(app, tenantId, assetId) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      (SELECT COUNT(*)::int
+       FROM public.asset_ownership_history aoh
+       WHERE aoh.tenant_id = $1
+         AND aoh.asset_id = $2) AS asset_ownership_history_count,
+      (SELECT COUNT(*)::int
+       FROM public.asset_state_history ash
+       WHERE ash.tenant_id = $1
+         AND ash.asset_id = $2) AS asset_state_history_count,
+      (SELECT COUNT(*)::int
+       FROM public.contract_assets ca
+       WHERE ca.tenant_id = $1
+         AND ca.asset_id = $2) AS contract_assets_count,
+      (SELECT COUNT(*)::int
+       FROM public.software_installations si
+       WHERE si.tenant_id = $1
+         AND si.asset_id = $2) AS software_installations_count,
+      (SELECT COUNT(*)::int
+       FROM public.asset_transfer_requests atr
+       WHERE atr.tenant_id = $1
+         AND atr.asset_id = $2) AS asset_transfer_requests_count,
+      (SELECT COUNT(*)::int
+       FROM public.software_entitlement_allocations sea
+       WHERE sea.tenant_id = $1
+         AND sea.asset_id = $2) AS software_entitlement_allocations_count,
+      (SELECT COUNT(*)::int
+       FROM public.evidence_links el
+       WHERE el.tenant_id = $1
+         AND el.target_type = 'ASSET'
+         AND el.target_id = $2) AS evidence_links_count
+    `,
+    [tenantId, assetId]
+  );
+
+  const row = rows[0] || {};
+  const assetOwnershipHistoryCount = Number(row.asset_ownership_history_count || 0);
+  const assetStateHistoryCount = Number(row.asset_state_history_count || 0);
+  const contractAssetsCount = Number(row.contract_assets_count || 0);
+  const softwareInstallationsCount = Number(row.software_installations_count || 0);
+  const assetTransferRequestsCount = Number(row.asset_transfer_requests_count || 0);
+  const softwareEntitlementAllocationsCount = Number(
+    row.software_entitlement_allocations_count || 0
+  );
+  const evidenceLinksCount = Number(row.evidence_links_count || 0);
+
+  return {
+    asset_ownership_history_count: assetOwnershipHistoryCount,
+    asset_state_history_count: assetStateHistoryCount,
+    contract_assets_count: contractAssetsCount,
+    software_installations_count: softwareInstallationsCount,
+    asset_transfer_requests_count: assetTransferRequestsCount,
+    software_entitlement_allocations_count: softwareEntitlementAllocationsCount,
+    evidence_links_count: evidenceLinksCount,
+    total:
+      assetOwnershipHistoryCount +
+      assetStateHistoryCount +
+      contractAssetsCount +
+      softwareInstallationsCount +
+      assetTransferRequestsCount +
+      softwareEntitlementAllocationsCount +
+      evidenceLinksCount,
+  };
+}
+
+export async function lockAssetDeleteRelatedTables(app) {
+  await app.pg.query(`
+    LOCK TABLE public.asset_ownership_history,
+      public.asset_state_history,
+      public.contract_assets,
+      public.software_installations,
+      public.asset_transfer_requests,
+      public.software_entitlement_allocations,
+      public.evidence_links
+    IN SHARE ROW EXCLUSIVE MODE
+  `);
+}
+
+export async function deleteAssetById(app, tenantId, assetId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.assets
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      asset_tag,
+      name,
+      asset_type_id,
+      current_state_id,
+      status,
+      location_id,
+      owner_department_id,
+      current_custodian_identity_id
+    `,
+    [tenantId, assetId]
+  );
+
+  return rows[0] ?? null;
 }
 
 function buildWhere(tenantId, filters) {

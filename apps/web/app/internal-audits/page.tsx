@@ -1,5 +1,10 @@
-import InternalAuditsClient from './InternalAuditsClient';
+import InternalAuditsClient from "./InternalAuditsClient";
+import { WorkspacePage } from "../components/WorkspaceLayout";
 
 export default function InternalAuditsPage() {
-  return <InternalAuditsClient />;
+  return (
+    <WorkspacePage>
+      <InternalAuditsClient />
+    </WorkspacePage>
+  );
 }

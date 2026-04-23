@@ -8,6 +8,7 @@ import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
 import { canDeleteEvidenceFiles, canManageEvidence } from "../lib/evidenceAccess";
 import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
 import ActionToast from "@/app/components/ActionToast";
+import { WorkspaceSection } from "@/app/components/WorkspaceLayout";
 
 type UiConfigNormalized = {
   pageSizeOptions: number[];
@@ -290,7 +291,7 @@ export default function EvidencePageClient() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+    <div className="space-y-8">
       <ActionToast
         open={Boolean(toast)}
         type={toast?.type || "success"}
@@ -310,10 +311,8 @@ export default function EvidencePageClient() {
         onConfirm={() => void confirmDeleteFile()}
       />
 
-      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)] pointer-events-none" />
-
-      <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
-        <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
+      <WorkspaceSection className="space-y-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
               Operational Workspace
@@ -333,9 +332,10 @@ export default function EvidencePageClient() {
             Back
           </Link>
         </div>
+      </WorkspaceSection>
 
-        <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="mb-4 flex justify-end">
+      <WorkspaceSection className="space-y-8">
+          <div className="flex justify-end">
             {canUploadEvidence ? (
               <Link href="/evidence/upload" className="itam-primary-action">
                 Upload
@@ -491,8 +491,7 @@ export default function EvidencePageClient() {
           </div>
 
           </div>
-        </div>
-      </div>
-    </main>
+      </WorkspaceSection>
+    </div>
   );
 }

@@ -1,32 +1,27 @@
 import Link from "next/link";
 import SuperadminTenantsClient from "./SuperadminTenantsClient";
+import { WorkspaceHeader, WorkspacePage } from "../../components/WorkspaceLayout";
 
 export default function SuperadminTenantsPage() {
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Superadmin Tenants
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              MVP0.2 - platform tenant management.
-            </p>
-          </div>
+    <WorkspacePage>
+      <div className="space-y-8">
+        <WorkspaceHeader
+          eyebrow="Platform Admin"
+          title="Superadmin Tenants"
+          description="MVP0.2 - platform tenant management."
+          action={
+            <Link
+              href="/"
+              className="itam-secondary-action"
+            >
+              Back
+            </Link>
+          }
+        />
 
-          <Link
-            href="/"
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Back
-          </Link>
-        </div>
-
-        <div className="mt-6">
-          <SuperadminTenantsClient />
-        </div>
+        <SuperadminTenantsClient />
       </div>
-    </main>
+    </WorkspacePage>
   );
 }

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { apiGet, apiPatchJson, apiPostJson } from "@/app/lib/api";
+import { apiDelete, apiGet, apiPatchJson, apiPostJson } from "@/app/lib/api";
 import SoftwareAssignmentsModal from "./SoftwareAssignmentsModal";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type InstallationStatus = "INSTALLED" | "UNINSTALLED" | "DETECTED";
 
@@ -235,6 +237,11 @@ export default function SoftwareInstallationsPanel({
   const [quickActionId, setQuickActionId] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [modalErr, setModalErr] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SoftwareInstallationItem | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
@@ -470,8 +477,66 @@ export default function SoftwareInstallationsPanel({
     [normalizedAssetId, reloadAll]
   );
 
+  const openDeleteConfirm = useCallback((item: SoftwareInstallationItem) => {
+    setDeleteTarget(item);
+    setModalErr(null);
+  }, []);
+
+  const closeDeleteConfirm = useCallback(() => {
+    if (deleteLoading) return;
+    setDeleteTarget(null);
+  }, [deleteLoading]);
+
+  const confirmDeleteInstallation = useCallback(async () => {
+    if (!deleteTarget || deleteLoading) return;
+
+    setDeleteLoading(true);
+    setErr(null);
+
+    try {
+      await apiDelete(
+        `/api/v1/assets/${encodeURIComponent(normalizedAssetId)}/software-installations/${deleteTarget.id}`
+      );
+      setDeleteTarget(null);
+      setToast({
+        type: "success",
+        message: "Software installation deleted.",
+      });
+      await reloadAll();
+    } catch (e: any) {
+      if (e?.code === "SOFTWARE_INSTALLATION_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Software installation masih dipakai oleh assignment atau allocation.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: e?.message || "Failed to delete software installation.",
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [deleteLoading, deleteTarget, normalizedAssetId, reloadAll]);
+
   return (
     <>
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={Boolean(deleteTarget)}
+        title="Delete software installation"
+        description={`Software installation ${deleteTarget?.software_product_code || deleteTarget?.software_product_name || ""} akan dihapus permanen jika tidak sedang dipakai oleh assignment atau allocation.`}
+        confirmLabel="Delete Installation"
+        loading={deleteLoading}
+        onCancel={closeDeleteConfirm}
+        onConfirm={() => void confirmDeleteInstallation()}
+      />
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -640,6 +705,17 @@ export default function SoftwareInstallationsPanel({
                               {quickActionId === item.id
                                 ? "Processing..."
                                 : "Mark Uninstalled"}
+                            </button>
+                          ) : null}
+
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              onClick={() => openDeleteConfirm(item)}
+                              className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={deleteLoading && deleteTarget?.id === item.id}
+                            >
+                              Delete
                             </button>
                           ) : null}
                         </div>

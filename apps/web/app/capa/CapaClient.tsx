@@ -417,9 +417,8 @@ export default function CapaClient() {
   }
 
   return (
-    <main className="itam-page-shell">
-      <div className="itam-page-shell-inner">
-        <section className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+    <div className="space-y-8">
+      <section className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
               <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
@@ -913,7 +912,6 @@ export default function CapaClient() {
             </div>
           </div>
         </section>
-      </div>
-    </main>
+    </div>
   );
 }

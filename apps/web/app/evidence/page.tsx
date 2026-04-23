@@ -1,10 +1,13 @@
 import { Suspense } from "react";
 import EvidencePageClient from "./EvidencePageClient";
+import { WorkspacePage } from "../components/WorkspaceLayout";
 
 export default function EvidencePage() {
   return (
-    <Suspense>
-      <EvidencePageClient />
-    </Suspense>
+    <WorkspacePage>
+      <Suspense>
+        <EvidencePageClient />
+      </Suspense>
+    </WorkspacePage>
   );
 }

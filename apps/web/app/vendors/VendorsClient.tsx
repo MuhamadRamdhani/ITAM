@@ -6,6 +6,7 @@ import { apiGet, apiPostJson } from "@/app/lib/api";
 import { SkeletonTableRow } from "@/app/lib/loadingComponents";
 import { canManageVendors } from "@/app/lib/vendorAccess";
 import Link from "next/link";
+import { WorkspaceSection } from "@/app/components/WorkspaceLayout";
 
 type Vendor = {
   id: number;
@@ -243,8 +244,8 @@ export default function VendorsClient() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-white bg-white/80 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+    <div className="space-y-8">
+      <WorkspaceSection className="space-y-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
@@ -267,7 +268,7 @@ export default function VendorsClient() {
             Back
           </Link>
         </div>
-      </div>
+      </WorkspaceSection>
 
       {(loadErr || createErr || createOk) && (
         <div className="space-y-2">
@@ -291,7 +292,7 @@ export default function VendorsClient() {
         </div>
       )}
 
-      <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+      <WorkspaceSection className="space-y-8">
         <div className="flex justify-end">
           {meLoading ? (
             <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
@@ -599,7 +600,7 @@ export default function VendorsClient() {
         <div className="mt-3 text-xs text-slate-500">
           Tip: vendor akan dipakai sebagai baseline untuk kontrak, software publisher, dan supplier.
         </div>
-      </div>
+      </WorkspaceSection>
     </div>
   );
 }

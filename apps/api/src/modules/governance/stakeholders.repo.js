@@ -102,6 +102,32 @@ export async function getStakeholdersRegisterById(db, { tenantId, id }) {
   return res.rows?.[0] ?? null;
 }
 
+export async function getStakeholdersRegisterByIdForDelete(db, { tenantId, id }) {
+  const sql = `
+    SELECT
+      id,
+      tenant_id,
+      name,
+      category_code,
+      priority_code,
+      status_code,
+      expectations,
+      owner_identity_id,
+      review_date,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    FROM public.stakeholders_register
+    WHERE tenant_id = $1
+      AND id = $2
+    FOR UPDATE
+    LIMIT 1
+  `;
+  const res = await db.query(sql, [tenantId, id]);
+  return res.rows?.[0] ?? null;
+}
+
 export async function insertStakeholdersRegister(db, {
   tenantId,
   name,
@@ -213,5 +239,34 @@ export async function updateStakeholdersRegister(db, {
     actorUserId ?? null,
   ]);
 
+  return res.rows?.[0] ?? null;
+}
+
+export async function countStakeholdersRegisterDeleteDependencies() {
+  return { total: 0 };
+}
+
+export async function deleteStakeholdersRegisterById(db, { tenantId, id }) {
+  const sql = `
+    DELETE FROM public.stakeholders_register
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      name,
+      category_code,
+      priority_code,
+      status_code,
+      expectations,
+      owner_identity_id,
+      review_date,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+  `;
+
+  const res = await db.query(sql, [tenantId, id]);
   return res.rows?.[0] ?? null;
 }

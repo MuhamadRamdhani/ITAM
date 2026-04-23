@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { apiGet } from "../../lib/api";
+import { apiDelete, apiGet } from "../../lib/api";
 import {
   canCreateOrEditAsset,
   canManageAssetSoftware,
@@ -22,6 +22,8 @@ import LifecyclePanel from "./LifecyclePanel";
 import ApprovalsPanel from "./ApprovalsPanel";
 import SoftwareInstallationsPanel from "./SoftwareInstallationsPanel";
 import AssetEvidenceTab from "./_componets/AssetEvidenceTab";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type AssetType = { code: string; label: string };
 type StateType = { code: string; label: string };
@@ -109,6 +111,11 @@ export default function AssetDetailClient() {
   const [idenOptions, setIdenOptions] = useState<LookupItem[]>([]);
   const [activeScopeDepartmentTokens, setActiveScopeDepartmentTokens] = useState<string[]>([]);
   const [activeScopeLocationTokens, setActiveScopeLocationTokens] = useState<string[]>([]);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const canCreateAsset = useMemo(() => canCreateOrEditAsset(roles), [roles]);
   const canTransferAsset = useMemo(() => canCreateAssetTransfer(roles), [roles]);
@@ -365,8 +372,57 @@ export default function AssetDetailClient() {
       ? "border-b-2 border-cyan-500 pb-3 text-cyan-700"
       : "pb-3 text-slate-600 hover:text-slate-900";
 
+  async function confirmDeleteAsset() {
+    if (!a || deleteLoading) return;
+
+    setDeleteLoading(true);
+
+    try {
+      await apiDelete(`/api/v1/assets/${a.id}`);
+      setDeleteOpen(false);
+      setToast({
+        type: "success",
+        message: `Asset ${a.asset_tag} deleted.`,
+      });
+
+      window.setTimeout(() => {
+        router.push("/assets");
+      }, 700);
+    } catch (error) {
+      const code = (error as any)?.code;
+      if (code === "ASSET_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Asset masih dipakai oleh history, contract, installation, transfer, atau allocation.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: (error as any)?.message || "Gagal menghapus asset.",
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   return (
     <main className={shell}>
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={deleteOpen}
+        title="Delete asset"
+        description={`Asset ${a.asset_tag} akan dihapus permanen jika tidak sedang dipakai oleh history, contract, installation, transfer request, atau allocation.`}
+        confirmLabel="Delete Asset"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void confirmDeleteAsset()}
+      />
       <div className="absolute inset-x-0 top-0 h-64 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
 
       <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
@@ -421,6 +477,17 @@ export default function AssetDetailClient() {
               >
                 Edit
               </Link>
+            ) : null}
+
+            {canCreateAsset ? (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={deleteLoading}
+              >
+                Delete
+              </button>
             ) : null}
           </div>
 

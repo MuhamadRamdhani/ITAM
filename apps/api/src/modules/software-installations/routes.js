@@ -9,6 +9,7 @@ import {
   listAssetSoftwareInstallationsService,
   createAssetSoftwareInstallationService,
   updateAssetSoftwareInstallationService,
+  deleteAssetSoftwareInstallationService,
 } from "./software-installations.service.js";
 
 export default async function softwareInstallationsRoutes(app) {
@@ -60,6 +61,24 @@ export default async function softwareInstallationsRoutes(app) {
     },
     async function updateAssetSoftwareInstallationHandler(req, reply) {
       const data = await updateAssetSoftwareInstallationService(app, req);
+
+      return reply.send({
+        ok: true,
+        data,
+      });
+    }
+  );
+
+  app.delete(
+    "/:id/software-installations/:installationId",
+    {
+      schema: {
+        tags: ["Software Installations"],
+        params: assetSoftwareInstallationMutationParamsSchema,
+      },
+    },
+    async function deleteAssetSoftwareInstallationHandler(req, reply) {
+      const data = await deleteAssetSoftwareInstallationService(app, req);
 
       return reply.send({
         ok: true,

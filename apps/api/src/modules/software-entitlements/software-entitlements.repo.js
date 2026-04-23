@@ -116,6 +116,42 @@ export async function getSoftwareEntitlementByContractAndId(
   return rows[0] || null;
 }
 
+export async function getSoftwareEntitlementByContractAndIdForDelete(
+  app,
+  tenantId,
+  contractId,
+  entitlementId
+) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      id,
+      tenant_id,
+      contract_id,
+      software_product_id,
+      entitlement_code,
+      entitlement_name,
+      licensing_metric,
+      quantity_purchased,
+      start_date,
+      end_date,
+      status,
+      notes,
+      created_at,
+      updated_at
+    FROM public.software_entitlements
+    WHERE tenant_id = $1
+      AND contract_id = $2
+      AND id = $3
+    FOR UPDATE
+    LIMIT 1
+    `,
+    [tenantId, contractId, entitlementId]
+  );
+
+  return rows[0] || null;
+}
+
 export async function getSoftwareEntitlementDetailById(app, tenantId, entitlementId) {
   const { rows } = await app.pg.query(
     `
@@ -341,6 +377,63 @@ export async function updateSoftwareEntitlement(
       updated_at
     `,
     values
+  );
+
+  return rows[0] || null;
+}
+
+export async function countSoftwareEntitlementDeleteDependencies(
+  app,
+  tenantId,
+  entitlementId
+) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT COUNT(1)::int AS total
+    FROM public.software_entitlement_allocations
+    WHERE tenant_id = $1
+      AND software_entitlement_id = $2
+    `,
+    [tenantId, entitlementId]
+  );
+
+  const allocations = Number(rows?.[0]?.total ?? 0);
+  return {
+    software_entitlement_allocations_count: allocations,
+    total: allocations,
+  };
+}
+
+export async function lockSoftwareEntitlementDeleteRelatedTables(app) {
+  await app.pg.query(`
+    LOCK TABLE public.software_entitlement_allocations
+    IN SHARE ROW EXCLUSIVE MODE
+  `);
+}
+
+export async function deleteSoftwareEntitlementById(app, tenantId, entitlementId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.software_entitlements
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      contract_id,
+      software_product_id,
+      entitlement_code,
+      entitlement_name,
+      licensing_metric,
+      quantity_purchased,
+      start_date,
+      end_date,
+      status,
+      notes,
+      created_at,
+      updated_at
+    `,
+    [tenantId, entitlementId]
   );
 
   return rows[0] || null;

@@ -3,11 +3,16 @@ import {
   getSoftwareProductById,
   findSoftwareEntitlementByUniqueCode,
   getSoftwareEntitlementByContractAndId,
+  getSoftwareEntitlementByContractAndIdForDelete,
   getSoftwareEntitlementDetailById,
   listSoftwareEntitlementsByContract,
   createSoftwareEntitlement,
   updateSoftwareEntitlement,
+  countSoftwareEntitlementDeleteDependencies,
+  lockSoftwareEntitlementDeleteRelatedTables,
+  deleteSoftwareEntitlementById,
 } from "./software-entitlements.repo.js";
+import { insertAuditEvent } from "../../lib/audit.js";
 
 const READ_ROLES = new Set([
   "SUPERADMIN",
@@ -43,10 +48,13 @@ const ALLOWED_LICENSING_METRICS = new Set([
   "OTHER",
 ]);
 
-function appError(statusCode, code, message) {
+function appError(statusCode, code, message, details) {
   const err = new Error(message);
   err.statusCode = statusCode;
   err.code = code;
+  if (details !== undefined) {
+    err.details = details;
+  }
   return err;
 }
 
@@ -263,6 +271,29 @@ function normalizePatchPayload(body) {
   }
 
   return patch;
+}
+
+async function withTransaction(app, fn) {
+  const client = await app.pg.connect();
+
+  try {
+    await client.query("BEGIN");
+    const result = await fn({ pg: client });
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function actorFromIdentityId(identityId) {
+  if (Number.isFinite(identityId) && identityId > 0) return `IDENTITY:${identityId}`;
+  return "SYSTEM";
 }
 
 async function safeWriteAuditEvent(app, req, event) {
@@ -499,4 +530,82 @@ export async function updateContractSoftwareEntitlementService(app, req) {
   });
 
   return detail;
+}
+
+export async function deleteContractSoftwareEntitlementService(app, req) {
+  assertAllowed(req, WRITE_ROLES, "delete software entitlements");
+
+  const tenantId = getTenantId(req);
+  const contractId = parsePositiveInt(req.params?.id, "CONTRACT_ID_INVALID", "contract_id");
+  const entitlementId = parsePositiveInt(
+    req.params?.entitlementId,
+    "SOFTWARE_ENTITLEMENT_ID_INVALID",
+    "entitlement_id"
+  );
+  const actorId = req?.requestContext?.identityId ?? null;
+
+  return withTransaction(app, async (tx) => {
+    const current = await getSoftwareEntitlementByContractAndIdForDelete(
+      tx,
+      tenantId,
+      contractId,
+      entitlementId
+    );
+
+    if (!current) {
+      throw appError(
+        404,
+        "SOFTWARE_ENTITLEMENT_NOT_FOUND",
+        "Software entitlement not found."
+      );
+    }
+
+    await lockSoftwareEntitlementDeleteRelatedTables(tx);
+
+    const dependencies = await countSoftwareEntitlementDeleteDependencies(
+      tx,
+      tenantId,
+      entitlementId
+    );
+    if (dependencies.total > 0) {
+      throw appError(
+        409,
+        "SOFTWARE_ENTITLEMENT_IN_USE",
+        "Software entitlement is still in use.",
+        dependencies
+      );
+    }
+
+    await insertAuditEvent(tx, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "SOFTWARE_ENTITLEMENT_DELETED",
+      entityType: "SOFTWARE_ENTITLEMENT",
+      entityId: entitlementId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        contract_id: Number(current.contract_id),
+        software_product_id: Number(current.software_product_id),
+        entitlement_code: current.entitlement_code ?? null,
+        entitlement_name: current.entitlement_name ?? null,
+        licensing_metric: current.licensing_metric ?? null,
+        quantity_purchased: Number(current.quantity_purchased ?? 0),
+        start_date: current.start_date ?? null,
+        end_date: current.end_date ?? null,
+        status: current.status ?? null,
+      },
+    });
+
+    const deleted = await deleteSoftwareEntitlementById(tx, tenantId, entitlementId);
+    if (!deleted) {
+      throw appError(
+        404,
+        "SOFTWARE_ENTITLEMENT_NOT_FOUND",
+        "Software entitlement not found."
+      );
+    }
+
+    return deleted;
+  });
 }

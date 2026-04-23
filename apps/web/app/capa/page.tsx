@@ -1,5 +1,10 @@
-import CapaClient from './CapaClient';
+import CapaClient from "./CapaClient";
+import { WorkspacePage } from "../components/WorkspaceLayout";
 
 export default function CapaPage() {
-  return <CapaClient />;
+  return (
+    <WorkspacePage>
+      <CapaClient />
+    </WorkspacePage>
+  );
 }

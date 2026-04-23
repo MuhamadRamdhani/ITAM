@@ -364,8 +364,7 @@ export default function InternalAuditsClient() {
   }
 
   return (
-    <main className="itam-page-shell">
-      <div className="itam-page-shell-inner">
+    <div className="space-y-8">
         <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
@@ -616,7 +615,6 @@ export default function InternalAuditsClient() {
             </div>
           </div>
         </div>
-      </div>
-    </main>
+    </div>
   );
 }

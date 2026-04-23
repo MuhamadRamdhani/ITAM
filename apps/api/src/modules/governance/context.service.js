@@ -1,8 +1,11 @@
 import {
   listContextRegisters,
   getContextRegisterById,
+  getContextRegisterByIdForDelete,
   insertContextRegister,
   updateContextRegister,
+  countContextRegisterDeleteDependencies,
+  deleteContextRegisterById,
 } from "./context.repo.js";
 import { insertAuditEventDb } from "../../lib/audit.js";
 
@@ -153,6 +156,29 @@ function normalizeTitle(v) {
 
 function normalizeDescription(v) {
   return String(v ?? "").trim();
+}
+
+async function withTransaction(db, fn) {
+  const canConnect = typeof db.connect === "function";
+  const client = canConnect ? await db.connect() : db;
+
+  try {
+    if (canConnect) await client.query("BEGIN");
+    const result = await fn(client);
+    if (canConnect) await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    if (canConnect) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+    }
+    throw err;
+  } finally {
+    if (canConnect && typeof client.release === "function") {
+      client.release();
+    }
+  }
 }
 
 export async function listContextRegistersService(db, request, query) {
@@ -323,4 +349,69 @@ export async function updateContextRegisterService(db, request, id, body) {
   });
 
   return updated;
+}
+
+export async function deleteContextRegisterService(db, request, id) {
+  assertCanManageContext(request);
+
+  const tenantId = getTenantIdFromRequest(request);
+  const actorUserId = getActorUserIdFromRequest(request);
+  const numericId = Number(id);
+
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    throw makeError("Invalid context id", 400, "VALIDATION_ERROR");
+  }
+
+  return withTransaction(db, async (trx) => {
+    const current = await getContextRegisterByIdForDelete(trx, {
+      tenantId,
+      id: numericId,
+    });
+
+    if (!current) {
+      throw makeError("Context register not found", 404, "NOT_FOUND");
+    }
+
+    const dependencies = await countContextRegisterDeleteDependencies(trx, {
+      tenantId,
+      id: numericId,
+    });
+    if (dependencies.total > 0) {
+      throw makeError(
+        "Context register is still in use",
+        409,
+        "CONTEXT_REGISTER_IN_USE",
+        dependencies
+      );
+    }
+
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "CONTEXT_REGISTER_DELETED",
+      entityType: "CONTEXT_REGISTER",
+      entityId: numericId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        title: current.title ?? null,
+        category_code: current.category_code ?? null,
+        priority_code: current.priority_code ?? null,
+        status_code: current.status_code ?? null,
+        owner_identity_id: current.owner_identity_id ?? null,
+        review_date: current.review_date ?? null,
+      },
+    });
+
+    const deleted = await deleteContextRegisterById(trx, {
+      tenantId,
+      id: numericId,
+    });
+
+    if (!deleted) {
+      throw makeError("Context register not found", 404, "NOT_FOUND");
+    }
+
+    return deleted;
+  });
 }

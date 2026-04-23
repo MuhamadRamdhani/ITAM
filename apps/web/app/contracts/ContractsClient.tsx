@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPostJson } from "../lib/api";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
 import { canManageContracts } from "../lib/contractAccess";
+import { WorkspaceSection } from "@/app/components/WorkspaceLayout";
 
 type ContractItem = {
   id: number | string;
@@ -410,8 +411,8 @@ export default function ContractsClient() {
   }
 
 return (
-  <div className="relative z-10 space-y-12">
-    <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:p-8">
+  <div className="space-y-8">
+    <WorkspaceSection className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="max-w-3xl">
           <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
@@ -429,9 +430,9 @@ return (
           Back
         </Link>
       </div>
-    </div>
+    </WorkspaceSection>
 
-    <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-5">
+    <WorkspaceSection className="space-y-8">
       <div className="mb-4 flex justify-end">
         {meLoading ? (
           <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400">
@@ -829,7 +830,7 @@ return (
           </div>
         </div>
       </div>
-    </div>
+    </WorkspaceSection>
   </div>
 );
 

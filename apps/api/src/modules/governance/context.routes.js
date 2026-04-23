@@ -1,8 +1,10 @@
+import { Type } from "@sinclair/typebox";
 import {
   listContextRegistersService,
   getContextRegisterDetailService,
   createContextRegisterService,
   updateContextRegisterService,
+  deleteContextRegisterService,
 } from "./context.service.js";
 
 function getDbFromFastify(fastify) {
@@ -70,4 +72,27 @@ export default async function governanceContextRoutes(fastify) {
       sendError(reply, err);
     }
   });
+
+  fastify.delete(
+    "/:id",
+    {
+      schema: {
+        params: Type.Object({
+          id: Type.String(),
+        }),
+      },
+    },
+    async function handler(request, reply) {
+      try {
+        const data = await deleteContextRegisterService(
+          db,
+          request,
+          request.params.id
+        );
+        reply.send({ ok: true, data });
+      } catch (err) {
+        sendError(reply, err);
+      }
+    }
+  );
 }

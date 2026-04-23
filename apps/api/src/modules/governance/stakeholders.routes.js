@@ -1,8 +1,10 @@
+import { Type } from "@sinclair/typebox";
 import {
   listStakeholdersRegistersService,
   getStakeholdersRegisterDetailService,
   createStakeholdersRegisterService,
   updateStakeholdersRegisterService,
+  deleteStakeholdersRegisterService,
 } from "./stakeholders.service.js";
 
 function getDbFromFastify(fastify) {
@@ -70,4 +72,27 @@ export default async function governanceStakeholdersRoutes(fastify) {
       sendError(reply, err);
     }
   });
+
+  fastify.delete(
+    "/:id",
+    {
+      schema: {
+        params: Type.Object({
+          id: Type.String(),
+        }),
+      },
+    },
+    async function handler(request, reply) {
+      try {
+        const data = await deleteStakeholdersRegisterService(
+          db,
+          request,
+          request.params.id
+        );
+        reply.send({ ok: true, data });
+      } catch (err) {
+        sendError(reply, err);
+      }
+    }
+  );
 }

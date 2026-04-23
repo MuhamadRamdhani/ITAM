@@ -1780,7 +1780,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
           </div>
 
           <div className="mt-6 rounded-3xl border border-white bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <SoftwareEntitlementsPanel contractId={detail.id} />
+            <SoftwareEntitlementsPanel contractId={detail.id} canEdit={canManage} />
           </div>
         </>
       )}

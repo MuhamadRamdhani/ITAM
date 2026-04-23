@@ -12,6 +12,7 @@ import {
   getAssetDetail,
   createAsset,
   patchAsset,
+  deleteAssetService,
 } from "./assets.service.js";
 
 export default async function assetsRoutes(app) {
@@ -74,6 +75,22 @@ export default async function assetsRoutes(app) {
       }
 
       return { ok: true, data: { id }, meta: { request_id: req.id } };
+    }
+  );
+
+  app.delete(
+    "/:id",
+    { schema: { response: { 200: SimpleOkResponse } } },
+    async (req) => {
+      const assetId = Number(req.params.id);
+      if (!Number.isFinite(assetId)) {
+        const e = new Error("Invalid asset id");
+        e.statusCode = 400;
+        throw e;
+      }
+
+      const data = await deleteAssetService(app, req, assetId);
+      return { ok: true, data: { id: data.id }, meta: { request_id: req.id } };
     }
   );
 }

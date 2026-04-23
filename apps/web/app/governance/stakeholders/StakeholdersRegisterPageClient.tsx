@@ -4,8 +4,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { canManageGovernance } from "../../lib/governanceAccess";
-import { apiGet, apiPatchJson, apiPostJson } from "../../lib/api";
+import { apiDelete, apiGet, apiPatchJson, apiPostJson } from "../../lib/api";
 import { SkeletonTableRow } from "../../lib/loadingComponents";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type StakeholderRow = {
   id: number | string;
@@ -198,6 +200,11 @@ export default function StakeholdersRegisterPageClient() {
   const [form, setForm] = useState(blankForm());
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StakeholderRow | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   useEffect(() => {
     setSearchText(q);
@@ -319,6 +326,50 @@ export default function StakeholdersRegisterPageClient() {
     setSaveErr(null);
   }
 
+  function openDeleteDialog(row: StakeholderRow) {
+    setDeleteTarget(row);
+  }
+
+  function closeDeleteDialog() {
+    if (deleteLoading) return;
+    setDeleteTarget(null);
+  }
+
+  async function confirmDelete(row: StakeholderRow) {
+    if (deleteLoading) return;
+
+    setDeleteLoading(true);
+    setToast(null);
+
+    try {
+      await apiDelete(`/api/v1/governance/stakeholders/${row.id}`);
+      setItems((prev) => prev.filter((item) => Number(item.id) !== Number(row.id)));
+      setTotal((prev) => Math.max(0, prev - 1));
+      if (editingId === Number(row.id)) {
+        startCreate();
+      }
+      setDeleteTarget(null);
+      setToast({
+        type: "success",
+        message: "Stakeholder register deleted.",
+      });
+    } catch (error) {
+      if ((error as any)?.code === "STAKEHOLDER_REGISTER_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Stakeholder register masih dipakai oleh relasi bisnis.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: getErrorMessage(error, "Failed to delete stakeholder register"),
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   async function saveForm() {
     setSaving(true);
     setSaveErr(null);
@@ -389,6 +440,23 @@ export default function StakeholdersRegisterPageClient() {
 
   return (
     <main className="relative z-10">
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={Boolean(deleteTarget)}
+        title="Delete stakeholder register"
+        description={`Stakeholder register ${deleteTarget?.name || ""} akan dihapus permanen jika tidak sedang dipakai oleh relasi bisnis.`}
+        confirmLabel="Delete Stakeholder"
+        loading={deleteLoading}
+        onCancel={closeDeleteDialog}
+        onConfirm={() => {
+          if (deleteTarget) void confirmDelete(deleteTarget);
+        }}
+      />
       <div className="mx-auto max-w-7xl px-6 py-12">
         <div className="rounded-3xl border border-white bg-white/80 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -724,13 +792,22 @@ export default function StakeholdersRegisterPageClient() {
                           <td className="whitespace-nowrap py-3 pr-4">{fmtDateTime(row.updated_at)}</td>
                           <td className="whitespace-nowrap py-3 pr-4 text-right">
                             {canManage ? (
-                              <button
-                                type="button"
-                                onClick={() => startEdit(row)}
-                                className="text-blue-700 hover:underline"
-                              >
-                                Edit
-                              </button>
+                              <div className="flex items-center justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(row)}
+                                  className="text-blue-700 hover:underline"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openDeleteDialog(row)}
+                                  className="text-rose-700 hover:underline"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-gray-400">-</span>
                             )}

@@ -102,6 +102,32 @@ export async function getContextRegisterById(db, { tenantId, id }) {
   return res.rows?.[0] ?? null;
 }
 
+export async function getContextRegisterByIdForDelete(db, { tenantId, id }) {
+  const sql = `
+    SELECT
+      id,
+      tenant_id,
+      title,
+      category_code,
+      priority_code,
+      status_code,
+      description,
+      owner_identity_id,
+      review_date,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    FROM public.context_register
+    WHERE tenant_id = $1
+      AND id = $2
+    FOR UPDATE
+    LIMIT 1
+  `;
+  const res = await db.query(sql, [tenantId, id]);
+  return res.rows?.[0] ?? null;
+}
+
 export async function insertContextRegister(db, {
   tenantId,
   title,
@@ -213,5 +239,34 @@ export async function updateContextRegister(db, {
     actorUserId ?? null,
   ]);
 
+  return res.rows?.[0] ?? null;
+}
+
+export async function countContextRegisterDeleteDependencies() {
+  return { total: 0 };
+}
+
+export async function deleteContextRegisterById(db, { tenantId, id }) {
+  const sql = `
+    DELETE FROM public.context_register
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      title,
+      category_code,
+      priority_code,
+      status_code,
+      description,
+      owner_identity_id,
+      review_date,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+  `;
+
+  const res = await db.query(sql, [tenantId, id]);
   return res.rows?.[0] ?? null;
 }

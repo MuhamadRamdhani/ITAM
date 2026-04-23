@@ -6,8 +6,12 @@ import {
   countAssets,
   listAssets as repoListAssets,
   getAssetById as repoGetAssetById,
+  getAssetByIdForDelete,
+  countAssetDeleteDependencies,
+  lockAssetDeleteRelatedTables,
   insertAsset,
   updateAsset,
+  deleteAssetById,
 } from "./assets.repo.js";
 
 function makeBadRequest(code, message, details) {
@@ -33,6 +37,32 @@ function actorStr(req) {
   const a = req?.actor;
   if (a?.type === "USER" && a?.id) return `USER:${a.id}`;
   return "SYSTEM";
+}
+
+async function withTransaction(app, fn) {
+  const client = await app.pg.connect();
+
+  try {
+    await client.query("BEGIN");
+    const result = await fn({ pg: client });
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function makeDeleteError(statusCode, code, message, details) {
+  const e = new Error(message);
+  e.statusCode = statusCode;
+  e.code = code;
+  e.details = details;
+  return e;
 }
 
 function mustHaveAnyRole(req, allowed) {
@@ -491,4 +521,57 @@ export async function patchAsset(app, req, assetId, body) {
     });
   }
   return updatedId;
+}
+
+export async function deleteAssetService(app, req, assetId) {
+  const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER"]);
+
+  const numericId = Number(assetId);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    throw makeDeleteError(400, "BAD_REQUEST", "Invalid asset id");
+  }
+
+  const actor = actorStr(req);
+
+  return withTransaction(app, async (tx) => {
+    const current = await getAssetByIdForDelete(tx, tenantId, numericId);
+    if (!current) {
+      throw makeDeleteError(404, "NOT_FOUND", "Asset not found");
+    }
+
+    await lockAssetDeleteRelatedTables(tx);
+
+    const dependencies = await countAssetDeleteDependencies(tx, tenantId, numericId);
+    if (dependencies.total > 0) {
+      throw makeDeleteError(409, "ASSET_IN_USE", "Asset is still in use", dependencies);
+    }
+
+    await insertAuditEvent(tx, {
+      tenantId,
+      actor,
+      action: "ASSET_DELETED",
+      entityType: "ASSET",
+      entityId: numericId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        asset_tag: current.asset_tag ?? null,
+        name: current.name ?? null,
+        asset_type_id: current.asset_type_id ?? null,
+        current_state_id: current.current_state_id ?? null,
+        status: current.status ?? null,
+        location_id: current.location_id ?? null,
+        owner_department_id: current.owner_department_id ?? null,
+        current_custodian_identity_id: current.current_custodian_identity_id ?? null,
+      },
+    });
+
+    const deleted = await deleteAssetById(tx, tenantId, numericId);
+    if (!deleted) {
+      throw makeDeleteError(404, "NOT_FOUND", "Asset not found");
+    }
+
+    return deleted;
+  });
 }

@@ -3,11 +3,16 @@ import {
   getSoftwareProductById,
   findSoftwareInstallationByMapping,
   getSoftwareInstallationByAssetAndId,
+  getSoftwareInstallationByAssetAndIdForDelete,
   getSoftwareInstallationDetailById,
   listSoftwareInstallationsByAsset,
   createSoftwareInstallation,
   updateSoftwareInstallation,
+  countSoftwareInstallationDeleteDependencies,
+  lockSoftwareInstallationDeleteRelatedTables,
+  deleteSoftwareInstallationById,
 } from "./software-installations.repo.js";
+import { insertAuditEvent } from "../../lib/audit.js";
 
 const READ_ROLES = new Set([
   "SUPERADMIN",
@@ -22,10 +27,13 @@ const WRITE_ROLES = new Set([
   "ITAM_MANAGER",
 ]);
 
-function appError(statusCode, code, message) {
+function appError(statusCode, code, message, details) {
   const err = new Error(message);
   err.statusCode = statusCode;
   err.code = code;
+  if (details !== undefined) {
+    err.details = details;
+  }
   return err;
 }
 
@@ -228,6 +236,29 @@ function normalizePatchPayload(body) {
   }
 
   return patch;
+}
+
+async function withTransaction(app, fn) {
+  const client = await app.pg.connect();
+
+  try {
+    await client.query("BEGIN");
+    const result = await fn({ pg: client });
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function actorFromIdentityId(identityId) {
+  if (Number.isFinite(identityId) && identityId > 0) return `IDENTITY:${identityId}`;
+  return "SYSTEM";
 }
 
 /**
@@ -436,4 +467,81 @@ export async function updateAssetSoftwareInstallationService(app, req) {
   });
 
   return detail;
+}
+
+export async function deleteAssetSoftwareInstallationService(app, req) {
+  assertAllowed(req, WRITE_ROLES, "delete software installations");
+
+  const tenantId = getTenantId(req);
+  const assetId = parsePositiveInt(req.params?.id, "ASSET_ID_INVALID", "asset_id");
+  const installationId = parsePositiveInt(
+    req.params?.installationId,
+    "SOFTWARE_INSTALLATION_ID_INVALID",
+    "installation_id"
+  );
+  const actorId = req?.requestContext?.identityId ?? null;
+
+  return withTransaction(app, async (tx) => {
+    const current = await getSoftwareInstallationByAssetAndIdForDelete(
+      tx,
+      tenantId,
+      assetId,
+      installationId
+    );
+
+    if (!current) {
+      throw appError(
+        404,
+        "SOFTWARE_INSTALLATION_NOT_FOUND",
+        "Software installation not found."
+      );
+    }
+
+    await lockSoftwareInstallationDeleteRelatedTables(tx);
+
+    const dependencies = await countSoftwareInstallationDeleteDependencies(
+      tx,
+      tenantId,
+      installationId
+    );
+    if (dependencies.total > 0) {
+      throw appError(
+        409,
+        "SOFTWARE_INSTALLATION_IN_USE",
+        "Software installation is still in use.",
+        dependencies
+      );
+    }
+
+    await insertAuditEvent(tx, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "SOFTWARE_INSTALLATION_DELETED",
+      entityType: "SOFTWARE_INSTALLATION",
+      entityId: installationId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        asset_id: Number(current.asset_id),
+        software_product_id: Number(current.software_product_id),
+        installation_status: current.installation_status ?? null,
+        installed_version: current.installed_version ?? null,
+        installation_date: current.installation_date ?? null,
+        uninstalled_date: current.uninstalled_date ?? null,
+        discovered_by: current.discovered_by ?? null,
+        discovery_source: current.discovery_source ?? null,
+      },
+    });
+
+    const deleted = await deleteSoftwareInstallationById(tx, tenantId, installationId);
+    if (!deleted) {
+      throw appError(
+        404,
+        "SOFTWARE_INSTALLATION_NOT_FOUND",
+        "Software installation not found."
+      );
+    }
+
+    return deleted;
+  });
 }

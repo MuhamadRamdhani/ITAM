@@ -107,6 +107,41 @@ export async function getSoftwareInstallationByAssetAndId(
   return rows[0] || null;
 }
 
+export async function getSoftwareInstallationByAssetAndIdForDelete(
+  app,
+  tenantId,
+  assetId,
+  installationId
+) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      id,
+      tenant_id,
+      asset_id,
+      software_product_id,
+      installation_status,
+      installed_version,
+      installation_date,
+      uninstalled_date,
+      discovered_by,
+      discovery_source,
+      notes,
+      created_at,
+      updated_at
+    FROM public.software_installations
+    WHERE tenant_id = $1
+      AND asset_id = $2
+      AND id = $3
+    FOR UPDATE
+    LIMIT 1
+    `,
+    [tenantId, assetId, installationId]
+  );
+
+  return rows[0] || null;
+}
+
 export async function getSoftwareInstallationDetailById(app, tenantId, installationId) {
   const { rows } = await app.pg.query(
     `
@@ -346,6 +381,77 @@ export async function updateSoftwareInstallation(
       updated_at
     `,
     values
+  );
+
+  return rows[0] || null;
+}
+
+export async function countSoftwareInstallationDeleteDependencies(
+  app,
+  tenantId,
+  installationId
+) {
+  const [assignmentRows, allocationRows] = await Promise.all([
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.software_assignments
+      WHERE tenant_id = $1
+        AND software_installation_id = $2
+      `,
+      [tenantId, installationId]
+    ),
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.software_entitlement_allocations
+      WHERE tenant_id = $1
+        AND software_installation_id = $2
+      `,
+      [tenantId, installationId]
+    ),
+  ]);
+
+  const assignments = Number(assignmentRows.rows?.[0]?.total ?? 0);
+  const allocations = Number(allocationRows.rows?.[0]?.total ?? 0);
+
+  return {
+    software_assignments_count: assignments,
+    software_entitlement_allocations_count: allocations,
+    total: assignments + allocations,
+  };
+}
+
+export async function lockSoftwareInstallationDeleteRelatedTables(app) {
+  await app.pg.query(`
+    LOCK TABLE public.software_assignments,
+      public.software_entitlement_allocations
+    IN SHARE ROW EXCLUSIVE MODE
+  `);
+}
+
+export async function deleteSoftwareInstallationById(app, tenantId, installationId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.software_installations
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      asset_id,
+      software_product_id,
+      installation_status,
+      installed_version,
+      installation_date,
+      uninstalled_date,
+      discovered_by,
+      discovery_source,
+      notes,
+      created_at,
+      updated_at
+    `,
+    [tenantId, installationId]
   );
 
   return rows[0] || null;

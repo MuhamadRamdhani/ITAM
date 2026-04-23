@@ -9,6 +9,7 @@ import {
   listContractSoftwareEntitlementsService,
   createContractSoftwareEntitlementService,
   updateContractSoftwareEntitlementService,
+  deleteContractSoftwareEntitlementService,
 } from "./software-entitlements.service.js";
 
 export default async function softwareEntitlementsRoutes(app) {
@@ -60,6 +61,24 @@ export default async function softwareEntitlementsRoutes(app) {
     },
     async function updateContractSoftwareEntitlementHandler(req, reply) {
       const data = await updateContractSoftwareEntitlementService(app, req);
+
+      return reply.send({
+        ok: true,
+        data,
+      });
+    }
+  );
+
+  app.delete(
+    "/:id/software-entitlements/:entitlementId",
+    {
+      schema: {
+        tags: ["Software Entitlements"],
+        params: contractSoftwareEntitlementMutationParamsSchema,
+      },
+    },
+    async function deleteContractSoftwareEntitlementHandler(req, reply) {
+      const data = await deleteContractSoftwareEntitlementService(app, req);
 
       return reply.send({
         ok: true,

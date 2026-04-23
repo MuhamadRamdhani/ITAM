@@ -142,7 +142,8 @@ function buildListHref(params: {
   if (params.q.trim()) qs.set("q", params.q.trim());
   if (params.status && params.status !== "ALL") qs.set("status", params.status);
   if (params.page && params.page > 0) qs.set("page", String(params.page));
-  if (params.pageSize && params.pageSize > 0) qs.set("page_size", String(params.pageSize));
+  if (params.pageSize && params.pageSize > 0)
+    qs.set("page_size", String(params.pageSize));
 
   const out = qs.toString();
   return out ? `/asset-transfer-requests?${out}` : "/asset-transfer-requests";
@@ -165,19 +166,25 @@ function normalizeListItem(raw: any): TransferRequestListItem {
         asset?.asset_name ??
         asset?.name ??
         asset?.display_name ??
-        asset?.hostname
+        asset?.hostname,
     ),
 
     source_tenant_id: toNullableNumber(
-      raw?.tenant_id ?? raw?.source_tenant_id ?? sourceTenant?.id
+      raw?.tenant_id ?? raw?.source_tenant_id ?? sourceTenant?.id,
     ),
     source_tenant_name: toNullableString(
-      raw?.source_tenant_name ?? sourceTenant?.tenant_name ?? sourceTenant?.name
+      raw?.source_tenant_name ??
+        sourceTenant?.tenant_name ??
+        sourceTenant?.name,
     ),
 
-    target_tenant_id: toNullableNumber(raw?.target_tenant_id ?? targetTenant?.id),
+    target_tenant_id: toNullableNumber(
+      raw?.target_tenant_id ?? targetTenant?.id,
+    ),
     target_tenant_name: toNullableString(
-      raw?.target_tenant_name ?? targetTenant?.tenant_name ?? targetTenant?.name
+      raw?.target_tenant_name ??
+        targetTenant?.tenant_name ??
+        targetTenant?.name,
     ),
 
     reason: toNullableString(raw?.reason),
@@ -188,7 +195,10 @@ function normalizeListItem(raw: any): TransferRequestListItem {
   };
 }
 
-function normalizeListResponse(payload: any, fallbackPage: number): TransferRequestListResponse {
+function normalizeListResponse(
+  payload: any,
+  fallbackPage: number,
+): TransferRequestListResponse {
   const data = payload?.data ?? payload ?? {};
   const rawItems =
     data?.items ??
@@ -236,17 +246,17 @@ export default function AssetTransferRequestsClient() {
   const pageSize = pickInt(searchParams.get("page_size"), 10);
 
   const currentTransferListHref = useMemo(() => {
-  return buildListHref({
-    q,
-    status,
-    page,
-    pageSize,
-  });
-}, [q, status, page, pageSize]);
+    return buildListHref({
+      q,
+      status,
+      page,
+      pageSize,
+    });
+  }, [q, status, page, pageSize]);
 
-const goToAssetsHref = useMemo(() => {
-  return `/assets?return_to=${encodeURIComponent(currentTransferListHref)}`;
-}, [currentTransferListHref]);
+  const goToAssetsHref = useMemo(() => {
+    return `/assets?return_to=${encodeURIComponent(currentTransferListHref)}`;
+  }, [currentTransferListHref]);
 
   const canCreateTransfer = useMemo(() => {
     return roles.some((role) => TRANSFER_ALLOWED_ROLES.includes(role));
@@ -291,7 +301,9 @@ const goToAssetsHref = useMemo(() => {
             return;
           }
 
-          setErr(eAny?.message || "Failed to initialize transfer requests page.");
+          setErr(
+            eAny?.message || "Failed to initialize transfer requests page.",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -323,7 +335,9 @@ const goToAssetsHref = useMemo(() => {
         qs.set("page", String(page));
         qs.set("page_size", String(pageSize));
 
-        const payload = await apiGet(`/api/v1/asset-transfer-requests?${qs.toString()}`);
+        const payload = await apiGet(
+          `/api/v1/asset-transfer-requests?${qs.toString()}`,
+        );
         if (cancelled) return;
 
         setData(normalizeListResponse(payload, page));
@@ -364,15 +378,13 @@ const goToAssetsHref = useMemo(() => {
         status: statusInput,
         page: 1,
         pageSize,
-      })
+      }),
     );
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)]" />
-
-      <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
+    <div className="space-y-8">
+      <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
         <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
@@ -384,7 +396,8 @@ const goToAssetsHref = useMemo(() => {
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
-              Track draft, submitted, approved, rejected, and executed asset transfer requests.
+              Track draft, submitted, approved, rejected, and executed asset
+              transfer requests.
             </p>
           </div>
 
@@ -399,15 +412,18 @@ const goToAssetsHref = useMemo(() => {
 
         <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="mb-4 flex flex-wrap justify-end gap-3">
-           <Link
-  href={goToAssetsHref}
-  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
->
-  Go to Assets
-</Link>
+            <Link
+              href={goToAssetsHref}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Go to Assets
+            </Link>
 
             {canCreateTransfer ? (
-              <Link href="/asset-transfer-requests/new" className="itam-primary-action">
+              <Link
+                href="/asset-transfer-requests/new"
+                className="itam-primary-action"
+              >
                 New Transfer Request
               </Link>
             ) : null}
@@ -447,11 +463,14 @@ const goToAssetsHref = useMemo(() => {
             <div className="mt-5 flex items-start justify-between gap-4">
               <div className="text-sm text-slate-600">
                 Total: {total}{" "}
-                <span className="ml-2">{total === 0 ? "(0)" : `(showing ${startIdx}–${endIdx})`}</span>
+                <span className="ml-2">
+                  {total === 0 ? "(0)" : `(showing ${startIdx}-${endIdx})`}
+                </span>
               </div>
 
               <div className="text-xs text-slate-500">
-                Tip: gunakan status untuk memisahkan request aktif dan yang sudah final.
+                Tip: gunakan status untuk memisahkan request aktif dan yang
+                sudah final.
               </div>
             </div>
 
@@ -497,24 +516,36 @@ const goToAssetsHref = useMemo(() => {
                       return (
                         <tr key={item.id} className="border-t border-slate-100">
                           <td className="py-4 pr-4 align-top">
-                            <div className="font-medium text-slate-900">{item.request_code}</div>
-                            <div className="mt-1 text-xs text-slate-500">ID: {item.id}</div>
+                            <div className="font-medium text-slate-900">
+                              {item.request_code}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              ID: {item.id}
+                            </div>
                           </td>
 
                           <td className="py-4 pr-4 align-top">
-                            <div className="font-medium text-slate-900">{item.asset_tag ?? "-"}</div>
-                            <div className="mt-1 text-xs text-slate-500">{item.asset_name ?? "-"}</div>
+                            <div className="font-medium text-slate-900">
+                              {item.asset_tag ?? "-"}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {item.asset_name ?? "-"}
+                            </div>
                           </td>
 
                           <td className="py-4 pr-4 align-top">
-                            <div className="text-slate-900">{item.source_tenant_name ?? "-"}</div>
+                            <div className="text-slate-900">
+                              {item.source_tenant_name ?? "-"}
+                            </div>
                             <div className="mt-1 text-xs text-slate-500">
                               Tenant ID: {item.source_tenant_id ?? "-"}
                             </div>
                           </td>
 
                           <td className="py-4 pr-4 align-top">
-                            <div className="text-slate-900">{item.target_tenant_name ?? "-"}</div>
+                            <div className="text-slate-900">
+                              {item.target_tenant_name ?? "-"}
+                            </div>
                             <div className="mt-1 text-xs text-slate-500">
                               Tenant ID: {item.target_tenant_id ?? "-"}
                             </div>
@@ -523,7 +554,7 @@ const goToAssetsHref = useMemo(() => {
                           <td className="py-4 pr-4 align-top">
                             <span
                               className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                                item.status
+                                item.status,
                               )}`}
                             >
                               {item.status}
@@ -608,6 +639,6 @@ const goToAssetsHref = useMemo(() => {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

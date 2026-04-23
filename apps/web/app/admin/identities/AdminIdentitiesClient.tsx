@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiGet, apiPatchJson, apiPostJson } from "../../lib/api";import { SkeletonTableRow, ErrorState } from "../../lib/loadingComponents";
+import { apiGet, apiPatchJson, apiPostJson } from "../../lib/api";
+import { SkeletonTableRow, ErrorState } from "../../lib/loadingComponents";
 type MeData = {
   tenant_id: number;
   user_id: number;

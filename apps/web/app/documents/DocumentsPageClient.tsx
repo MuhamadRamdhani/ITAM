@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet } from "../lib/api";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
 import { canManageDocuments } from "../lib/documentAccess";
+import { WorkspaceSection } from "@/app/components/WorkspaceLayout";
 
 type DocumentItem = {
   id: number | string;
@@ -293,11 +294,9 @@ export default function DocumentsPageClient() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
-      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)] pointer-events-none" />
-
-      <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
-        <div className="flex flex-col gap-4 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl md:flex-row md:items-end md:justify-between">
+    <div className="space-y-8">
+      <WorkspaceSection className="space-y-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
               Operational Workspace
@@ -317,9 +316,10 @@ export default function DocumentsPageClient() {
             Back
           </Link>
         </div>
+      </WorkspaceSection>
 
-        <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="mb-4 flex justify-end">
+      <WorkspaceSection className="space-y-8">
+          <div className="flex justify-end">
             {canManageDocs ? (
               <Link href="/documents/new" className="itam-primary-action">
                 New Document
@@ -503,8 +503,7 @@ export default function DocumentsPageClient() {
           </div>
 
           </div>
-        </div>
-      </div>
-    </main>
+      </WorkspaceSection>
+    </div>
   );
 }

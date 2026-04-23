@@ -1,14 +1,13 @@
 import { Suspense } from "react";
 import AuditEventsPageClient from "./AuditEventsPageClient";
+import { WorkspacePage } from "../components/WorkspaceLayout";
 
 export default function AuditEventsPage() {
   return (
-    <main className="itam-page-shell">
-      <div className="itam-page-shell-inner">
+    <WorkspacePage>
         <Suspense>
           <AuditEventsPageClient />
         </Suspense>
-      </div>
-    </main>
+    </WorkspacePage>
   );
 }

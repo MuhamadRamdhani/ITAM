@@ -1,8 +1,11 @@
 import {
   listStakeholdersRegisters,
   getStakeholdersRegisterById,
+  getStakeholdersRegisterByIdForDelete,
   insertStakeholdersRegister,
   updateStakeholdersRegister,
+  countStakeholdersRegisterDeleteDependencies,
+  deleteStakeholdersRegisterById,
 } from "./stakeholders.repo.js";
 import { insertAuditEventDb } from "../../lib/audit.js";
 
@@ -157,6 +160,29 @@ function normalizeName(v) {
 
 function normalizeExpectations(v) {
   return String(v ?? "").trim();
+}
+
+async function withTransaction(db, fn) {
+  const canConnect = typeof db.connect === "function";
+  const client = canConnect ? await db.connect() : db;
+
+  try {
+    if (canConnect) await client.query("BEGIN");
+    const result = await fn(client);
+    if (canConnect) await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    if (canConnect) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+    }
+    throw err;
+  } finally {
+    if (canConnect && typeof client.release === "function") {
+      client.release();
+    }
+  }
 }
 
 export async function listStakeholdersRegistersService(db, request, query) {
@@ -327,4 +353,69 @@ export async function updateStakeholdersRegisterService(db, request, id, body) {
   });
 
   return updated;
+}
+
+export async function deleteStakeholdersRegisterService(db, request, id) {
+  assertCanManageStakeholders(request);
+
+  const tenantId = getTenantIdFromRequest(request);
+  const actorUserId = getActorUserIdFromRequest(request);
+  const numericId = Number(id);
+
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    throw makeError("Invalid stakeholder id", 400, "VALIDATION_ERROR");
+  }
+
+  return withTransaction(db, async (trx) => {
+    const current = await getStakeholdersRegisterByIdForDelete(trx, {
+      tenantId,
+      id: numericId,
+    });
+
+    if (!current) {
+      throw makeError("Stakeholder register not found", 404, "NOT_FOUND");
+    }
+
+    const dependencies = await countStakeholdersRegisterDeleteDependencies(trx, {
+      tenantId,
+      id: numericId,
+    });
+    if (dependencies.total > 0) {
+      throw makeError(
+        "Stakeholder register is still in use",
+        409,
+        "STAKEHOLDER_REGISTER_IN_USE",
+        dependencies
+      );
+    }
+
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "STAKEHOLDER_REGISTER_DELETED",
+      entityType: "STAKEHOLDER_REGISTER",
+      entityId: numericId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        name: current.name ?? null,
+        category_code: current.category_code ?? null,
+        priority_code: current.priority_code ?? null,
+        status_code: current.status_code ?? null,
+        owner_identity_id: current.owner_identity_id ?? null,
+        review_date: current.review_date ?? null,
+      },
+    });
+
+    const deleted = await deleteStakeholdersRegisterById(trx, {
+      tenantId,
+      id: numericId,
+    });
+
+    if (!deleted) {
+      throw makeError("Stakeholder register not found", 404, "NOT_FOUND");
+    }
+
+    return deleted;
+  });
 }
