@@ -447,6 +447,54 @@ test.describe.serial("Contracts", () => {
     expect(String(afterRow?.contract_health ?? "")).toBe("ACTIVE");
   });
 
+  test("CONT-015 tenant admin can delete draft contract", async ({ page }) => {
+    if (!seedVendor) throw new Error("Seed vendor is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    const draft = await createContractViaUi(page, seedVendor, {
+      contractType: "SOFTWARE",
+      status: "DRAFT",
+      startDate: addDays(-5),
+      endDate: addDays(20),
+      renewalNoticeDays: 30,
+      contractName: `Playwright Draft Contract ${uniqueSuffix()}`,
+      notes: "Draft contract delete test",
+    });
+
+    await openContractDetail(page, draft.contractId);
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Draft" }).first().click();
+
+    const confirmModal = page.locator("div.fixed.inset-0.z-50").first();
+    await expect(confirmModal.getByText(/dihapus permanen/i)).toBeVisible();
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/api/v1/contracts/${draft.contractId}`),
+      { timeout: 30_000 }
+    );
+    await page.getByRole("button", { name: "Delete Draft" }).last().click();
+    const deleteResponseResult = await deleteResponse;
+    expect(deleteResponseResult.status()).toBe(200);
+
+    await page.goto(`/contracts/${draft.contractId}`);
+    await expect(page.getByText(/Contract not found|not ditemukan/i)).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
+  test("CONT-016 non-draft contract blocks delete draft UI and API", async ({ page }) => {
+    if (!seedContract) throw new Error("Seed contract is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    await openContractDetail(page, seedContract.contractId);
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toHaveCount(0);
+
+    const denied = await apiDelete(page, `/api/v1/contracts/${seedContract.contractId}`);
+    expect(denied.status).toBe(409);
+    expect(denied.json?.error?.code).toBe("CONTRACT_NOT_DELETABLE");
+  });
+
   test("CONT-007 edit contract", async ({ page }) => {
     if (!seedContract) throw new Error("Seed contract is missing");
     await loginAs(page, USERS.tenantAdmin);
@@ -620,6 +668,112 @@ test.describe.serial("Contracts", () => {
     await expect(allocModal.getByText("RELEASED")).toBeVisible();
   });
 
+  test("CONT-017 draft contract delete is blocked by asset relation", async ({ page }) => {
+    if (!seedVendor) throw new Error("Seed vendor is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    const draft = await createContractViaUi(page, seedVendor, {
+      contractType: "SOFTWARE",
+      status: "DRAFT",
+      startDate: addDays(-5),
+      endDate: addDays(20),
+      renewalNoticeDays: 30,
+      contractName: `Playwright Asset Blocker ${uniqueSuffix()}`,
+      notes: "Contract delete asset blocker",
+    });
+
+    const asset = await createAssetViaApi(page, {
+      assetTag: `PW-CT-BLOCK-ASSET-${uniqueSuffix()}`,
+      name: "Playwright Block Asset",
+    });
+    const attach = await apiPostJson(page, `/api/v1/contracts/${draft.contractId}/assets`, {
+      asset_id: asset.assetId,
+      note: "Asset blocker",
+    });
+    expect(attach.status).toBe(201);
+
+    await openContractDetail(page, draft.contractId);
+    await page.getByRole("button", { name: "Delete Draft" }).first().click();
+    const confirmModal = page.locator("div.fixed.inset-0.z-50").first();
+    await page.getByRole("button", { name: "Delete Draft" }).last().click();
+
+    await expect(page.getByText("Contract is still in use").first()).toBeVisible({
+      timeout: 20_000,
+    });
+    const denied = await apiDelete(page, `/api/v1/contracts/${draft.contractId}`);
+    expect(denied.status).toBe(409);
+    expect(denied.json?.error?.code).toBe("CONTRACT_IN_USE");
+  });
+
+  test("CONT-018 draft contract delete is blocked by document relation", async ({ page }) => {
+    if (!seedVendor) throw new Error("Seed vendor is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    const draft = await createContractViaUi(page, seedVendor, {
+      contractType: "SOFTWARE",
+      status: "DRAFT",
+      startDate: addDays(-5),
+      endDate: addDays(20),
+      renewalNoticeDays: 30,
+      contractName: `Playwright Document Blocker ${uniqueSuffix()}`,
+      notes: "Contract delete document blocker",
+    });
+
+    const document = await createDocumentViaApi(page);
+    const attach = await apiPostJson(page, `/api/v1/contracts/${draft.contractId}/documents`, {
+      document_id: document.documentId,
+      note: "Document blocker",
+    });
+    expect(attach.status).toBe(201);
+
+    await openContractDetail(page, draft.contractId);
+    await page.getByRole("button", { name: "Delete Draft" }).first().click();
+    const confirmModal = page.locator("div.fixed.inset-0.z-50").first();
+    await page.getByRole("button", { name: "Delete Draft" }).last().click();
+
+    await expect(page.getByText("Contract is still in use").first()).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
+  test("CONT-019 draft contract delete is blocked by software entitlement relation", async ({ page }) => {
+    if (!seedVendor) throw new Error("Seed vendor is missing");
+    await loginAs(page, USERS.tenantAdmin);
+
+    const draft = await createContractViaUi(page, seedVendor, {
+      contractType: "SOFTWARE",
+      status: "DRAFT",
+      startDate: addDays(-5),
+      endDate: addDays(20),
+      renewalNoticeDays: 30,
+      contractName: `Playwright Entitlement Blocker ${uniqueSuffix()}`,
+      notes: "Contract delete entitlement blocker",
+    });
+
+    const product = await createSoftwareProductViaApi(page);
+    const entitlementRes = await apiPostJson(page, `/api/v1/contracts/${draft.contractId}/software-entitlements`, {
+      software_product_id: product.productId,
+      entitlement_code: `PW-ENT-BLOCK-${uniqueSuffix()}`,
+      entitlement_name: `Playwright Entitlement Block ${uniqueSuffix()}`,
+      licensing_metric: "PER_USER",
+      quantity_purchased: 3,
+      start_date: addDays(-1),
+      end_date: addDays(20),
+      status: "ACTIVE",
+      notes: "Entitlement blocker",
+    });
+    expect(entitlementRes.status).toBe(201);
+
+    await openContractDetail(page, draft.contractId);
+    await page.getByRole("button", { name: "Delete Draft" }).first().click();
+    const confirmModal = page.locator("div.fixed.inset-0.z-50").first();
+    await confirmModal.getByRole("button", { name: "Delete Draft" }).click();
+
+    await expect(page.getByText("Contract is still in use").first()).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
   test("CONT-011 asset unlink", async ({ page }) => {
     if (!seedContract) throw new Error("Seed contract is missing");
     await loginAs(page, USERS.tenantAdmin);
@@ -661,11 +815,24 @@ test.describe.serial("Contracts", () => {
   });
 
   test("CONT-012 role guard", async ({ page }) => {
-    if (!seedContract) throw new Error("Seed contract is missing");
+    if (!seedVendor) throw new Error("Seed vendor is missing");
+    await loginAs(page, USERS.tenantAdmin);
+    const draft = await createContractViaUi(page, seedVendor, {
+      contractType: "SOFTWARE",
+      status: "DRAFT",
+      startDate: addDays(-5),
+      endDate: addDays(20),
+      renewalNoticeDays: 30,
+      contractName: `Playwright Auditor Guard ${uniqueSuffix()}`,
+      notes: "Auditor delete guard",
+    });
+
     await loginAs(page, USERS.auditor);
 
     await openContractsPage(page);
     await expect(page.getByRole("button", { name: "New Contract" })).toHaveCount(0);
+    await openContractDetail(page, draft.contractId);
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toHaveCount(0);
 
     const denied = await apiPostJson(page, "/api/v1/contracts", {
       vendor_id: seedVendor?.vendorId,

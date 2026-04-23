@@ -1,5 +1,6 @@
 import {
   createContractService,
+  deleteContractService,
   getContractDetailService,
   getContractSoftwareComplianceSummaryService,
   getContractSoftwareConsumptionSummaryService,
@@ -120,6 +121,17 @@ export default async function contractsRoutes(app) {
   // PATCH /api/v1/contracts/:id
   app.patch("/:id", async function updateContractHandler(req, reply) {
     const row = await updateContractService(app, req);
+
+    return reply.send({
+      ok: true,
+      data: row,
+      meta: { request_id: req.id },
+    });
+  });
+
+  // DELETE /api/v1/contracts/:id
+  app.delete("/:id", async function deleteContractHandler(req, reply) {
+    const row = await deleteContractService(app, req, req.params.id);
 
     return reply.send({
       ok: true,

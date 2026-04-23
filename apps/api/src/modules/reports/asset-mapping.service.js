@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { getUiConfig } from "../config/config.repo.js";
 import {
   listAssetMapping,
-  listAllAssetMapping,
+  listAllAssetMappingExportByAsset,
   countAssetMapping,
   getAssetMappingSummary,
 } from "./asset-mapping.repo.js";
@@ -177,14 +177,6 @@ function buildFilters(req, tenantId) {
   };
 }
 
-function coverageKindLabel(value) {
-  if (value === "WARRANTY") return "Warranty";
-  if (value === "SUPPORT") return "Support";
-  if (value === "SUBSCRIPTION") return "Subscription";
-  if (value === "NONE") return "No Coverage";
-  return value || "";
-}
-
 function safeCell(value) {
   return value == null ? "" : value;
 }
@@ -221,6 +213,127 @@ function buildFilterSummary(filters) {
   if (filters.expiringInDays != null)
     lines.push(`Expiring In Days: ${filters.expiringInDays}`);
   return lines.length ? lines.join(" | ") : "No filters";
+}
+
+function styleHeaderRow(row) {
+  row.height = 26;
+  row.eachCell((cell) => {
+    cell.font = {
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+    };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF0F766E" },
+    };
+    cell.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+      wrapText: true,
+    };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FFD1D5DB" } },
+      left: { style: "thin", color: { argb: "FFD1D5DB" } },
+      bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+      right: { style: "thin", color: { argb: "FFD1D5DB" } },
+    };
+  });
+}
+
+function styleDataSheet(sheet) {
+  sheet.views = [{ state: "frozen", ySplit: 1 }];
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: sheet.columns.length },
+  };
+
+  styleHeaderRow(sheet.getRow(1));
+
+  const wrapColumns = new Set([
+    "name",
+    "asset_type_label",
+    "state_label",
+    "department_name",
+    "location_name",
+    "owner_identity_name",
+    "owner_identity_email",
+    "contract_codes_preview",
+    "vendor_names_preview",
+  ]);
+
+  sheet.columns.forEach((col) => {
+    const key = String(col.key || "");
+    const isWrap = wrapColumns.has(key);
+    col.alignment = {
+      vertical: "middle",
+      wrapText: isWrap,
+    };
+  });
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+
+    row.height = 22;
+
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE5E7EB" } },
+        left: { style: "thin", color: { argb: "FFE5E7EB" } },
+        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+        right: { style: "thin", color: { argb: "FFE5E7EB" } },
+      };
+    });
+
+    if (rowNumber % 2 === 0) {
+      row.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF8FAFC" },
+        };
+      });
+    }
+  });
+}
+
+function styleMetaSheet(sheet) {
+  sheet.getRow(1).height = 24;
+  sheet.getRow(1).eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE2E8F0" },
+    };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FFD1D5DB" } },
+      left: { style: "thin", color: { argb: "FFD1D5DB" } },
+      bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+      right: { style: "thin", color: { argb: "FFD1D5DB" } },
+    };
+    cell.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+      wrapText: true,
+    };
+  });
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFE5E7EB" } },
+        left: { style: "thin", color: { argb: "FFE5E7EB" } },
+        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+        right: { style: "thin", color: { argb: "FFE5E7EB" } },
+      };
+      cell.alignment = {
+        vertical: "middle",
+        wrapText: true,
+      };
+    });
+  });
 }
 
 export async function listAssetMappingService(app, req) {
@@ -278,7 +391,7 @@ export async function exportAssetMappingXlsxService(app, req, reply) {
   ]);
 
   const filters = buildFilters(req, tenantId);
-  const rows = await listAllAssetMapping(app, filters);
+  const rows = await listAllAssetMappingExportByAsset(app, filters);
 
   if (rows.length > EXPORT_MAX_ROWS) {
     throw httpError(
@@ -300,23 +413,35 @@ export async function exportAssetMappingXlsxService(app, req, reply) {
   sheet.columns = [
     { header: "Asset ID", key: "asset_id", width: 12 },
     { header: "Asset Tag", key: "asset_tag", width: 20 },
-    { header: "Name", key: "name", width: 28 },
+    { header: "Name", key: "name", width: 30 },
     { header: "Status", key: "status", width: 16 },
     { header: "Asset Type Code", key: "asset_type_code", width: 18 },
     { header: "Asset Type Label", key: "asset_type_label", width: 24 },
     { header: "State Code", key: "state_code", width: 16 },
     { header: "State Label", key: "state_label", width: 20 },
+
     { header: "Department Code", key: "department_code", width: 18 },
     { header: "Department Name", key: "department_name", width: 24 },
     { header: "Location Code", key: "location_code", width: 18 },
     { header: "Location Name", key: "location_name", width: 24 },
     { header: "Owner Identity Name", key: "owner_identity_name", width: 24 },
     { header: "Owner Identity Email", key: "owner_identity_email", width: 28 },
-    { header: "Coverage Kind", key: "coverage_kind", width: 18 },
-    { header: "Start Date", key: "start_date", width: 14 },
-    { header: "End Date", key: "end_date", width: 14 },
-    { header: "Coverage Health", key: "coverage_health", width: 18 },
-    { header: "Days To Expiry", key: "days_to_expiry", width: 16 },
+
+    { header: "Warranty Start Date", key: "warranty_start_date", width: 16 },
+    { header: "Warranty End Date", key: "warranty_end_date", width: 16 },
+    { header: "Warranty Health", key: "warranty_health", width: 18 },
+    { header: "Warranty Days To Expiry", key: "warranty_days_to_expiry", width: 22 },
+
+    { header: "Support Start Date", key: "support_start_date", width: 16 },
+    { header: "Support End Date", key: "support_end_date", width: 16 },
+    { header: "Support Health", key: "support_health", width: 18 },
+    { header: "Support Days To Expiry", key: "support_days_to_expiry", width: 22 },
+
+    { header: "Subscription Start Date", key: "subscription_start_date", width: 18 },
+    { header: "Subscription End Date", key: "subscription_end_date", width: 18 },
+    { header: "Subscription Health", key: "subscription_health", width: 20 },
+    { header: "Subscription Days To Expiry", key: "subscription_days_to_expiry", width: 24 },
+
     { header: "Has Linked Contract", key: "has_linked_contract", width: 18 },
     { header: "Linked Contracts Count", key: "linked_contracts_count", width: 20 },
     { header: "Linked Vendors Count", key: "linked_vendors_count", width: 18 },
@@ -324,8 +449,6 @@ export async function exportAssetMappingXlsxService(app, req, reply) {
     { header: "Contract Codes Preview", key: "contract_codes_preview", width: 36 },
     { header: "Vendor Names Preview", key: "vendor_names_preview", width: 36 },
   ];
-
-  sheet.getRow(1).font = { bold: true };
 
   for (const row of rows) {
     sheet.addRow({
@@ -337,17 +460,34 @@ export async function exportAssetMappingXlsxService(app, req, reply) {
       asset_type_label: safeCell(row.asset_type?.label),
       state_code: safeCell(row.state?.code),
       state_label: safeCell(row.state?.label),
+
       department_code: safeCell(row.department?.code),
       department_name: safeCell(row.department?.label),
       location_code: safeCell(row.location?.code),
       location_name: safeCell(row.location?.label),
       owner_identity_name: safeCell(row.owner_identity?.name),
       owner_identity_email: safeCell(row.owner_identity?.email),
-      coverage_kind: coverageKindLabel(row.coverage_kind),
-      start_date: safeCell(row.start_date),
-      end_date: safeCell(row.end_date),
-      coverage_health: safeCell(row.coverage_health),
-      days_to_expiry: row.days_to_expiry == null ? "" : row.days_to_expiry,
+
+      warranty_start_date: safeCell(row.warranty_start_date),
+      warranty_end_date: safeCell(row.warranty_end_date),
+      warranty_health: safeCell(row.warranty_health),
+      warranty_days_to_expiry:
+        row.warranty_days_to_expiry == null ? "" : row.warranty_days_to_expiry,
+
+      support_start_date: safeCell(row.support_start_date),
+      support_end_date: safeCell(row.support_end_date),
+      support_health: safeCell(row.support_health),
+      support_days_to_expiry:
+        row.support_days_to_expiry == null ? "" : row.support_days_to_expiry,
+
+      subscription_start_date: safeCell(row.subscription_start_date),
+      subscription_end_date: safeCell(row.subscription_end_date),
+      subscription_health: safeCell(row.subscription_health),
+      subscription_days_to_expiry:
+        row.subscription_days_to_expiry == null
+          ? ""
+          : row.subscription_days_to_expiry,
+
       has_linked_contract: yesNo(row.has_linked_contract),
       linked_contracts_count: row.linked_contracts_count ?? 0,
       linked_vendors_count: row.linked_vendors_count ?? 0,
@@ -357,24 +497,23 @@ export async function exportAssetMappingXlsxService(app, req, reply) {
     });
   }
 
-  sheet.views = [{ state: "frozen", ySplit: 1 }];
-  sheet.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: 1, column: sheet.columns.length },
-  };
+  styleDataSheet(sheet);
 
   const meta = workbook.addWorksheet("Meta");
   meta.columns = [
     { header: "Key", key: "key", width: 24 },
     { header: "Value", key: "value", width: 80 },
   ];
-  meta.getRow(1).font = { bold: true };
 
   meta.addRow({ key: "Report", value: "Asset Mapping Report" });
   meta.addRow({ key: "Generated At", value: new Date().toISOString() });
   meta.addRow({ key: "Tenant ID", value: String(tenantId) });
   meta.addRow({ key: "Applied Filters", value: buildFilterSummary(filters) });
   meta.addRow({ key: "Total Rows", value: String(rows.length) });
+  meta.addRow({ key: "Ordering", value: "asset_id ASC" });
+  meta.addRow({ key: "Export Shape", value: "1 asset_id = 1 row" });
+
+  styleMetaSheet(meta);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const fileDate = new Date().toISOString().slice(0, 10);

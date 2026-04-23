@@ -19,6 +19,12 @@ export const ASSET_TRANSFER_DECIDE_ALLOWED_ROLES = [
   "ITAM_MANAGER",
 ] as const;
 
+export const ASSET_TRANSFER_DELETE_ALLOWED_ROLES = [
+  "SUPERADMIN",
+  "TENANT_ADMIN",
+  "ITAM_MANAGER",
+] as const;
+
 export function normalizeRoles(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   return input
@@ -45,4 +51,8 @@ export function canSubmitAssetTransfer(userRoles: unknown): boolean {
 
 export function canDecideAssetTransfer(userRoles: unknown): boolean {
   return hasAnyRole(userRoles, ASSET_TRANSFER_DECIDE_ALLOWED_ROLES);
+}
+
+export function canDeleteAssetTransfer(userRoles: unknown): boolean {
+  return hasAnyRole(userRoles, ASSET_TRANSFER_DELETE_ALLOWED_ROLES);
 }

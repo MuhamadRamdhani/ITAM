@@ -2,7 +2,13 @@ import {
   listDocuments,
   createDocumentTx,
   getDocumentBundle,
+  getDocumentByIdForDelete,
   addVersionTx,
+  countDocumentDeleteDependencies,
+  lockDocumentDeleteRelatedTables,
+  deleteDocumentById,
+  deleteDocumentEventsByDocumentId,
+  deleteDocumentVersionsByDocumentId,
   transitionStatusTx,
   archiveTx,
 } from "./documents.repo.js";
@@ -21,6 +27,66 @@ function normType(s) {
 function actorFromIdentityId(identityId) {
   if (Number.isFinite(identityId) && identityId > 0) return `IDENTITY:${identityId}`;
   return "SYSTEM";
+}
+
+function mustTenantId(req) {
+  const tenantId = req?.tenantId ?? req?.requestContext?.tenantId ?? null;
+  if (!tenantId) {
+    const e = new Error("Unauthorized tenant context");
+    e.statusCode = 401;
+    e.code = "AUTH_REQUIRED";
+    throw e;
+  }
+  return Number(tenantId);
+}
+
+function mustHaveAnyRole(req, allowedRoles) {
+  const raw = Array.isArray(req?.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = raw
+    .map((role) => {
+      if (typeof role === "string") return role;
+      if (role && typeof role === "object") {
+        return role.code ?? role.role_code ?? role.roleCode ?? "";
+      }
+      return "";
+    })
+    .map((value) => String(value || "").trim().toUpperCase())
+    .filter(Boolean);
+
+  const ok = allowedRoles.some((role) => roles.includes(role));
+  if (!ok) {
+    const e = new Error("Forbidden");
+    e.statusCode = 403;
+    e.code = "FORBIDDEN";
+    e.details = { required_any: allowedRoles, got: roles };
+    throw e;
+  }
+}
+
+function makeDeleteError(statusCode, code, message, details) {
+  const e = new Error(message);
+  e.statusCode = statusCode;
+  e.code = code;
+  e.details = details;
+  return e;
+}
+
+async function withTransaction(app, fn) {
+  const client = await app.pg.connect();
+
+  try {
+    await client.query("BEGIN");
+    const result = await fn({ pg: client });
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listDocumentsService(app, { tenantId, q, status, type, page, pageSize }) {
@@ -235,4 +301,85 @@ export async function archiveDocumentService(app, { tenantId, documentId, actorI
   }
 
   return out;
+}
+
+export async function deleteDocumentService(app, req, documentId) {
+  const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER"]);
+
+  const actorId = req?.requestContext?.identityId ?? null;
+
+  try {
+    const deleted = await withTransaction(app, async (tx) => {
+      const current = await getDocumentByIdForDelete(tx, { tenantId, documentId });
+      if (!current) {
+        throw makeDeleteError(404, "NOT_FOUND", "Document not found");
+      }
+
+      const statusCode = String(current.status_code ?? "").toUpperCase();
+      if (statusCode !== "DRAFT") {
+        throw makeDeleteError(
+          409,
+          "DOCUMENT_NOT_DELETABLE",
+          "Only DRAFT documents can be deleted",
+          { status_code: current.status_code ?? null }
+        );
+      }
+
+      await lockDocumentDeleteRelatedTables(tx);
+
+      const dependencies = await countDocumentDeleteDependencies(tx, {
+        tenantId,
+        documentId,
+      });
+
+      if (dependencies.total > 0) {
+        throw makeDeleteError(409, "DOCUMENT_IN_USE", "Document is still in use", dependencies);
+      }
+
+      await insertAuditEvent(tx, {
+        tenantId,
+        actor: actorFromIdentityId(actorId),
+        action: "DOCUMENT_DELETED",
+        entityType: "DOCUMENT",
+        entityId: documentId,
+        payload: {
+          id: Number(current.id),
+          tenant_id: Number(current.tenant_id),
+          doc_type_code: current.doc_type_code ?? null,
+          title: current.title ?? null,
+          status_code: current.status_code ?? null,
+          current_version: Number(current.current_version ?? 1),
+        },
+      });
+
+      await deleteDocumentVersionsByDocumentId(tx, { tenantId, documentId });
+      await deleteDocumentEventsByDocumentId(tx, { tenantId, documentId });
+
+      const removed = await deleteDocumentById(tx, { tenantId, documentId });
+      if (!removed) {
+        throw makeDeleteError(404, "NOT_FOUND", "Document not found");
+      }
+
+      return removed;
+    });
+
+    return { ok: true, document: deleted };
+  } catch (error) {
+    if (
+      error?.code === "DOCUMENT_NOT_DELETABLE" ||
+      error?.code === "DOCUMENT_IN_USE" ||
+      error?.code === "NOT_FOUND"
+    ) {
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+        statusCode: error.statusCode ?? 409,
+        details: error.details,
+      };
+    }
+
+    throw error;
+  }
 }

@@ -8,6 +8,7 @@ import {
   listEvidenceFilesService,
   attachEvidenceLinkService,
   listEvidenceLinksService,
+  deleteEvidenceFileService,
 } from "./evidence.service.js";
 import { checkUploadRateLimit } from "../../lib/uploadRateLimit.js";
 
@@ -177,6 +178,39 @@ export default async function evidenceRoutes(app) {
           file,
           download_url: `/api/v1/evidence/files/${fileId}/download`,
         },
+        meta: { request_id: req.id },
+      });
+    }
+  );
+
+  // DELETE /api/v1/evidence/files/:id
+  app.delete(
+    "/evidence/files/:id",
+    {
+      schema: { params: Type.Object({ id: Type.String() }) },
+    },
+    async (req, reply) => {
+      const tenantId = mustTenantId(req);
+      mustHaveAnyRole(req, ["TENANT_ADMIN", "ITAM_MANAGER", "SUPERADMIN"]);
+
+      const fileId = Number(req.params.id);
+      if (!Number.isFinite(fileId) || fileId <= 0) {
+        return reply.code(400).send({
+          ok: false,
+          error: { code: "BAD_REQUEST", message: "Invalid file id" },
+          meta: { request_id: req.id },
+        });
+      }
+
+      const file = await deleteEvidenceFileService(app, {
+        tenantId,
+        actorId: req.requestContext?.identityId ?? null,
+        fileId,
+      });
+
+      return reply.send({
+        ok: true,
+        data: { file },
         meta: { request_id: req.id },
       });
     }

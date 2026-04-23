@@ -209,3 +209,309 @@ body {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+.itam-app-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: #0f172a;
+}
+
+.itam-app-sidebar {
+  width: 18.5rem;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.12), transparent 28%),
+    radial-gradient(circle at 85% 15%, rgba(14, 165, 233, 0.1), transparent 22%),
+    linear-gradient(180deg, #0f172a 0%, #111827 52%, #0b1324 100%);
+  color: rgb(226 232 240);
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+.itam-app-sidebar-inner {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.itam-app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.7rem 0.75rem 1.1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.itam-app-sidebar-brand-mark {
+  display: inline-flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, rgb(14 165 233), rgb(6 182 212));
+  color: white;
+  font-size: 1.35rem;
+  font-weight: 700;
+  box-shadow: 0 16px 40px rgba(6, 182, 212, 0.25);
+}
+
+.itam-app-sidebar-brand-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: white;
+}
+
+.itam-app-sidebar-brand-subtitle {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+  color: rgb(191 219 254);
+}
+
+.itam-app-sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 0 1rem;
+}
+
+.itam-app-sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.itam-app-sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.25);
+}
+
+.itam-app-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.itam-app-sidebar-section {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+}
+
+.itam-app-sidebar-section-active {
+  border-color: rgba(103, 232, 249, 0.25);
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.itam-app-sidebar-section-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0;
+  background: transparent;
+  padding: 1rem 1rem;
+  text-align: left;
+  color: rgb(241 245 249);
+  cursor: pointer;
+}
+
+.itam-app-sidebar-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.itam-app-sidebar-section-chevron {
+  font-size: 0.95rem;
+  color: rgb(186 230 253);
+  transition: transform 150ms ease;
+}
+
+.itam-app-sidebar-section-chevron-open {
+  transform: rotate(0deg);
+}
+
+.itam-app-sidebar-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0 0.65rem 0.85rem;
+}
+
+.itam-app-sidebar-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.95rem;
+  padding: 0.8rem 0.9rem;
+  text-decoration: none;
+  color: rgb(203 213 225);
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.itam-app-sidebar-link:hover {
+  transform: translateY(-1px);
+  background: rgba(14, 165, 233, 0.12);
+  color: white;
+}
+
+.itam-app-sidebar-link-active {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(14, 165, 233, 0.16));
+  color: white;
+  box-shadow:
+    inset 0 0 0 1px rgba(103, 232, 249, 0.18),
+    0 10px 24px rgba(8, 145, 178, 0.12);
+}
+
+.itam-app-sidebar-link-dot {
+  height: 0.45rem;
+  width: 0.45rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: rgba(125, 211, 252, 0.55);
+}
+
+.itam-app-sidebar-link-active .itam-app-sidebar-link-dot {
+  background: rgb(165 243 252);
+  box-shadow: 0 0 0 6px rgba(103, 232, 249, 0.08);
+}
+
+.itam-app-sidebar-footer {
+  margin-top: auto;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  padding: 1rem 0.75rem 0.2rem;
+}
+
+.itam-app-sidebar-footer-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(165 243 252);
+}
+
+.itam-app-sidebar-footer-text {
+  margin-top: 0.55rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: rgb(191 219 254);
+}
+
+.itam-app-content {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+}
+
+.itam-app-content-body {
+  min-width: 0;
+}
+
+.itam-app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(248, 250, 252, 0.9);
+  padding: 0.9rem 1rem;
+  backdrop-filter: blur(14px);
+}
+
+.itam-app-mobile-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.22rem;
+  border: 1px solid rgb(203 213 225);
+  border-radius: 0.9rem;
+  background: white;
+  padding: 0.8rem 0.75rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.itam-app-mobile-toggle span {
+  display: block;
+  width: 1.1rem;
+  height: 2px;
+  border-radius: 9999px;
+  background: rgb(51 65 85);
+}
+
+.itam-app-topbar-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.itam-app-topbar-brand-mark {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgb(14 165 233), rgb(6 182 212));
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(6, 182, 212, 0.2);
+}
+
+.itam-app-topbar-brand-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.itam-app-topbar-brand-subtitle {
+  font-size: 0.8rem;
+  color: rgb(100 116 139);
+}
+
+.itam-app-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(2, 6, 23, 0.5);
+  border: 0;
+}
+
+.itam-app-mobile-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 80;
+  width: min(18.5rem, 88vw);
+  max-width: 18.5rem;
+}
+
+.itam-app-mobile-drawer .itam-app-sidebar {
+  min-height: 100vh;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .itam-app-content-body {
+    min-height: 100vh;
+  }
+
+  .itam-page-shell-inner {
+    max-width: none;
+  }
+}

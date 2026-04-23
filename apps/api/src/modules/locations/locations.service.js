@@ -2,10 +2,13 @@ import { getUiConfig } from "../config/config.repo.js";
 import { insertAuditEvent } from "../../lib/audit.js";
 import {
   getLocationById,
+  getLocationByIdForDelete,
   locationCodeExists,
   listLocations,
   insertLocation,
   updateLocation,
+  countLocationDeleteDependencies,
+  deleteLocationById,
 } from "./locations.repo.js";
 
 function mustTenantId(req) {
@@ -222,4 +225,57 @@ export async function patchLocationService(app, req, locationId, body) {
   });
 
   return await getLocationById(app, tenantId, locationId);
+}
+
+export async function deleteLocationService(app, req, locationId) {
+  const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, ["TENANT_ADMIN", "SUPERADMIN"]);
+
+  const current = await getLocationByIdForDelete(app, tenantId, locationId);
+  if (!current) {
+    const e = new Error("Location not found");
+    e.statusCode = 404;
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  const dependencies = await countLocationDeleteDependencies(app, tenantId, locationId);
+  if (dependencies.total > 0) {
+    const e = new Error("Location is still in use");
+    e.statusCode = 409;
+    e.code = "LOCATION_IN_USE";
+    e.details = dependencies;
+    throw e;
+  }
+
+  await app.pg.query("BEGIN");
+  try {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorStr(req),
+      action: "LOCATION_DELETED",
+      entityType: "LOCATION",
+      entityId: locationId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        code: current.code,
+        name: current.name,
+      },
+    });
+
+    const deleted = await deleteLocationById(app, tenantId, locationId);
+    if (!deleted) {
+      throw Object.assign(new Error("Location not found"), {
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    }
+
+    await app.pg.query("COMMIT");
+    return deleted;
+  } catch (error) {
+    await app.pg.query("ROLLBACK");
+    throw error;
+  }
 }

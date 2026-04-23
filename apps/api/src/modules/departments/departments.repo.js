@@ -12,6 +12,10 @@ export async function getDepartmentById(app, tenantId, departmentId) {
   return rows[0] || null;
 }
 
+export async function getDepartmentByIdForDelete(app, tenantId, departmentId) {
+  return await getDepartmentById(app, tenantId, departmentId);
+}
+
 export async function departmentCodeExists(app, tenantId, code, excludeId = null) {
   if (!code) return false;
 
@@ -101,4 +105,61 @@ export async function updateDepartment(app, tenantId, departmentId, { code, name
   );
 
   return rowCount;
+}
+
+export async function countDepartmentDeleteDependencies(app, tenantId, departmentId) {
+  const [assetRows, identityRows, historyRows] = await Promise.all([
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.assets
+      WHERE tenant_id = $1
+        AND owner_department_id = $2
+      `,
+      [tenantId, departmentId]
+    ),
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.identities
+      WHERE tenant_id = $1
+        AND department_id = $2
+      `,
+      [tenantId, departmentId]
+    ),
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.asset_ownership_history
+      WHERE tenant_id = $1
+        AND owner_department_id = $2
+      `,
+      [tenantId, departmentId]
+    ),
+  ]);
+
+  const assets = Number(assetRows.rows?.[0]?.total ?? 0);
+  const identities = Number(identityRows.rows?.[0]?.total ?? 0);
+  const history = Number(historyRows.rows?.[0]?.total ?? 0);
+
+  return {
+    assets,
+    identities,
+    history,
+    total: assets + identities + history,
+  };
+}
+
+export async function deleteDepartmentById(app, tenantId, departmentId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.departments
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING id, tenant_id, code, name
+    `,
+    [tenantId, departmentId]
+  );
+
+  return rows[0] || null;
 }

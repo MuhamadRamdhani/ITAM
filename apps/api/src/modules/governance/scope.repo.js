@@ -85,6 +85,33 @@ export async function getScopeVersionById(db, { tenantId, id }) {
   return res.rows?.[0] ?? null;
 }
 
+export async function getScopeVersionByIdForDelete(db, { tenantId, id }) {
+  const sql = `
+    SELECT
+      id,
+      tenant_id,
+      version_no,
+      status,
+      scope_json,
+      note,
+      created_by_user_id,
+      updated_by_user_id,
+      submitted_at,
+      approved_at,
+      activated_at,
+      superseded_at,
+      created_at,
+      updated_at
+    FROM public.scope_versions
+    WHERE tenant_id = $1
+      AND id = $2
+    FOR UPDATE
+    LIMIT 1
+  `;
+  const res = await db.query(sql, [tenantId, id]);
+  return res.rows?.[0] ?? null;
+}
+
 export async function listScopeEventsByVersionId(db, { tenantId, scopeVersionId }) {
   const sql = `
     SELECT
@@ -103,6 +130,13 @@ export async function listScopeEventsByVersionId(db, { tenantId, scopeVersionId 
   `;
   const res = await db.query(sql, [tenantId, scopeVersionId]);
   return res.rows ?? [];
+}
+
+export async function lockScopeVersionDeleteRelatedTables(db) {
+  await db.query(`
+    LOCK TABLE public.scope_events
+    IN SHARE ROW EXCLUSIVE MODE
+  `);
 }
 
 export async function getNextScopeVersionNo(db, { tenantId }) {
@@ -363,5 +397,41 @@ export async function insertScopeEvent(db, {
     note ?? null,
     JSON.stringify(eventPayload ?? {}),
   ]);
+  return res.rows?.[0] ?? null;
+}
+
+export async function deleteScopeEventsByVersionId(db, { tenantId, scopeVersionId }) {
+  const sql = `
+    DELETE FROM public.scope_events
+    WHERE tenant_id = $1
+      AND scope_version_id = $2
+  `;
+  const res = await db.query(sql, [tenantId, scopeVersionId]);
+  return Number(res.rowCount ?? 0);
+}
+
+export async function deleteScopeVersionById(db, { tenantId, id }) {
+  const sql = `
+    DELETE FROM public.scope_versions
+    WHERE tenant_id = $1
+      AND id = $2
+      AND status = 'DRAFT'
+    RETURNING
+      id,
+      tenant_id,
+      version_no,
+      status,
+      scope_json,
+      note,
+      created_by_user_id,
+      updated_by_user_id,
+      submitted_at,
+      approved_at,
+      activated_at,
+      superseded_at,
+      created_at,
+      updated_at
+  `;
+  const res = await db.query(sql, [tenantId, id]);
   return res.rows?.[0] ?? null;
 }

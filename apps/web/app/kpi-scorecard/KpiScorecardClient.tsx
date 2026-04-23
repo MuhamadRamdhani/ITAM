@@ -1,13 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   KpiPeriodParts,
   KpiPeriodType,
-  KpiScorecardItem,
-  KpiScorecardSummary,
   buildPeriodKeyFromParts,
   canManageKpis,
   canViewKpiModule,
@@ -24,6 +22,35 @@ import {
   parsePeriodKeyToParts,
 } from '@/app/lib/kpi';
 
+type ScorecardRow = {
+  kpi_id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  source_type: string;
+  category_code: string;
+  period_type: string;
+  target_value: number | null;
+  actual_value: number | null;
+  achievement_pct: number | null;
+  status: string;
+  measured_at: string | null;
+  measurement_note: string | null;
+  unit_code: string;
+};
+
+type ScorecardView = {
+  summary: {
+    total_kpis: number;
+    on_track_count: number;
+    warning_count: number;
+    critical_count: number;
+    no_target_count: number;
+    missing_count: number;
+  };
+  items: ScorecardRow[];
+};
+
 type CaptureFormState = {
   actual_value: string;
   measurement_note: string;
@@ -34,9 +61,175 @@ const DEFAULT_CAPTURE_FORM: CaptureFormState = {
   measurement_note: '',
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function asNumberOrNull(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function asInt(value: unknown, fallback = 0): number {
+  const parsed = asNumberOrNull(value);
+  return parsed == null ? fallback : Math.trunc(parsed);
+}
+
+function normalizeScorecard(input: unknown): ScorecardView {
+  const root = isRecord(input) ? input : {};
+  const rawSummary = isRecord(root.summary) ? root.summary : {};
+  const rawItems = Array.isArray(root.items)
+    ? root.items
+    : Array.isArray(root.rows)
+      ? root.rows
+      : [];
+
+  const items: ScorecardRow[] = rawItems
+    .map((rawItem) => {
+      if (!isRecord(rawItem)) return null;
+
+      return {
+        kpi_id: asInt(rawItem.kpi_id ?? rawItem.id, 0),
+        code: asString(rawItem.code ?? rawItem.kpi_code, '-'),
+        name: asString(rawItem.name ?? rawItem.kpi_name, '-'),
+        description: asNullableString(rawItem.description),
+        source_type: asString(rawItem.source_type, '-'),
+        category_code: asString(rawItem.category_code, '-'),
+        period_type: asString(rawItem.period_type, '-'),
+        target_value: asNumberOrNull(rawItem.target_value),
+        actual_value: asNumberOrNull(rawItem.actual_value),
+        achievement_pct: asNumberOrNull(
+          rawItem.achievement_pct ?? rawItem.achievement_value,
+        ),
+        status: asString(rawItem.status, 'MISSING'),
+        measured_at: asNullableString(rawItem.measured_at ?? rawItem.created_at),
+        measurement_note: asNullableString(rawItem.measurement_note),
+        unit_code: asString(rawItem.unit_code, 'NUMBER'),
+      };
+    })
+    .filter((item): item is ScorecardRow => item !== null);
+
+  return {
+    summary: {
+      total_kpis: asInt(rawSummary.total_kpis),
+      on_track_count: asInt(rawSummary.on_track_count),
+      warning_count: asInt(rawSummary.warning_count),
+      critical_count: asInt(rawSummary.critical_count),
+      no_target_count: asInt(rawSummary.no_target_count),
+      missing_count: asInt(rawSummary.missing_count),
+    },
+    items,
+  };
+}
+
 function getYearOptions() {
   const currentYear = new Date().getFullYear();
   return Array.from({ length: 11 }, (_, index) => String(currentYear - 5 + index));
+}
+
+function getPeriodWindow(periodType: KpiPeriodType, parts: KpiPeriodParts) {
+  const year = Number(parts.year || new Date().getFullYear());
+
+  if (periodType === 'MONTHLY') {
+    const month = Math.max(1, Math.min(12, Number(parts.month || 1)));
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+    };
+  }
+
+  if (periodType === 'QUARTERLY') {
+    const quarter = parts.quarter || 'Q1';
+    const quarterIndex =
+      quarter === 'Q2' ? 1 : quarter === 'Q3' ? 2 : quarter === 'Q4' ? 3 : 0;
+    const startMonth = quarterIndex * 3;
+    const start = new Date(year, startMonth, 1);
+    const end = new Date(year, startMonth + 3, 0);
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+    };
+  }
+
+  const start = new Date(year, 0, 1);
+  const end = new Date(year, 11, 31);
+  return {
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
+  };
+}
+
+function SummaryCard({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string;
+  value: number;
+  tone?: 'default' | 'green' | 'amber' | 'rose' | 'slate';
+}) {
+  const className =
+    tone === 'green'
+      ? 'border-emerald-200 text-emerald-800'
+      : tone === 'amber'
+        ? 'border-amber-200 text-amber-800'
+        : tone === 'rose'
+          ? 'border-rose-200 text-rose-800'
+          : tone === 'slate'
+            ? 'border-slate-200 text-slate-800'
+            : 'border-slate-200 text-slate-900';
+
+  return (
+    <div
+      className={`rounded-[1.5rem] border bg-white/90 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] ${className}`}
+    >
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-3 text-3xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function PanelCard({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+          {description ? (
+            <p className="mt-1 text-sm text-slate-600">{description}</p>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function EmptyState({
@@ -51,7 +244,7 @@ function EmptyState({
   const isMonthly = periodType === 'MONTHLY';
 
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
       <div className="mx-auto max-w-2xl">
         <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">
           No scorecard rows
@@ -62,45 +255,35 @@ function EmptyState({
         </h3>
 
         <p className="mt-3 text-sm leading-7 text-slate-700">
-          Scorecard hanya menampilkan KPI yang period type-nya sama dengan pilihan saat ini.
-          Untuk periode <span className="font-semibold text-slate-900">{periodType}</span> dengan key{' '}
-          <span className="font-semibold text-slate-900">{periodKey}</span>, belum ada baris yang bisa ditampilkan.
+          Scorecard hanya menampilkan KPI yang period type-nya sama dengan pilihan saat
+          ini. Untuk periode{' '}
+          <span className="font-semibold text-slate-900">{periodType}</span> dengan key{' '}
+          <span className="font-semibold text-slate-900">{periodKey}</span>, belum ada
+          baris yang bisa ditampilkan.
         </p>
 
-        {!isMonthly && (
+        {!isMonthly ? (
           <p className="mt-3 text-sm leading-7 text-slate-700">
-            Ini normal kalau KPI yang sudah kamu buat saat ini masih dominan
-            <span className="font-semibold text-slate-900"> MONTHLY</span>. KPI monthly memang
-            tidak akan muncul saat selector ada di Quarterly atau Yearly.
+            Ini normal kalau KPI yang sudah Anda buat saat ini masih dominan
+            <span className="font-semibold text-slate-900"> MONTHLY</span>. KPI monthly
+            memang tidak akan muncul saat selector ada di Quarterly atau Yearly.
           </p>
-        )}
+        ) : null}
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/kpis"
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-          >
+          <Link href="/kpis" className="itam-secondary-action">
             Open KPI Library
           </Link>
 
-          {!isMonthly && (
+          {!isMonthly ? (
             <button
               type="button"
               onClick={onBackToMonthly}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+              className="itam-primary-action"
             >
               Back to Monthly
             </button>
-          )}
-        </div>
-
-        <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left text-sm text-blue-800">
-          <div className="font-medium">Saran penggunaan</div>
-          <ul className="mt-2 space-y-1">
-            <li>• Gunakan Monthly untuk KPI yang sudah berjalan saat ini.</li>
-            <li>• Buat KPI baru dengan period type Quarterly atau Yearly jika memang dibutuhkan.</li>
-            <li>• Capture measurement hanya bisa dilakukan setelah KPI untuk period type tersebut tersedia.</li>
-          </ul>
+          ) : null}
         </div>
       </div>
     </div>
@@ -117,20 +300,29 @@ export default function KpiScorecardClient() {
   const [roles, setRoles] = useState<string[]>([]);
   const [periodType, setPeriodType] = useState<KpiPeriodType>('MONTHLY');
   const [periodParts, setPeriodParts] = useState<KpiPeriodParts>(() =>
-    parsePeriodKeyToParts('MONTHLY', getCurrentPeriodKey('MONTHLY'))
+    parsePeriodKeyToParts('MONTHLY', getCurrentPeriodKey('MONTHLY')),
   );
-  const [scorecard, setScorecard] = useState<KpiScorecardSummary | null>(null);
+  const [scorecard, setScorecard] = useState<ScorecardView | null>(null);
 
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false);
-  const [captureTarget, setCaptureTarget] = useState<KpiScorecardItem | null>(null);
+  const [captureTarget, setCaptureTarget] = useState<ScorecardRow | null>(null);
   const [captureForm, setCaptureForm] = useState<CaptureFormState>(DEFAULT_CAPTURE_FORM);
   const [captureError, setCaptureError] = useState('');
 
   const canManage = useMemo(() => canManageKpis(roles), [roles]);
-  const yearOptions = useMemo(() => getYearOptions(), []);
   const periodKey = useMemo(
     () => buildPeriodKeyFromParts(periodType, periodParts),
-    [periodType, periodParts]
+    [periodType, periodParts],
+  );
+  const yearOptions = useMemo(() => getYearOptions(), []);
+  const periodWindow = useMemo(
+    () => getPeriodWindow(periodType, periodParts),
+    [periodType, periodParts],
+  );
+  const returnTo = useMemo(
+    () =>
+      `/kpi-scorecard?periodType=${encodeURIComponent(periodType)}&periodKey=${encodeURIComponent(periodKey)}`,
+    [periodKey, periodType],
   );
 
   const summaryCards = useMemo(() => {
@@ -140,39 +332,39 @@ export default function KpiScorecardClient() {
       {
         label: 'Total KPI',
         value: scorecard.summary.total_kpis,
-        className: 'border-gray-200 bg-white text-gray-900',
+        tone: 'default' as const,
       },
       {
         label: 'On Track',
         value: scorecard.summary.on_track_count,
-        className: 'border-green-200 bg-green-50 text-green-700',
+        tone: 'green' as const,
       },
       {
         label: 'Warning',
         value: scorecard.summary.warning_count,
-        className: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+        tone: 'amber' as const,
       },
       {
         label: 'Critical',
         value: scorecard.summary.critical_count,
-        className: 'border-red-200 bg-red-50 text-red-700',
+        tone: 'rose' as const,
       },
       {
         label: 'No Target',
         value: scorecard.summary.no_target_count,
-        className: 'border-gray-200 bg-gray-50 text-gray-700',
+        tone: 'slate' as const,
       },
       {
         label: 'Missing',
         value: scorecard.summary.missing_count,
-        className: 'border-slate-200 bg-slate-50 text-slate-700',
+        tone: 'slate' as const,
       },
     ];
   }, [scorecard]);
 
   async function loadScorecard(nextPeriodType = periodType, nextPeriodKey = periodKey) {
     const result = await getKpiScorecardSummary(nextPeriodType, nextPeriodKey);
-    setScorecard(result);
+    setScorecard(normalizeScorecard(result));
   }
 
   useEffect(() => {
@@ -205,7 +397,7 @@ export default function KpiScorecardClient() {
       }
     }
 
-    bootstrap();
+    void bootstrap();
 
     return () => {
       cancelled = true;
@@ -225,7 +417,7 @@ export default function KpiScorecardClient() {
         const result = await getKpiScorecardSummary(periodType, periodKey);
         if (cancelled) return;
 
-        setScorecard(result);
+        setScorecard(normalizeScorecard(result));
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(getErrorMessage(error));
@@ -238,14 +430,19 @@ export default function KpiScorecardClient() {
       }
     }
 
-    refreshScorecard();
+    void refreshScorecard();
 
     return () => {
       cancelled = true;
     };
-  }, [authReady, periodType, periodKey]);
+  }, [authReady, periodKey, periodType]);
 
-  function openCaptureModal(item: KpiScorecardItem) {
+  function handlePeriodTypeChange(nextType: KpiPeriodType) {
+    setPeriodType(nextType);
+    setPeriodParts(parsePeriodKeyToParts(nextType, getCurrentPeriodKey(nextType)));
+  }
+
+  function openCaptureModal(item: ScorecardRow) {
     setCaptureTarget(item);
     setCaptureForm(DEFAULT_CAPTURE_FORM);
     setCaptureError('');
@@ -260,62 +457,48 @@ export default function KpiScorecardClient() {
     setCaptureError('');
   }
 
-  async function handleCaptureSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCaptureSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!captureTarget) return;
 
     try {
       setSubmitting(true);
       setCaptureError('');
 
-      if (captureTarget.source_type === 'MANUAL' && captureForm.actual_value.trim() === '') {
-        setCaptureError('actual_value is required for MANUAL KPI.');
-        return;
-      }
-
-      await createKpiMeasurement(captureTarget.kpi_id, {
+      await createKpiMeasurement(String(captureTarget.kpi_id), {
         period_key: periodKey,
-        period_type: periodType,
-        actual_value:
-          captureTarget.source_type === 'MANUAL'
-            ? Number(captureForm.actual_value)
-            : undefined,
-        measurement_note: captureForm.measurement_note || null,
+        actual_value: Number(captureForm.actual_value),
+        measurement_note: captureForm.measurement_note.trim() || null,
       });
 
-      await loadScorecard(periodType, periodKey);
       closeCaptureModal();
+      setLoading(true);
+      await loadScorecard(periodType, periodKey);
     } catch (error) {
       setCaptureError(getErrorMessage(error));
     } finally {
       setSubmitting(false);
+      setLoading(false);
     }
-  }
-
-  function handleBackToMonthly() {
-    const nextType: KpiPeriodType = 'MONTHLY';
-    setPeriodType(nextType);
-    setPeriodParts(parsePeriodKeyToParts(nextType, getCurrentPeriodKey(nextType)));
   }
 
   function renderPeriodPicker() {
     if (periodType === 'MONTHLY') {
+      const monthValue = `${periodParts.year}-${periodParts.month}`;
+
       return (
         <input
           type="month"
-          value={`${periodParts.year}-${periodParts.month}`}
+          value={monthValue}
           onChange={(event) => {
-            const [year, month] = event.target.value.split('-');
-            if (!year || !month) return;
-
-            setPeriodParts({
-              year,
-              month,
-              quarter: String(Math.floor((Number(month) - 1) / 3) + 1),
-            });
-          }}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+  const [year, month] = event.target.value.split('-');
+  setPeriodParts((current) => ({
+    ...current,
+    year: year || current.year,
+    month: month || current.month,
+  }));
+}}
+          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
         />
       );
     }
@@ -324,23 +507,6 @@ export default function KpiScorecardClient() {
       return (
         <div className="grid grid-cols-2 gap-3">
           <select
-            value={periodParts.year}
-            onChange={(event) =>
-              setPeriodParts((current) => ({
-                ...current,
-                year: event.target.value,
-              }))
-            }
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-          >
-            {yearOptions.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-
-          <select
             value={periodParts.quarter}
             onChange={(event) =>
               setPeriodParts((current) => ({
@@ -348,12 +514,29 @@ export default function KpiScorecardClient() {
                 quarter: event.target.value,
               }))
             }
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
           >
-            <option value="1">Quarter 1 (Jan–Mar)</option>
-            <option value="2">Quarter 2 (Apr–Jun)</option>
-            <option value="3">Quarter 3 (Jul–Sep)</option>
-            <option value="4">Quarter 4 (Oct–Dec)</option>
+            <option value="Q1">Q1</option>
+            <option value="Q2">Q2</option>
+            <option value="Q3">Q3</option>
+            <option value="Q4">Q4</option>
+          </select>
+
+          <select
+            value={periodParts.year}
+            onChange={(event) =>
+              setPeriodParts((current) => ({
+                ...current,
+                year: event.target.value,
+              }))
+            }
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+          >
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
           </select>
         </div>
       );
@@ -368,7 +551,7 @@ export default function KpiScorecardClient() {
             year: event.target.value,
           }))
         }
-        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
       >
         {yearOptions.map((year) => (
           <option key={year} value={year}>
@@ -379,82 +562,69 @@ export default function KpiScorecardClient() {
     );
   }
 
-  function renderActionCell(item: KpiScorecardItem) {
-    const showQuickCapture = canManage && item.measurement_id == null;
-
-    return (
-      <div className="flex justify-end gap-2 whitespace-nowrap">
-        <Link
-          href={`/kpis/${item.kpi_id}`}
-          className="inline-flex rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-        >
-          View Detail
-        </Link>
-
-        {showQuickCapture && (
-          <button
-            type="button"
-            onClick={() => openCaptureModal(item)}
-            className="inline-flex rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-black"
-          >
-            {item.source_type === 'SYSTEM' ? 'Snapshot' : 'Capture'}
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  const isEmpty = !loading && !!scorecard && scorecard.items.length === 0;
-
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-600">MVP 3.0</p>
-              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <section className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
+                MVP 3.0
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 KPI Scorecard
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-gray-600">
+
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
                 Ringkasan KPI per periode, target vs actual, dan status scorecard tenant.
               </p>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-3">
-              <Link
-                href="/"
-                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link href="/" className="itam-secondary-action">
                 Back
               </Link>
-              <Link
-                href="/kpis"
-                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
+              <Link href="/kpis" className="itam-secondary-action">
                 Open KPI Library
               </Link>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <div className="flex flex-col gap-4">
-            <div className="grid gap-4 md:grid-cols-3">
+        {errorMessage ? (
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {errorMessage}
+          </div>
+        ) : null}
+
+        <section className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <PanelCard
+            title="Scorecard"
+            description={`Computed period key: ${periodKey}`}
+            action={
+              <button
+                type="button"
+                onClick={() => {
+                  void loadScorecard(periodType, periodKey);
+                }}
+                className="itam-primary-action"
+              >
+                Refresh Scorecard
+              </button>
+            }
+          >
+            <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Period Type
                 </label>
                 <select
                   value={periodType}
-                  onChange={(event) => {
-                    const nextType = event.target.value as KpiPeriodType;
-                    setPeriodType(nextType);
-                    setPeriodParts(
-                      parsePeriodKeyToParts(nextType, getCurrentPeriodKey(nextType))
-                    );
-                  }}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
+                  onChange={(event) =>
+                    handlePeriodTypeChange(event.target.value as KpiPeriodType)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                 >
                   <option value="MONTHLY">Monthly</option>
                   <option value="QUARTERLY">Quarterly</option>
@@ -463,250 +633,247 @@ export default function KpiScorecardClient() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Period Picker
                 </label>
                 {renderPeriodPicker()}
               </div>
+            </div>
 
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      setErrorMessage('');
-                      await loadScorecard(periodType, periodKey);
-                    } catch (error) {
-                      setErrorMessage(getErrorMessage(error));
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="w-full rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-900"
-                >
-                  Refresh Scorecard
-                </button>
+            <div className="mt-4 space-y-2 text-sm text-slate-700">
+              <div>
+                Computed period key: <span className="font-semibold">{periodKey}</span>
               </div>
-            </div>
-
-            <div className="text-sm text-gray-600">
-              Computed period key:{' '}
-              <span className="font-medium text-gray-900">{periodKey}</span>
-            </div>
-
-            {scorecard && (
-              <div className="text-sm text-gray-600">
+              <div>
                 Period window:{' '}
-                <span className="font-medium text-gray-900">
-                  {scorecard.period_start_date}
-                </span>{' '}
-                to{' '}
-                <span className="font-medium text-gray-900">
-                  {scorecard.period_end_date}
+                <span className="font-semibold">
+                  {periodWindow.start} to {periodWindow.end}
                 </span>
               </div>
-            )}
-
-            {errorMessage && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-              {(summaryCards || []).map((card) => (
-                <div
-                  key={card.label}
-                  className={`rounded-2xl border p-4 shadow-sm ${card.className}`}
-                >
-                  <div className="text-xs uppercase tracking-wide opacity-80">
-                    {card.label}
-                  </div>
-                  <div className="mt-2 text-3xl font-semibold">{card.value}</div>
-                </div>
-              ))}
             </div>
 
-            <div className="mt-2">
-              {loading ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-12 text-center text-sm text-gray-500">
-                  Loading scorecard...
-                </div>
-              ) : isEmpty ? (
-                <EmptyState
-                  periodType={periodType}
-                  periodKey={periodKey}
-                  onBackToMonthly={handleBackToMonthly}
-                />
-              ) : !scorecard ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-12 text-center text-sm text-gray-500">
-                  No KPI scorecard data available.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead>
-                      <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                        <th className="px-4 py-3">KPI</th>
-                        <th className="px-4 py-3">Category</th>
-                        <th className="px-4 py-3">Source</th>
-                        <th className="px-4 py-3">Target</th>
-                        <th className="px-4 py-3">Actual</th>
-                        <th className="px-4 py-3">Achievement</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Measured At</th>
-                        <th className="px-4 py-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {scorecard.items.map((item) => (
-                        <tr key={item.kpi_id} className="align-top">
-                          <td className="px-4 py-4">
-                            <div className="font-medium text-gray-900">{item.name}</div>
-                            <div className="mt-1 font-mono text-xs text-gray-500">
-                              {item.code}
-                            </div>
-                            <div className="mt-1 text-xs text-gray-500">
-                              {item.description || '-'}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 text-gray-700">{item.category_code}</td>
-                          <td className="px-4 py-4">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
-                                item.source_type
-                              )}`}
-                            >
-                              {item.source_type}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 text-gray-700">
-                            {formatKpiValue(item.target_value, item.unit_code)}
-                          </td>
-                          <td className="px-4 py-4 text-gray-700">
-                            {formatKpiValue(item.actual_value, item.unit_code)}
-                          </td>
-                          <td className="px-4 py-4 text-gray-700">
-                            {formatKpiValue(item.achievement_pct, 'PERCENT')}
-                          </td>
-                          <td className="px-4 py-4">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                                item.status_code
-                              )}`}
-                            >
-                              {item.status_code}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 text-gray-700">
-                            {formatDateTime(item.measured_at)}
-                          </td>
-                          <td className="px-4 py-4 text-right">{renderActionCell(item)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {isCaptureModalOpen && captureTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                  {captureTarget.source_type === 'SYSTEM'
-                    ? 'Create System Snapshot'
-                    : 'Capture Manual Measurement'}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                KPI: <span className="font-medium text-gray-900">{captureTarget.name}</span>
-                {' · '}
-                Period: <span className="font-medium text-gray-900">{periodKey}</span>
-              </p>
-            </div>
-
-            <form onSubmit={handleCaptureSubmit} className="space-y-5 px-6 py-6">
-              {captureError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {captureError}
-                </div>
-              )}
-
-              {captureTarget.source_type === 'MANUAL' && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Actual Value
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={captureForm.actual_value}
-                    onChange={(event) =>
-                      setCaptureForm((current) => ({
-                        ...current,
-                        actual_value: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                    placeholder="89"
-                    required
+            {summaryCards ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+                {summaryCards.map((item) => (
+                  <SummaryCard
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    tone={item.tone}
                   />
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Note
-                </label>
-                <textarea
-                  value={captureForm.measurement_note}
-                  onChange={(event) =>
-                    setCaptureForm((current) => ({
-                      ...current,
-                      measurement_note: event.target.value,
-                    }))
-                  }
-                  rows={3}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  placeholder="Optional note"
-                />
+                ))}
               </div>
+            ) : null}
+          </PanelCard>
+        </section>
 
-              {captureTarget.source_type === 'SYSTEM' && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                  Actual value will be calculated automatically from backend metric source.
+        <section className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <PanelCard
+            title="Scorecard Items"
+            description={`Total rows: ${scorecard?.items.length ?? 0}`}
+          >
+            {loading ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
+                Loading scorecard...
+              </div>
+            ) : !scorecard || scorecard.items.length === 0 ? (
+              <EmptyState
+                periodType={periodType}
+                periodKey={periodKey}
+                onBackToMonthly={() => handlePeriodTypeChange('MONTHLY')}
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="min-w-[1200px] w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">KPI</th>
+                      <th className="px-4 py-3 font-medium">Category</th>
+                      <th className="px-4 py-3 font-medium">Source</th>
+                      <th className="px-4 py-3 font-medium">Target</th>
+                      <th className="px-4 py-3 font-medium">Actual</th>
+                      <th className="px-4 py-3 font-medium">Achievement</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Measured At</th>
+                      <th className="px-4 py-3 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {scorecard.items.map((item) => (
+                      <tr key={`${item.kpi_id}-${item.code}`} className="align-top">
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-slate-900">{item.name}</div>
+                          <div className="mt-1 font-mono text-xs text-slate-500">
+                            {item.code}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {item.description || '-'}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">{item.category_code}</td>
+
+                        <td className="px-4 py-4">
+                          <span className={getSourceBadgeClass(item.source_type)}>
+                            {item.source_type}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatKpiValue(item.target_value, item.unit_code)}
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">
+                          {item.actual_value == null
+                            ? '-'
+                            : formatKpiValue(item.actual_value, item.unit_code)}
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">
+                          {item.achievement_pct == null
+                            ? '-'
+                            : `${item.achievement_pct.toFixed(2)}%`}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span className={getStatusBadgeClass(item.status)}>
+                            {item.status}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">
+                          {item.measured_at ? formatDateTime(item.measured_at) : '-'}
+                        </td>
+
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`/kpis/${item.kpi_id}?returnTo=${encodeURIComponent(returnTo)}`}
+                              className="inline-flex min-w-[92px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium leading-none text-slate-700 transition hover:bg-slate-50"
+                            >
+                              View Detail
+                            </Link>
+
+                            {canManage ? (
+                             <button
+  type="button"
+  onClick={() => openCaptureModal(item)}
+  className="inline-flex min-w-[88px] cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-cyan-300 bg-cyan-500 px-4 py-2 text-sm font-semibold leading-none text-white transition hover:bg-cyan-600"
+>
+  Capture
+</button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </PanelCard>
+        </section>
+
+        {isCaptureModalOpen && captureTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div className="w-full max-w-2xl rounded-[2rem] border border-white/80 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Capture KPI Measurement
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {captureTarget.name} · {periodKey}
+                  </p>
                 </div>
-              )}
 
-              <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
                 <button
                   type="button"
                   onClick={closeCaptureModal}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700"
+                  className="itam-secondary-action-sm"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {submitting
-                    ? 'Saving...'
-                    : captureTarget.source_type === 'SYSTEM'
-                    ? 'Create Snapshot'
-                    : 'Capture Measurement'}
+                  Close
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleCaptureSubmit} className="px-6 py-5">
+                {captureError ? (
+                  <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {captureError}
+                  </div>
+                ) : null}
+
+                <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-semibold text-slate-900">
+                    {captureTarget.name}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">{captureTarget.code}</div>
+                  <div className="mt-2 text-sm text-slate-700">
+                    Target:{' '}
+                    <span className="font-medium">
+                      {formatKpiValue(captureTarget.target_value, captureTarget.unit_code)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Actual Value
+                    </label>
+                    <input
+                      value={captureForm.actual_value}
+                      onChange={(event) =>
+                        setCaptureForm((current) => ({
+                          ...current,
+                          actual_value: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Measurement Note
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={captureForm.measurement_note}
+                      onChange={(event) =>
+                        setCaptureForm((current) => ({
+                          ...current,
+                          measurement_note: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeCaptureModal}
+                    className="itam-secondary-action"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="itam-primary-action disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting ? 'Saving...' : 'Save Measurement'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
     </main>
   );
 }

@@ -250,6 +250,26 @@ export async function getAssetTransferRequestById(app, tenantId, requestId) {
   return rows[0] || null;
 }
 
+export async function deleteAssetTransferRequestById(app, tenantId, requestId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.asset_transfer_requests
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      asset_id,
+      target_tenant_id,
+      request_code,
+      status
+    `,
+    [tenantId, requestId]
+  );
+
+  return rows[0] || null;
+}
+
 export async function listAssetTransferRequests(app, filters) {
   const values = [];
   const where = [];

@@ -1,4 +1,5 @@
 const EVIDENCE_WRITE_ROLES = ["TENANT_ADMIN", "ITAM_MANAGER", "ASSET_CUSTODIAN"];
+const EVIDENCE_DELETE_ROLES = ["SUPERADMIN", "TENANT_ADMIN", "ITAM_MANAGER"];
 
 export function normalizeRoles(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
@@ -14,4 +15,8 @@ function hasAnyRole(userRoles: unknown, allowedRoles: readonly string[]): boolea
 
 export function canManageEvidence(userRoles: unknown): boolean {
   return hasAnyRole(userRoles, EVIDENCE_WRITE_ROLES);
+}
+
+export function canDeleteEvidenceFiles(userRoles: unknown): boolean {
+  return hasAnyRole(userRoles, EVIDENCE_DELETE_ROLES);
 }

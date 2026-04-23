@@ -1,6 +1,7 @@
 import {
   createAssetTransferRequestService,
   decideAssetTransferRequestService,
+  deleteAssetTransferRequestService,
   getAssetTransferPreviewService,
   getAssetTransferRequestDetailService,
   getTargetTenantOptionsService,
@@ -90,6 +91,17 @@ export default async function assetTransferRoutes(app) {
   // POST /api/v1/asset-transfer-requests/:id/decide
   app.post("/:id/decide", async function decideAssetTransferRequestHandler(req, reply) {
     const row = await decideAssetTransferRequestService(app, req);
+
+    return reply.send({
+      ok: true,
+      data: row,
+      meta: { request_id: req.id },
+    });
+  });
+
+  // DELETE /api/v1/asset-transfer-requests/:id
+  app.delete("/:id", async function deleteAssetTransferRequestHandler(req, reply) {
+    const row = await deleteAssetTransferRequestService(app, req);
 
     return reply.send({
       ok: true,

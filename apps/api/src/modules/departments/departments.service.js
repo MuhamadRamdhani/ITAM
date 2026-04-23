@@ -2,10 +2,13 @@ import { getUiConfig } from "../config/config.repo.js";
 import { insertAuditEvent } from "../../lib/audit.js";
 import {
   getDepartmentById,
+  getDepartmentByIdForDelete,
   departmentCodeExists,
   listDepartments,
   insertDepartment,
   updateDepartment,
+  countDepartmentDeleteDependencies,
+  deleteDepartmentById,
 } from "./departments.repo.js";
 
 function mustTenantId(req) {
@@ -222,4 +225,57 @@ export async function patchDepartmentService(app, req, departmentId, body) {
   });
 
   return await getDepartmentById(app, tenantId, departmentId);
+}
+
+export async function deleteDepartmentService(app, req, departmentId) {
+  const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, ["TENANT_ADMIN", "SUPERADMIN"]);
+
+  const current = await getDepartmentByIdForDelete(app, tenantId, departmentId);
+  if (!current) {
+    const e = new Error("Department not found");
+    e.statusCode = 404;
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  const dependencies = await countDepartmentDeleteDependencies(app, tenantId, departmentId);
+  if (dependencies.total > 0) {
+    const e = new Error("Department is still in use");
+    e.statusCode = 409;
+    e.code = "DEPARTMENT_IN_USE";
+    e.details = dependencies;
+    throw e;
+  }
+
+  await app.pg.query("BEGIN");
+  try {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorStr(req),
+      action: "DEPARTMENT_DELETED",
+      entityType: "DEPARTMENT",
+      entityId: departmentId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        code: current.code,
+        name: current.name,
+      },
+    });
+
+    const deleted = await deleteDepartmentById(app, tenantId, departmentId);
+    if (!deleted) {
+      throw Object.assign(new Error("Department not found"), {
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    }
+
+    await app.pg.query("COMMIT");
+    return deleted;
+  } catch (error) {
+    await app.pg.query("ROLLBACK");
+    throw error;
+  }
 }

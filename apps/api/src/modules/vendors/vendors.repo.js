@@ -107,6 +107,10 @@ export async function findVendorById(app, tenantId, vendorId) {
   return rows[0] || null;
 }
 
+export async function findVendorByIdForDelete(app, tenantId, vendorId) {
+  return await findVendorById(app, tenantId, vendorId);
+}
+
 export async function findVendorByCode(
   app,
   tenantId,
@@ -281,6 +285,64 @@ export async function updateVendor(app, tenantId, vendorId, patch) {
       updated_at
     `,
     params
+  );
+
+  return rows[0] || null;
+}
+
+export async function countVendorDeleteDependencies(app, tenantId, vendorId) {
+  const [contractRows, softwareProductRows] = await Promise.all([
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.contracts
+      WHERE tenant_id = $1
+        AND vendor_id = $2
+      `,
+      [tenantId, vendorId]
+    ),
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.software_products
+      WHERE tenant_id = $1
+        AND publisher_vendor_id = $2
+      `,
+      [tenantId, vendorId]
+    ),
+  ]);
+
+  const contracts = Number(contractRows.rows?.[0]?.total ?? 0);
+  const softwareProducts = Number(softwareProductRows.rows?.[0]?.total ?? 0);
+
+  return {
+    contracts,
+    softwareProducts,
+    total: contracts + softwareProducts,
+  };
+}
+
+export async function deleteVendorById(app, tenantId, vendorId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.vendors
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      vendor_code,
+      vendor_name,
+      vendor_type,
+      status,
+      primary_contact_name,
+      primary_contact_email,
+      primary_contact_phone,
+      notes,
+      created_at,
+      updated_at
+    `,
+    [tenantId, vendorId]
   );
 
   return rows[0] || null;

@@ -111,6 +111,25 @@ async function apiPostJson(page: Page, pathUrl: string, body: unknown): Promise<
   );
 }
 
+async function apiDeleteJson(page: Page, pathUrl: string): Promise<ApiResponse> {
+  return page.evaluate(
+    async (url) => {
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      return { status: res.status, json };
+    },
+    `${API_BASE}${pathUrl}`
+  );
+}
+
 function extractRequestId(payload: any): number {
   return Number(payload?.data?.id ?? payload?.data?.request?.id ?? payload?.id ?? 0);
 }
@@ -722,5 +741,58 @@ test.describe.serial("Asset Transfer Requests", () => {
 
     expect(decideAttempt.status).toBe(400);
     expect(JSON.stringify(decideAttempt.json)).toMatch(/Only SUBMITTED transfer requests can be decided/);
+  });
+
+  test("ATR-011 delete is forbidden for auditor", async ({ page }) => {
+    if (!targetTenant) throw new Error("Target tenant option missing");
+
+    await loginAs(page, USERS.tenantAdmin);
+    const asset = await createAssetViaUi(page, "auditor-delete");
+    const created = await createTransferRequestViaApi(page, asset.assetId, targetTenant.id, "Auditor delete guard");
+
+    await loginAs(page, USERS.auditor);
+    const response = await apiDeleteJson(page, `/api/v1/asset-transfer-requests/${created.requestId}`);
+
+    expect(response.status).toBe(403);
+    expect(response.json?.error?.code).toBe("FORBIDDEN");
+  });
+
+  test("ATR-012 delete is blocked for non-DRAFT requests", async ({ page }) => {
+    if (!submittedRequest) throw new Error("Submitted request seed missing");
+
+    await loginAs(page, USERS.tenantAdmin);
+    await openTransferRequestDetail(page, submittedRequest.requestId);
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toHaveCount(0);
+
+    const response = await apiDeleteJson(page, `/api/v1/asset-transfer-requests/${submittedRequest.requestId}`);
+    expect(response.status).toBe(409);
+    expect(response.json?.error?.code).toBe("ASSET_TRANSFER_NOT_DELETABLE");
+  });
+
+  test("ATR-013 delete draft request succeeds", async ({ page }) => {
+    if (!draftRequest) throw new Error("Draft request seed missing");
+
+    await loginAs(page, USERS.tenantAdmin);
+    await openTransferRequestDetail(page, draftRequest.requestId);
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/asset-transfer-requests/${draftRequest.requestId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete Draft" }).first().click();
+    await expect(page.getByRole("heading", { name: "Delete draft transfer request" })).toBeVisible();
+    const confirmModal = page.locator("div.fixed").last();
+    await confirmModal.getByRole("button", { name: "Delete Draft" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(200);
+    await expect(page.getByText(`Draft transfer request ${draftRequest.requestCode} deleted.`)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page).toHaveURL(/\/asset-transfer-requests$/);
   });
 });

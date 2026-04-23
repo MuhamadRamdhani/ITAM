@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { apiGet } from "../lib/api";
+import { apiDelete, apiGet } from "../lib/api";
 import { SkeletonTableRow, ErrorState } from "../lib/loadingComponents";
-import { canManageEvidence } from "../lib/evidenceAccess";
+import { canDeleteEvidenceFiles, canManageEvidence } from "../lib/evidenceAccess";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type UiConfigNormalized = {
   pageSizeOptions: number[];
@@ -132,6 +134,12 @@ export default function EvidencePageClient() {
   const [pageSizeOptions, setPageSizeOptions] = useState<number[]>([10, 20, 50]);
   const [pageSize, setPageSize] = useState<number>(10);
   const [roles, setRoles] = useState<string[]>([]);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<EvidenceFile | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const [searchQ, setSearchQ] = useState(q);
 
@@ -220,6 +228,7 @@ export default function EvidencePageClient() {
   const canPrev = pageFromUrl > 1;
   const canNext = pageFromUrl < totalPages;
   const canUploadEvidence = canManageEvidence(roles);
+  const canDeleteEvidence = canDeleteEvidenceFiles(roles);
 
   function onSearchSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -242,8 +251,65 @@ export default function EvidencePageClient() {
     );
   }
 
+  async function confirmDeleteFile() {
+    if (!deleteTarget || deleteLoading) return;
+
+    setDeleteLoading(true);
+    setErr(null);
+
+    try {
+      await apiDelete(`/api/v1/evidence/files/${deleteTarget.id}`);
+      setItems((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      setTotal((prev) => Math.max(0, prev - 1));
+      setToast({
+        type: "success",
+        message: `Evidence file ${deleteTarget.original_name} deleted.`,
+      });
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+    } catch (error: any) {
+      if (error?.code === "EVIDENCE_FILE_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Evidence file masih attached ke record lain.",
+        });
+      } else if (error?.code === "EVIDENCE_FILE_DELETE_FAILED") {
+        setToast({
+          type: "error",
+          message: "File fisik gagal dihapus. Row database tetap dipertahankan.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: getErrorMessage(error, "Gagal menghapus evidence file"),
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_55%,#eef6fb_100%)] text-slate-900">
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={deleteOpen}
+        title="Delete evidence file"
+        description={`File ${deleteTarget?.original_name || ""} akan dihapus permanen bersama file fisiknya. Aksi ini hanya aman jika file tidak lagi attached ke record lain.`}
+        confirmLabel="Delete File"
+        loading={deleteLoading}
+        onCancel={() => {
+          setDeleteOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDeleteFile()}
+      />
+
       <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.12),_transparent_60%)] pointer-events-none" />
 
       <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
@@ -330,7 +396,7 @@ export default function EvidencePageClient() {
                   <th className="py-3 pr-4">Mime</th>
                   <th className="py-3 pr-4">Size</th>
                   <th className="py-3 pr-4">SHA256</th>
-                  <th className="py-3 pr-4">Download</th>
+                  <th className="py-3 pr-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -358,14 +424,30 @@ export default function EvidencePageClient() {
                       <td className="whitespace-nowrap py-4 pr-4 text-slate-700">{fmtBytes(f.size_bytes)}</td>
                       <td className="py-4 pr-4 font-mono text-xs text-slate-500">{f.sha256 ?? "-"}</td>
                       <td className="py-2 pr-4">
-                        <a
-                          className="text-cyan-700 hover:underline"
-                          href={`${apiBase}/api/v1/evidence/files/${f.id}/download`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Download
-                        </a>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100"
+                            href={`${apiBase}/api/v1/evidence/files/${f.id}/download`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Download
+                          </a>
+
+                          {canDeleteEvidence ? (
+                            <button
+                              type="button"
+                              className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => {
+                                setDeleteTarget(f);
+                                setDeleteOpen(true);
+                              }}
+                              disabled={deleteLoading}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))

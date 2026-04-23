@@ -154,6 +154,117 @@ export async function getContractById(app, tenantId, contractId) {
   return rows[0] || null;
 }
 
+export async function getContractByIdForDelete(app, tenantId, contractId) {
+  const sql = `
+    SELECT
+      id,
+      tenant_id,
+      vendor_id,
+      contract_code,
+      contract_name,
+      contract_type,
+      status,
+      start_date,
+      end_date,
+      renewal_notice_days,
+      owner_identity_id,
+      notes,
+      created_at,
+      updated_at
+    FROM public.contracts
+    WHERE tenant_id = $1
+      AND id = $2
+    FOR UPDATE
+    LIMIT 1
+  `;
+
+  const { rows } = await app.pg.query(sql, [tenantId, contractId]);
+  return rows[0] || null;
+}
+
+export async function countContractDeleteDependencies(app, tenantId, contractId) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      (SELECT COUNT(*)::int
+       FROM public.contract_assets ca
+       WHERE ca.tenant_id = $1
+         AND ca.contract_id = $2) AS contract_assets_count,
+      (SELECT COUNT(*)::int
+       FROM public.contract_documents cd
+       WHERE cd.tenant_id = $1
+         AND cd.contract_id = $2) AS contract_documents_count,
+      (SELECT COUNT(*)::int
+       FROM public.software_entitlements se
+       WHERE se.tenant_id = $1
+         AND se.contract_id = $2) AS software_entitlements_count,
+      (SELECT COUNT(*)::int
+       FROM public.evidence_links el
+       WHERE el.tenant_id = $1
+         AND el.target_type = 'CONTRACT'
+         AND el.target_id = $2) AS evidence_links_count
+    `,
+    [tenantId, contractId]
+  );
+
+  const row = rows[0] || {};
+  const contractAssetsCount = Number(row.contract_assets_count || 0);
+  const contractDocumentsCount = Number(row.contract_documents_count || 0);
+  const softwareEntitlementsCount = Number(row.software_entitlements_count || 0);
+  const evidenceLinksCount = Number(row.evidence_links_count || 0);
+
+  return {
+    contract_assets_count: contractAssetsCount,
+    contract_documents_count: contractDocumentsCount,
+    software_entitlements_count: softwareEntitlementsCount,
+    evidence_links_count: evidenceLinksCount,
+    total:
+      contractAssetsCount +
+      contractDocumentsCount +
+      softwareEntitlementsCount +
+      evidenceLinksCount,
+  };
+}
+
+export async function lockContractDeleteRelatedTables(app) {
+  await app.pg.query(`
+    LOCK TABLE public.contract_assets,
+      public.contract_documents,
+      public.evidence_links,
+      public.software_entitlements
+    IN SHARE ROW EXCLUSIVE MODE
+  `);
+}
+
+export async function deleteContractById(app, tenantId, contractId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.contracts
+    WHERE tenant_id = $1
+      AND id = $2
+      AND status = 'DRAFT'
+    RETURNING
+      id,
+      tenant_id,
+      vendor_id,
+      contract_code,
+      contract_name,
+      contract_type,
+      status,
+      start_date,
+      end_date,
+      renewal_notice_days,
+      owner_identity_id,
+      notes,
+      created_at,
+      updated_at
+    `,
+    [tenantId, contractId]
+  );
+
+  return rows[0] || null;
+}
+
 export async function getVendorByIdForTenant(app, tenantId, vendorId) {
   const { rows } = await app.pg.query(
     `

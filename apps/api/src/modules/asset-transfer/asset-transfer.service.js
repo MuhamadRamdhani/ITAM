@@ -6,6 +6,7 @@ import {
   getAssetForTransferById,
   getAssetTransferEventsByRequestId,
   getAssetTransferRequestById,
+  deleteAssetTransferRequestById,
   getTenantBasicById,
   insertAssetTransferEvent,
   insertAssetTransferRequest,
@@ -62,10 +63,12 @@ function hasAnyRole(req, allowedRoles) {
 
 function assertHasAnyRole(req, allowedRoles, message) {
   if (!hasAnyRole(req, allowedRoles)) {
-    throw httpError(403, message, {
+    const err = httpError(403, message, {
       code: "AUTH_FORBIDDEN",
       allowed_roles: allowedRoles,
     });
+    err.code = "FORBIDDEN";
+    throw err;
   }
 }
 
@@ -108,8 +111,12 @@ async function writeAssetTransferAudit(app, req, payload) {
   const auditPayload = {
     tenant_id: req?.tenantId ?? req?.requestContext?.tenantId ?? null,
     user_id: req?.requestContext?.userId ?? null,
-    entity_type: "ASSET",
-    entity_id: payload?.asset_id ?? null,
+    entity_type: payload?.entity_type ?? "ASSET",
+    entity_id:
+      payload?.entity_id ??
+      payload?.transfer_request_id ??
+      payload?.asset_id ??
+      null,
     action: payload?.action ?? "ASSET_TRANSFER_EXECUTED",
     payload,
   };
@@ -658,4 +665,46 @@ export async function decideAssetTransferRequestService(app, req) {
   await executeApprovedTransfer(app, req, existing, preview);
 
   return getAssetTransferRequestById(app, tenantId, requestId);
+}
+
+export async function deleteAssetTransferRequestService(app, req) {
+  const tenantId = mustTenantId(req);
+  assertHasAnyRole(
+    req,
+    ["SUPERADMIN", "TENANT_ADMIN", "ITAM_MANAGER"],
+    "You are not allowed to delete asset transfer requests"
+  );
+
+  const requestId = mustPositiveInt(req.params?.id, "transfer request id");
+  const existing = await getAssetTransferRequestById(app, tenantId, requestId);
+  if (!existing) {
+    throw httpError(404, "Asset transfer request not found");
+  }
+
+  if (normalizeEnum(existing.status) !== "DRAFT") {
+    const err = httpError(409, "Only DRAFT transfer requests can be deleted", {
+      status: existing.status,
+    });
+    err.code = "ASSET_TRANSFER_NOT_DELETABLE";
+    throw err;
+  }
+
+  await writeAssetTransferAudit(app, req, {
+    action: "ASSET_TRANSFER_REQUEST_DELETED",
+    entity_type: "ASSET_TRANSFER_REQUEST",
+    entity_id: requestId,
+    transfer_request_id: requestId,
+    asset_id: Number(existing.asset_id),
+    target_tenant_id: Number(existing.target_tenant_id),
+    request_code: existing.request_code,
+    status: existing.status,
+    tenant_id: tenantId,
+  });
+
+  const deleted = await deleteAssetTransferRequestById(app, tenantId, requestId);
+  if (!deleted) {
+    throw httpError(404, "Asset transfer request not found");
+  }
+
+  return deleted;
 }

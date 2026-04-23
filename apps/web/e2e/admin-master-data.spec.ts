@@ -68,6 +68,11 @@ const USERS = {
     email: "dhani@bni.com",
     password: "123456",
   },
+  auditor: {
+    tenantCode: "bni",
+    email: "boy@bni.com",
+    password: "123456",
+  },
   defaultAdmin: {
     tenantCode: "default",
     email: "admin@default.local",
@@ -174,6 +179,10 @@ async function apiPatchJson<T = any>(page: Page, path: string, body: unknown) {
   return apiFetchJson<T>(page, path, { method: "PATCH", body });
 }
 
+async function apiDeleteJson<T = any>(page: Page, path: string) {
+  return apiFetchJson<T>(page, path, { method: "DELETE" });
+}
+
 async function seedAsset(browser: Browser) {
   if (seededAsset) return seededAsset;
 
@@ -265,6 +274,113 @@ async function openAssetOwnership(page: Page, assetId: number) {
   await expect(page.getByRole("heading", { name: "Change Ownership" })).toBeVisible({
     timeout: 30_000,
   });
+}
+
+async function createAssetViaApi(page: Page, label: string) {
+  const suffix = uniqueSuffix();
+  const assetTag = `ADM-ASSET-${label.toUpperCase()}-${suffix}`;
+  const assetName = `Admin ${label} Asset ${suffix}`;
+
+  const res = await apiPostJson<{ id?: number; asset?: { id: number } }>(page, "/api/v1/assets", {
+    asset_tag: assetTag,
+    name: assetName,
+    asset_type_code: "HARDWARE",
+    initial_state_code: "REQUESTED",
+    status: "AKTIF",
+    purchase_date: "2026-04-20",
+    warranty_start_date: "2026-04-20",
+    warranty_end_date: "2027-04-20",
+    support_start_date: "2026-04-20",
+    support_end_date: "2027-04-20",
+    notes: `Admin master data ${label} asset`,
+  });
+
+  expect([200, 201]).toContain(res.status);
+  const assetId = Number(res.json?.data?.id ?? res.json?.data?.asset?.id ?? 0);
+  expect(assetId).toBeGreaterThan(0);
+
+  return {
+    assetId,
+    assetTag,
+    assetName,
+  };
+}
+
+async function createDepartmentViaUi(page: Page) {
+  await openPage(page, "/admin/departments", "Departments");
+
+  const code = `ADM-DEPT-${uniqueSuffix()}`;
+  const name = `Admin Department ${uniqueSuffix()}`;
+  const createForm = page.locator("form").first();
+
+  await createForm.locator("input").nth(0).fill(code);
+  await createForm.locator("input").nth(1).fill(name);
+  await createForm.getByRole("button", { name: "Create Department" }).click();
+
+  await expect(page.getByText("Department berhasil dibuat.")).toBeVisible();
+
+  const id = await getDepartmentIdByCode(page, code);
+  await page.getByPlaceholder("Search code/name...").fill(code);
+  await page.getByRole("button", { name: "Search" }).click();
+  const row = await getRowByText(page, code);
+  await expect(row).toBeVisible({ timeout: 20_000 });
+
+  return { id, code, name };
+}
+
+async function createLocationViaUi(page: Page) {
+  await openPage(page, "/admin/locations", "Locations");
+
+  const code = `ADM-LOC-${uniqueSuffix()}`;
+  const name = `Admin Location ${uniqueSuffix()}`;
+  const createForm = page.locator("form").first();
+
+  await createForm.locator("input").nth(0).fill(code);
+  await createForm.locator("input").nth(1).fill(name);
+  await createForm.getByRole("button", { name: "Create Location" }).click();
+
+  await expect(page.getByText("Location berhasil dibuat.")).toBeVisible();
+
+  const id = await getLocationIdByCode(page, code);
+  await page.getByPlaceholder("Search code/name...").fill(code);
+  await page.getByRole("button", { name: "Search" }).click();
+  const row = await getRowByText(page, code);
+  await expect(row).toBeVisible({ timeout: 20_000 });
+
+  return { id, code, name };
+}
+
+async function setAssetOwnership(
+  page: Page,
+  assetId: number,
+  opts: { ownerDepartmentId?: number | null; locationId?: number | null }
+) {
+  await openAssetOwnership(page, assetId);
+  const modal = page.locator("div.fixed").last();
+  const selects = modal.locator("select");
+
+  if (opts.ownerDepartmentId !== undefined) {
+    await selects.nth(0).selectOption({
+      value: opts.ownerDepartmentId === null ? "" : String(opts.ownerDepartmentId),
+    });
+  }
+
+  if (opts.locationId !== undefined) {
+    await selects.nth(2).selectOption({
+      value: opts.locationId === null ? "" : String(opts.locationId),
+    });
+  }
+
+  const saveResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes(`/api/v1/assets/${assetId}/ownership-changes`),
+    { timeout: 30_000 }
+  );
+
+  await page.getByRole("button", { name: "Save" }).click();
+  await saveResponse;
+  await expect(page.getByText("Ownership History", { exact: true })).toBeVisible();
 }
 
 test.describe.serial("Admin Master Data", () => {
@@ -369,6 +485,70 @@ test.describe.serial("Admin Master Data", () => {
     await expect(page.locator("tbody tr").filter({ hasText: updatedName }).first()).toBeVisible();
   });
 
+  test("ADM-004A Department Delete", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createDepartmentViaUi(page);
+    const row = await getRowByText(page, created.code);
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/admin/departments/${created.id}`),
+      { timeout: 30_000 }
+    );
+
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete department" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Department" }).click();
+
+    const response = await deleteResponse;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByText("Department berhasil dihapus.")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("tbody tr").filter({ hasText: created.code })).toHaveCount(0);
+  });
+
+  test("ADM-004B Department Delete Blocked by Dependency", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createDepartmentViaUi(page);
+    await setAssetOwnership(page, seededAsset!.id, { ownerDepartmentId: created.id });
+
+    await openPage(page, "/admin/departments", "Departments");
+    await page.getByPlaceholder("Search code/name...").fill(created.code);
+    await page.getByRole("button", { name: "Search" }).click();
+    const row = await getRowByText(page, created.code);
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/admin/departments/${created.id}`),
+      { timeout: 30_000 }
+    );
+
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete department" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Department" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body?.error?.code).toBe("DEPARTMENT_IN_USE");
+    await expect(
+      page.getByText("Department masih dipakai oleh asset, identity, atau history.")
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("tbody tr").filter({ hasText: created.code })).toBeVisible();
+  });
+
+  test("ADM-004C Department Delete Forbidden for Auditor", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createDepartmentViaUi(page);
+
+    await loginAs(page, USERS.auditor);
+    const response = await apiDeleteJson(page, `/api/v1/admin/departments/${created.id}`);
+
+    expect(response.status).toBe(403);
+    expect(response.json?.error?.code).toBe("FORBIDDEN");
+  });
+
   test("ADM-005 Locations & Identities", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     await openPage(page, "/admin/locations", "Locations");
@@ -431,6 +611,70 @@ test.describe.serial("Admin Master Data", () => {
 
     const identityId = await getIdentityIdByEmail(page, identityEmail);
     expect(identityId).toBeGreaterThan(0);
+  });
+
+  test("ADM-005A Location Delete", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createLocationViaUi(page);
+    const row = await getRowByText(page, created.code);
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/admin/locations/${created.id}`),
+      { timeout: 30_000 }
+    );
+
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete location" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Location" }).click();
+
+    const response = await deleteResponse;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByText("Location berhasil dihapus.")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("tbody tr").filter({ hasText: created.code })).toHaveCount(0);
+  });
+
+  test("ADM-005B Location Delete Blocked by Dependency", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createLocationViaUi(page);
+    await setAssetOwnership(page, seededAsset!.id, { locationId: created.id });
+
+    await openPage(page, "/admin/locations", "Locations");
+    await page.getByPlaceholder("Search code/name...").fill(created.code);
+    await page.getByRole("button", { name: "Search" }).click();
+    const row = await getRowByText(page, created.code);
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/admin/locations/${created.id}`),
+      { timeout: 30_000 }
+    );
+
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete location" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Location" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body?.error?.code).toBe("LOCATION_IN_USE");
+    await expect(page.getByText("Location masih dipakai oleh asset atau history.")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.locator("tbody tr").filter({ hasText: created.code })).toBeVisible();
+  });
+
+  test("ADM-005C Location Delete Forbidden for Auditor", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createLocationViaUi(page);
+
+    await loginAs(page, USERS.auditor);
+    const response = await apiDeleteJson(page, `/api/v1/admin/locations/${created.id}`);
+
+    expect(response.status).toBe(403);
+    expect(response.json?.error?.code).toBe("FORBIDDEN");
   });
 
   test("ADM-006 Asset Types & Lifecycle States", async ({ page }) => {

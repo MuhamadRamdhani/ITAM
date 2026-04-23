@@ -3,6 +3,7 @@ import {
   listLocationsService,
   createLocationService,
   patchLocationService,
+  deleteLocationService,
 } from "./locations.service.js";
 
 export default async function locationsRoutes(app) {
@@ -80,6 +81,33 @@ export default async function locationsRoutes(app) {
         locationId,
         req.body
       );
+
+      return reply.send({
+        ok: true,
+        data: { location },
+        meta: { request_id: req.id },
+      });
+    }
+  );
+
+  app.delete(
+    "/locations/:id",
+    {
+      schema: {
+        params: Type.Object({ id: Type.String() }),
+      },
+    },
+    async (req, reply) => {
+      const locationId = Number(req.params.id);
+      if (!Number.isFinite(locationId) || locationId <= 0) {
+        return reply.code(400).send({
+          ok: false,
+          error: { code: "BAD_REQUEST", message: "Invalid location id" },
+          meta: { request_id: req.id },
+        });
+      }
+
+      const location = await deleteLocationService(app, req, locationId);
 
       return reply.send({
         ok: true,

@@ -22,6 +22,16 @@ function toDateOrNull(v) {
 
   const s = String(v).trim();
   if (!s) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return s;
+  }
+
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
   return s;
 }
 
@@ -728,4 +738,513 @@ export async function getAssetMappingSummary(app, filters) {
     no_coverage_count: toInt(r.no_coverage_count),
     no_end_date_count: toInt(r.no_end_date_count),
   };
+}
+
+/* =========================
+   EXPORT KHUSUS: 1 asset_id = 1 row
+   ========================= */
+
+function buildCoverageHealthSql(startExpr, endExpr, thresholdDaysParamIndex) {
+  return `
+    CASE
+      WHEN ${startExpr} IS NULL AND ${endExpr} IS NULL THEN 'NO_COVERAGE'
+      WHEN ${endExpr} IS NULL THEN 'NO_END_DATE'
+      WHEN ${endExpr} < CURRENT_DATE THEN 'EXPIRED'
+      WHEN ${endExpr} <= (CURRENT_DATE + ($${thresholdDaysParamIndex} * INTERVAL '1 day')) THEN 'EXPIRING'
+      ELSE 'ACTIVE'
+    END
+  `;
+}
+
+function buildDaysToExpirySql(startExpr, endExpr) {
+  return `
+    CASE
+      WHEN ${startExpr} IS NULL AND ${endExpr} IS NULL THEN NULL
+      WHEN ${endExpr} IS NULL THEN NULL
+      ELSE (${endExpr} - CURRENT_DATE)
+    END
+  `;
+}
+
+function buildExportOuterFiltersByAsset(filters, params) {
+  const clauses = [`1=1`];
+  const allNoCoverageExpr = `
+    (
+      ae.warranty_health = 'NO_COVERAGE'
+      AND ae.support_health = 'NO_COVERAGE'
+      AND ae.subscription_health = 'NO_COVERAGE'
+    )
+  `;
+
+  const coverageExistsExprByKind = {
+    WARRANTY: `ae.warranty_health <> 'NO_COVERAGE'`,
+    SUPPORT: `ae.support_health <> 'NO_COVERAGE'`,
+    SUBSCRIPTION: `ae.subscription_health <> 'NO_COVERAGE'`,
+    NONE: allNoCoverageExpr,
+  };
+
+  const healthExprByKind = {
+    WARRANTY: `ae.warranty_health`,
+    SUPPORT: `ae.support_health`,
+    SUBSCRIPTION: `ae.subscription_health`,
+  };
+
+  const daysExprByKind = {
+    WARRANTY: `ae.warranty_days_to_expiry`,
+    SUPPORT: `ae.support_days_to_expiry`,
+    SUBSCRIPTION: `ae.subscription_days_to_expiry`,
+  };
+
+  if (filters.coverageKind) {
+    clauses.push(coverageExistsExprByKind[filters.coverageKind] || `1=0`);
+  }
+
+  if (filters.health) {
+    if (filters.coverageKind === "NONE") {
+      if (filters.health === "NO_COVERAGE") {
+        clauses.push(allNoCoverageExpr);
+      } else {
+        clauses.push(`1=0`);
+      }
+    } else if (
+      filters.coverageKind === "WARRANTY" ||
+      filters.coverageKind === "SUPPORT" ||
+      filters.coverageKind === "SUBSCRIPTION"
+    ) {
+      params.push(filters.health);
+      clauses.push(`${healthExprByKind[filters.coverageKind]} = $${params.length}`);
+    } else {
+      if (filters.health === "NO_COVERAGE") {
+        clauses.push(allNoCoverageExpr);
+      } else {
+        params.push(filters.health);
+        clauses.push(`
+          (
+            ae.warranty_health = $${params.length}
+            OR ae.support_health = $${params.length}
+            OR ae.subscription_health = $${params.length}
+          )
+        `);
+      }
+    }
+  }
+
+  if (filters.linkStatus === "LINKED") {
+    clauses.push(`ae.has_linked_contract = TRUE`);
+  } else if (filters.linkStatus === "NO_LINK") {
+    clauses.push(`ae.has_linked_contract = FALSE`);
+  }
+
+  if (filters.expiringInDays != null) {
+    params.push(filters.expiringInDays);
+    const idx = params.length;
+
+    if (filters.coverageKind === "NONE") {
+      clauses.push(`1=0`);
+    } else if (
+      filters.coverageKind === "WARRANTY" ||
+      filters.coverageKind === "SUPPORT" ||
+      filters.coverageKind === "SUBSCRIPTION"
+    ) {
+      clauses.push(`
+        ${daysExprByKind[filters.coverageKind]} IS NOT NULL
+        AND ${daysExprByKind[filters.coverageKind]} BETWEEN 0 AND $${idx}
+      `);
+    } else {
+      clauses.push(`
+        (
+          (ae.warranty_days_to_expiry IS NOT NULL AND ae.warranty_days_to_expiry BETWEEN 0 AND $${idx})
+          OR (ae.support_days_to_expiry IS NOT NULL AND ae.support_days_to_expiry BETWEEN 0 AND $${idx})
+          OR (ae.subscription_days_to_expiry IS NOT NULL AND ae.subscription_days_to_expiry BETWEEN 0 AND $${idx})
+        )
+      `);
+    }
+  }
+
+  return { params, outerWhereSql: clauses.join(" AND ") };
+}
+
+function buildMappingExportByAssetSql(
+  baseWhereSql,
+  thresholdDaysParamIndex,
+  outerWhereSql
+) {
+  const warrantyStartSql = `
+    CASE
+      WHEN b.asset_type_code IN ('HARDWARE', 'NETWORK')
+        AND b.primary_contract_start_date IS NOT NULL
+        AND b.primary_contract_end_date IS NOT NULL
+      THEN b.primary_contract_start_date
+      ELSE b.warranty_start_date
+    END
+  `;
+
+  const warrantyEndSql = `
+    CASE
+      WHEN b.asset_type_code IN ('HARDWARE', 'NETWORK')
+        AND b.primary_contract_start_date IS NOT NULL
+        AND b.primary_contract_end_date IS NOT NULL
+      THEN b.primary_contract_end_date
+      ELSE b.warranty_end_date
+    END
+  `;
+
+  const subscriptionStartSql = `
+    CASE
+      WHEN b.asset_type_code IN ('SOFTWARE', 'SAAS', 'CLOUD', 'VM_CONTAINER')
+        AND b.primary_contract_start_date IS NOT NULL
+        AND b.primary_contract_end_date IS NOT NULL
+      THEN b.primary_contract_start_date
+      ELSE b.subscription_start_date
+    END
+  `;
+
+  const subscriptionEndSql = `
+    CASE
+      WHEN b.asset_type_code IN ('SOFTWARE', 'SAAS', 'CLOUD', 'VM_CONTAINER')
+        AND b.primary_contract_start_date IS NOT NULL
+        AND b.primary_contract_end_date IS NOT NULL
+      THEN b.primary_contract_end_date
+      ELSE b.subscription_end_date
+    END
+  `;
+
+  return `
+    WITH primary_contract AS (
+      SELECT
+        ca.tenant_id,
+        ca.asset_id,
+        c.id AS contract_id,
+        c.contract_code,
+        c.contract_type,
+        c.start_date,
+        c.end_date,
+        c.renewal_notice_days
+      FROM public.contract_assets ca
+      INNER JOIN public.contracts c
+        ON c.tenant_id = ca.tenant_id
+       AND c.id = ca.contract_id
+      INNER JOIN (
+        SELECT tenant_id, asset_id
+        FROM public.contract_assets
+        GROUP BY tenant_id, asset_id
+        HAVING COUNT(DISTINCT contract_id) = 1
+      ) single_contract
+        ON single_contract.tenant_id = ca.tenant_id
+       AND single_contract.asset_id = ca.asset_id
+    ),
+    base_asset AS (
+      SELECT
+        a.id AS asset_id,
+        a.asset_tag,
+        a.name,
+        a.status,
+        at.code AS asset_type_code,
+        jsonb_build_object('code', at.code, 'label', at.display_name) AS asset_type,
+        CASE
+          WHEN ls.id IS NULL THEN NULL
+          ELSE jsonb_build_object('code', ls.code, 'label', ls.display_name)
+        END AS state,
+        pc.contract_code AS primary_contract_code,
+        pc.contract_type AS primary_contract_type,
+        pc.start_date AS primary_contract_start_date,
+        pc.end_date AS primary_contract_end_date,
+        CASE
+          WHEN d.id IS NULL THEN NULL
+          ELSE jsonb_build_object('code', d.code, 'label', d.name)
+        END AS department,
+        CASE
+          WHEN l.id IS NULL THEN NULL
+          ELSE jsonb_build_object('code', l.code, 'label', l.name)
+        END AS location,
+        CASE
+          WHEN i.id IS NULL THEN NULL
+          ELSE jsonb_build_object(
+            'id', i.id,
+            'name', COALESCE(i.name, i.email),
+            'email', i.email
+          )
+        END AS owner_identity,
+        a.warranty_start_date,
+        a.warranty_end_date,
+        a.support_start_date,
+        a.support_end_date,
+        a.subscription_start_date,
+        a.subscription_end_date
+      FROM public.assets a
+      JOIN public.asset_types at
+        ON at.id = a.asset_type_id
+      LEFT JOIN public.lifecycle_states ls
+        ON ls.id = a.current_state_id
+      LEFT JOIN public.departments d
+        ON d.tenant_id = a.tenant_id
+       AND d.id = a.owner_department_id
+      LEFT JOIN public.locations l
+        ON l.tenant_id = a.tenant_id
+       AND l.id = a.location_id
+      LEFT JOIN public.identities i
+        ON i.tenant_id = a.tenant_id
+       AND i.id = a.current_custodian_identity_id
+      LEFT JOIN primary_contract pc
+        ON pc.tenant_id = a.tenant_id
+       AND pc.asset_id = a.id
+      WHERE ${baseWhereSql}
+    ),
+    contract_relation_rollup AS (
+      SELECT
+        ca.tenant_id,
+        ca.asset_id,
+        COUNT(DISTINCT c.id)::int AS linked_contracts_count,
+        COUNT(DISTINCT c.vendor_id)::int AS linked_vendors_count,
+        BOOL_OR((${contractHealthSql("c")}) = 'ACTIVE') AS has_active_contract,
+        BOOL_OR((${contractHealthSql("c")}) = 'EXPIRING') AS has_expiring_contract,
+        BOOL_OR((${contractHealthSql("c")}) = 'EXPIRED') AS has_expired_contract,
+        BOOL_OR((${contractHealthSql("c")}) = 'NO_END_DATE') AS has_no_end_date_contract,
+        COALESCE(
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT c.contract_code ORDER BY c.contract_code), NULL),
+          ARRAY[]::text[]
+        ) AS contract_codes_preview,
+        COALESCE(
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT v.vendor_name ORDER BY v.vendor_name), NULL),
+          ARRAY[]::text[]
+        ) AS vendor_names_preview,
+        COALESCE(
+          (
+            SELECT jsonb_agg(x.obj ORDER BY x.code)
+            FROM (
+              SELECT DISTINCT
+                c2.id,
+                c2.contract_code AS code,
+                jsonb_build_object('id', c2.id, 'code', c2.contract_code) AS obj
+              FROM public.contract_assets ca2
+              JOIN public.contracts c2
+                ON c2.tenant_id = ca2.tenant_id
+               AND c2.id = ca2.contract_id
+              WHERE ca2.tenant_id = ca.tenant_id
+                AND ca2.asset_id = ca.asset_id
+            ) x
+          ),
+          '[]'::jsonb
+        ) AS contract_preview_items,
+        COALESCE(
+          (
+            SELECT jsonb_agg(x.obj ORDER BY x.name)
+            FROM (
+              SELECT DISTINCT
+                v2.id,
+                v2.vendor_name AS name,
+                jsonb_build_object('id', v2.id, 'name', v2.vendor_name) AS obj
+              FROM public.contract_assets ca3
+              JOIN public.contracts c3
+                ON c3.tenant_id = ca3.tenant_id
+               AND c3.id = ca3.contract_id
+              LEFT JOIN public.vendors v2
+                ON v2.tenant_id = c3.tenant_id
+               AND v2.id = c3.vendor_id
+              WHERE ca3.tenant_id = ca.tenant_id
+                AND ca3.asset_id = ca.asset_id
+                AND v2.id IS NOT NULL
+            ) x
+          ),
+          '[]'::jsonb
+        ) AS vendor_preview_items
+      FROM public.contract_assets ca
+      JOIN public.contracts c
+        ON c.tenant_id = ca.tenant_id
+       AND c.id = ca.contract_id
+      LEFT JOIN public.vendors v
+        ON v.tenant_id = c.tenant_id
+       AND v.id = c.vendor_id
+      JOIN base_asset b
+        ON b.asset_id = ca.asset_id
+      GROUP BY ca.tenant_id, ca.asset_id
+    ),
+    coverage_pivot AS (
+      SELECT
+        b.asset_id,
+        b.asset_tag,
+        b.name,
+        b.status,
+        b.asset_type,
+        b.state,
+        b.department,
+        b.location,
+        b.owner_identity,
+
+        ${warrantyStartSql} AS warranty_start_date,
+        ${warrantyEndSql} AS warranty_end_date,
+
+        b.support_start_date AS support_start_date,
+        b.support_end_date AS support_end_date,
+
+        ${subscriptionStartSql} AS subscription_start_date,
+        ${subscriptionEndSql} AS subscription_end_date,
+
+        (COALESCE(rr.linked_contracts_count, 0) > 0) AS has_linked_contract,
+        COALESCE(rr.linked_contracts_count, 0) AS linked_contracts_count,
+        COALESCE(rr.linked_vendors_count, 0) AS linked_vendors_count,
+        COALESCE(rr.has_active_contract, FALSE) AS has_active_contract,
+        COALESCE(rr.has_expiring_contract, FALSE) AS has_expiring_contract,
+        COALESCE(rr.has_expired_contract, FALSE) AS has_expired_contract,
+        COALESCE(rr.has_no_end_date_contract, FALSE) AS has_no_end_date_contract,
+        CASE
+          WHEN COALESCE(rr.linked_contracts_count, 0) = 0 THEN 'NO_LINK'
+          WHEN COALESCE(rr.has_expired_contract, FALSE) THEN 'HAS_EXPIRED'
+          WHEN COALESCE(rr.has_expiring_contract, FALSE) THEN 'HAS_EXPIRING'
+          WHEN COALESCE(rr.has_no_end_date_contract, FALSE) THEN 'HAS_NO_END_DATE'
+          ELSE 'ACTIVE_ONLY'
+        END AS contract_health_rollup,
+        COALESCE(rr.contract_codes_preview, ARRAY[]::text[]) AS contract_codes_preview,
+        COALESCE(rr.vendor_names_preview, ARRAY[]::text[]) AS vendor_names_preview,
+        COALESCE(rr.contract_preview_items, '[]'::jsonb) AS contract_preview_items,
+        COALESCE(rr.vendor_preview_items, '[]'::jsonb) AS vendor_preview_items
+      FROM base_asset b
+      LEFT JOIN contract_relation_rollup rr
+        ON rr.asset_id = b.asset_id
+    ),
+    asset_export AS (
+      SELECT
+        cp.*,
+
+        ${buildCoverageHealthSql(
+          "cp.warranty_start_date",
+          "cp.warranty_end_date",
+          thresholdDaysParamIndex
+        )} AS warranty_health,
+        ${buildDaysToExpirySql(
+          "cp.warranty_start_date",
+          "cp.warranty_end_date"
+        )} AS warranty_days_to_expiry,
+
+        ${buildCoverageHealthSql(
+          "cp.support_start_date",
+          "cp.support_end_date",
+          thresholdDaysParamIndex
+        )} AS support_health,
+        ${buildDaysToExpirySql(
+          "cp.support_start_date",
+          "cp.support_end_date"
+        )} AS support_days_to_expiry,
+
+        ${buildCoverageHealthSql(
+          "cp.subscription_start_date",
+          "cp.subscription_end_date",
+          thresholdDaysParamIndex
+        )} AS subscription_health,
+        ${buildDaysToExpirySql(
+          "cp.subscription_start_date",
+          "cp.subscription_end_date"
+        )} AS subscription_days_to_expiry
+      FROM coverage_pivot cp
+    )
+    SELECT
+      ae.asset_id,
+      ae.asset_tag,
+      ae.name,
+      ae.status,
+      ae.asset_type,
+      ae.state,
+      ae.department,
+      ae.location,
+      ae.owner_identity,
+
+      ae.warranty_start_date,
+      ae.warranty_end_date,
+      ae.warranty_health,
+      ae.warranty_days_to_expiry,
+
+      ae.support_start_date,
+      ae.support_end_date,
+      ae.support_health,
+      ae.support_days_to_expiry,
+
+      ae.subscription_start_date,
+      ae.subscription_end_date,
+      ae.subscription_health,
+      ae.subscription_days_to_expiry,
+
+      ae.has_linked_contract,
+      ae.linked_contracts_count,
+      ae.linked_vendors_count,
+      ae.has_active_contract,
+      ae.has_expiring_contract,
+      ae.has_expired_contract,
+      ae.has_no_end_date_contract,
+      ae.contract_health_rollup,
+      ae.contract_codes_preview,
+      ae.vendor_names_preview,
+      ae.contract_preview_items,
+      ae.vendor_preview_items
+    FROM asset_export ae
+    WHERE ${outerWhereSql}
+    ORDER BY ae.asset_id ASC
+  `;
+}
+
+function mapMappingExportByAssetRow(r) {
+  return {
+    asset_id: toInt(r.asset_id),
+    asset_tag: r.asset_tag,
+    name: r.name,
+    status: r.status ?? null,
+    asset_type: r.asset_type ?? null,
+    state: r.state ?? null,
+    department: r.department ?? null,
+    location: r.location ?? null,
+    owner_identity: r.owner_identity ?? null,
+
+    warranty_start_date: toDateOrNull(r.warranty_start_date),
+    warranty_end_date: toDateOrNull(r.warranty_end_date),
+    warranty_health: r.warranty_health ?? "NO_COVERAGE",
+    warranty_days_to_expiry: toIntOrNull(r.warranty_days_to_expiry),
+
+    support_start_date: toDateOrNull(r.support_start_date),
+    support_end_date: toDateOrNull(r.support_end_date),
+    support_health: r.support_health ?? "NO_COVERAGE",
+    support_days_to_expiry: toIntOrNull(r.support_days_to_expiry),
+
+    subscription_start_date: toDateOrNull(r.subscription_start_date),
+    subscription_end_date: toDateOrNull(r.subscription_end_date),
+    subscription_health: r.subscription_health ?? "NO_COVERAGE",
+    subscription_days_to_expiry: toIntOrNull(r.subscription_days_to_expiry),
+
+    has_linked_contract: Boolean(r.has_linked_contract),
+    linked_contracts_count: toInt(r.linked_contracts_count),
+    linked_vendors_count: toInt(r.linked_vendors_count),
+    has_active_contract: Boolean(r.has_active_contract),
+    has_expiring_contract: Boolean(r.has_expiring_contract),
+    has_expired_contract: Boolean(r.has_expired_contract),
+    has_no_end_date_contract: Boolean(r.has_no_end_date_contract),
+    contract_health_rollup: r.contract_health_rollup ?? "NO_LINK",
+    contract_codes_preview: toStringArray(r.contract_codes_preview),
+    vendor_names_preview: toStringArray(r.vendor_names_preview),
+    contract_preview_items: toContractPreviewItems(r.contract_preview_items),
+    vendor_preview_items: toVendorPreviewItems(r.vendor_preview_items),
+  };
+}
+
+export async function listAllAssetMappingExportByAsset(app, filters) {
+  const { params: baseParams, baseWhereSql } = buildBaseFilters(filters);
+
+  const thresholdDays =
+    Number.isInteger(filters.expiringInDays) && filters.expiringInDays > 0
+      ? filters.expiringInDays
+      : 30;
+
+  baseParams.push(thresholdDays);
+  const thresholdDaysParamIndex = baseParams.length;
+
+  const { params, outerWhereSql } = buildExportOuterFiltersByAsset(
+    filters,
+    [...baseParams]
+  );
+
+  const sql = buildMappingExportByAssetSql(
+    baseWhereSql,
+    thresholdDaysParamIndex,
+    outerWhereSql
+  );
+
+  const { rows } = await app.pg.query(sql, params);
+  return (rows || []).map(mapMappingExportByAssetRow);
 }

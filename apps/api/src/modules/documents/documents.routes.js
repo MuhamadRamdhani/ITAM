@@ -3,6 +3,7 @@ import {
   listDocumentsService,
   createDocumentService,
   getDocumentService,
+  deleteDocumentService,
   addDocumentVersionService,
   submitDocumentService,
   approveDocumentService,
@@ -185,6 +186,38 @@ export default async function documentsRoutes(app) {
       }
 
       return reply.send({ ok: true, data, meta: { request_id: req.id } });
+    }
+  );
+
+  // DELETE /api/v1/documents/:id
+  app.delete(
+    "/documents/:id",
+    { schema: { params: Type.Object({ id: Type.String() }) } },
+    async (req, reply) => {
+      const documentId = Number(req.params.id);
+
+      if (!Number.isFinite(documentId)) {
+        return reply.code(400).send({
+          ok: false,
+          error: { code: "BAD_REQUEST", message: "Invalid document id" },
+          meta: { request_id: req.id },
+        });
+      }
+
+      const out = await deleteDocumentService(app, req, documentId);
+      if (!out.ok) {
+        return reply.code(out.statusCode ?? 400).send({
+          ok: false,
+          error: { code: out.code, message: out.message, details: out.details },
+          meta: { request_id: req.id },
+        });
+      }
+
+      return reply.send({
+        ok: true,
+        data: out.document,
+        meta: { request_id: req.id },
+      });
     }
   );
 

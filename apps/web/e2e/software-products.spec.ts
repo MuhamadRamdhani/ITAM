@@ -165,6 +165,25 @@ async function apiPostJson(page: Page, pathUrl: string, body: unknown): Promise<
   );
 }
 
+async function apiDeleteJson(page: Page, pathUrl: string): Promise<ApiResponse> {
+  return page.evaluate(
+    async (url) => {
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      return { status: res.status, json };
+    },
+    `${API_BASE}${pathUrl}`
+  );
+}
+
 async function apiPatchJson(page: Page, pathUrl: string, body: unknown): Promise<ApiResponse> {
   return page.evaluate(
     async ({ url, payload }) => {
@@ -380,6 +399,65 @@ async function createInactiveProductViaApi(page: Page, vendorId: number) {
     updatedName: `${payload.product_name} Updated`,
     updatedNotes: `${payload.notes} updated`,
   };
+}
+
+async function createSoftwareProductViaApi(
+  page: Page,
+  vendorId: number,
+  opts?: Partial<{
+    productCode: string;
+    productName: string;
+    status: "ACTIVE" | "INACTIVE";
+    notes: string;
+  }>
+) {
+  const suffix = uniqueSuffix();
+  const payload = {
+    product_code: opts?.productCode || `PW-SP-API-${suffix}`,
+    product_name: opts?.productName || `Playwright API Software ${suffix}`,
+    publisher_vendor_id: vendorId,
+    category: "BUSINESS_APPLICATION",
+    deployment_model: "SAAS",
+    licensing_metric: "SUBSCRIPTION",
+    status: opts?.status || "ACTIVE",
+    version_policy: "VERSIONED",
+    notes: opts?.notes || "Playwright software product",
+  };
+
+  const res = await apiPostJson(page, "/api/v1/software-products", payload);
+  expect(res.status).toBe(201);
+
+  const productId = Number((res.json as any)?.data?.id ?? 0);
+  expect(productId).toBeGreaterThan(0);
+
+  return {
+    productId,
+    productCode: payload.product_code,
+    productName: payload.product_name,
+    updatedName: `${payload.product_name} Updated`,
+    updatedNotes: `${payload.notes} updated`,
+  };
+}
+
+async function createEntitlementViaApi(page: Page, contractId: number, productId: number) {
+  const suffix = uniqueSuffix();
+  const entitlementRes = await apiPostJson(page, `/api/v1/contracts/${contractId}/software-entitlements`, {
+    software_product_id: productId,
+    entitlement_code: `PW-ENT-DEL-${suffix}`,
+    entitlement_name: `Playwright Delete Entitlement ${suffix}`,
+    licensing_metric: "SUBSCRIPTION",
+    quantity_purchased: 1,
+    start_date: isoDate(-5),
+    end_date: isoDate(30),
+    status: "ACTIVE",
+    notes: "Playwright entitlement for delete test",
+  });
+
+  expect(entitlementRes.status).toBe(201);
+  const entitlementId = Number((entitlementRes.json as any)?.data?.id ?? 0);
+  expect(entitlementId).toBeGreaterThan(0);
+
+  return { entitlementId };
 }
 
 async function createSoftwareProductViaUi(
@@ -806,10 +884,137 @@ test.describe.serial("Software Products", () => {
     await openSoftwareProductsPage(page);
     await expect(page.getByRole("button", { name: "Create Software Product" })).toHaveCount(0);
     await expect(page.getByText("Read-only access")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
 
     await page.goto(`/software-products/${seedMainProduct.productId}`);
     await expect(page.getByText("Read-only access")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save Changes" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+
+    const deleteAttempt = await apiDeleteJson(page, `/api/v1/software-products/${seedMainProduct.productId}`);
+    expect(deleteAttempt.status).toBe(403);
+    expect(deleteAttempt.json?.error?.code).toBe("FORBIDDEN");
+  });
+
+  test("SW-011A delete succeeds for unused software product", async ({ page }) => {
+    if (!seedVendor) throw new Error("Seed vendor is missing");
+
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createSoftwareProductViaUi(page, seedVendor, {
+      productName: `Deletable Software ${uniqueSuffix()}`,
+      notes: "Delete success test",
+    });
+
+    await openSoftwareProductDetail(page, created.productId);
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/software-products/${created.productId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete software product" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Product" }).click();
+
+    const response = await deleteResponse;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByText(`Software product ${created.productCode} deleted.`)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page).toHaveURL(/\/software-products$/);
+  });
+
+  test("SW-011B delete is blocked by installation dependency", async ({ page }) => {
+    if (!seedVendor || !seedInstallationAsset) {
+      throw new Error("Seed vendor or installation asset missing");
+    }
+
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createSoftwareProductViaUi(page, seedVendor, {
+      productName: `Installation Locked Software ${uniqueSuffix()}`,
+      notes: "Installation delete guard",
+    });
+
+    await openAssetDetail(page, seedInstallationAsset.assetId);
+    await page.getByRole("link", { name: "Software" }).click();
+    await expect(page.getByRole("button", { name: "Add Installation" })).toBeVisible();
+    await page.getByRole("button", { name: "Add Installation" }).click();
+    await expect(page.getByRole("heading", { name: "Add Software Installation" })).toBeVisible();
+
+    const installationModal = page.locator("div.fixed").last();
+    const productSelect = installationModal.locator("select").first();
+    await page.waitForFunction(() => {
+      const select = document.querySelector("div.fixed select") as HTMLSelectElement | null;
+      return !!select && select.options.length > 1;
+    }, { timeout: 20_000 });
+    await selectOptionContainingText(productSelect, created.productCode);
+    await installationModal.locator('input[placeholder="e.g. 16.0"]').fill("1.0.0");
+    await installationModal.getByRole("button", { name: "Create Installation" }).click();
+    await expect(page.getByRole("cell", { name: "1.0.0" }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await openSoftwareProductDetail(page, created.productId);
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/software-products/${created.productId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete software product" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Product" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body?.error?.code).toBe("SOFTWARE_PRODUCT_IN_USE");
+    await expect(
+      page.getByText("Software product masih dipakai oleh installation atau entitlement.")
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page).toHaveURL(new RegExp(`/software-products/${created.productId}$`));
+  });
+
+  test("SW-011C delete is blocked by entitlement dependency", async ({ page }) => {
+    if (!seedVendor || !seedContract) {
+      throw new Error("Seed vendor or contract missing");
+    }
+
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createSoftwareProductViaApi(page, seedVendor.vendorId, {
+      productName: `Entitlement Locked Software ${uniqueSuffix()}`,
+      notes: "Entitlement delete guard",
+    });
+    await createEntitlementViaApi(page, seedContract.contractId, created.productId);
+
+    await openSoftwareProductDetail(page, created.productId);
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/software-products/${created.productId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete software product" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Product" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body?.error?.code).toBe("SOFTWARE_PRODUCT_IN_USE");
+    await expect(
+      page.getByText("Software product masih dipakai oleh installation atau entitlement.")
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page).toHaveURL(new RegExp(`/software-products/${created.productId}$`));
   });
 
   test("SW-012 tenant isolation", async ({ page }) => {

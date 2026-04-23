@@ -10,6 +10,7 @@ import {
   getSoftwareProductDetailService,
   createSoftwareProductService,
   patchSoftwareProductService,
+  deleteSoftwareProductService,
 } from "./software-products.service.js";
 
 function mustHaveAnyRole(req, allowed) {
@@ -111,6 +112,24 @@ export default async function softwareProductsRoutes(app) {
         req,
         req.params.id,
         req.body || {}
+      );
+      return reply.send({ ok: true, data });
+    }
+  );
+
+  app.delete(
+    "/:id",
+    {
+      schema: {
+        params: SoftwareProductParamsSchema,
+      },
+    },
+    async (req, reply) => {
+      mustHaveAnyRole(req, WRITE_ROLES);
+      const data = await deleteSoftwareProductService(
+        app,
+        req,
+        req.params.id
       );
       return reply.send({ ok: true, data });
     }

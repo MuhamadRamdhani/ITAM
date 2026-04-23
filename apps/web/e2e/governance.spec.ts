@@ -168,6 +168,33 @@ async function browserRequest(page: Page, path: string, init?: { method?: string
   );
 }
 
+async function apiDelete(page: Page, path: string) {
+  return await page.evaluate(
+    async ({ apiBase, path }) => {
+      const res = await fetch(`${apiBase}${path}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return {
+        status: res.status,
+        json,
+        code: json?.error?.code || json?.code || null,
+        message: json?.error?.message || json?.message || null,
+      };
+    },
+    { apiBase: API_BASE, path }
+  );
+}
+
 async function browserLogin(page: Page, creds: Credentials) {
   return await page.evaluate(
     async ({ apiBase, creds }) => {
@@ -320,6 +347,32 @@ test.describe.serial("Governance", () => {
     await expect(page.locator("div.mt-2.text-sm.text-gray-700").first()).toHaveText(note);
   });
 
+  test("GOV-001A tenant admin can delete draft scope version", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const id = await createScopeDraftViaApi(page, `Governance delete draft ${uniqueSuffix()}`);
+
+    await page.goto(`/governance/scope/${id}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Draft" }).first().click();
+
+    const confirmModal = page.locator("div.fixed.inset-0.z-50").first();
+    await expect(confirmModal.getByText(/dihapus permanen/i)).toBeVisible();
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/api/v1/governance/scope/versions/${id}`),
+      { timeout: 30_000 }
+    );
+    await page.getByRole("button", { name: "Delete Draft" }).last().click();
+    const deleteResponseResult = await deleteResponse;
+    expect(deleteResponseResult.status()).toBe(200);
+
+    await page.goto(`/governance/scope/${id}`);
+    await expect(page.getByText(/Scope version not found|not ditemukan/i)).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
   test("GOV-002 submit, approve, and activate scope version", async ({ page }) => {
     await loginAs(page, USERS.tenantAdmin);
     expect(createdScopeVersionId).toBeTruthy();
@@ -363,6 +416,23 @@ test.describe.serial("Governance", () => {
         body: { note: "should be forbidden" },
       })
     ).rejects.toThrow(/Forbidden/);
+  });
+
+  test("GOV-002C non-draft scope version blocks delete draft UI and API", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const draftId = await createScopeDraftViaApi(page, `Governance non-draft delete ${uniqueSuffix()}`);
+
+    await browserJson(page, `/api/v1/governance/scope/versions/${draftId}/submit`, {
+      method: "POST",
+      body: { note: "prepare non-draft delete guard" },
+    });
+
+    await page.goto(`/governance/scope/${draftId}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toHaveCount(0);
+
+    const denied = await apiDelete(page, `/api/v1/governance/scope/versions/${draftId}`);
+    expect(denied.status).toBe(409);
+    expect(denied.code).toBe("GOVERNANCE_SCOPE_NOT_DELETABLE");
   });
 
   test("GOV-002B governance context validation rejects invalid payloads", async ({ page }) => {
@@ -596,11 +666,16 @@ test.describe.serial("Governance", () => {
   });
 
   test("GOV-005 auditor has read-only access on governance pages", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const draftId = await createScopeDraftViaApi(page, `Governance auditor guard ${uniqueSuffix()}`);
+
     await loginAs(page, USERS.auditor);
 
     await openPath(page, "/governance/scope", "Governance Scope");
     await expect(page.getByText("Read only. Create scope version, submit, approve, and activate are restricted")).toBeVisible();
     await expect(page.getByRole("button", { name: "Create Scope Version" })).toHaveCount(0);
+    await page.goto(`/governance/scope/${draftId}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toHaveCount(0);
 
     await openPath(page, "/governance/context", "Governance Context");
     await expect(page.getByRole("button", { name: "Create Context Entry" })).toHaveCount(0);

@@ -3,9 +3,12 @@ import {
   countVendors,
   listVendors,
   findVendorById,
+  findVendorByIdForDelete,
   findVendorByCode,
   insertVendor,
   updateVendor,
+  countVendorDeleteDependencies,
+  deleteVendorById,
 } from "./vendors.repo.js";
 
 function actorStr(req) {
@@ -23,6 +26,21 @@ function getTenantIdStrict(req) {
     throw e;
   }
   return Number(tenantId);
+}
+
+function mustHaveAnyRole(req, allowedRoles) {
+  const raw = Array.isArray(req?.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = raw
+    .map((role) => String(role || "").trim().toUpperCase())
+    .filter(Boolean);
+  const ok = allowedRoles.some((role) => roles.includes(role));
+  if (!ok) {
+    const e = new Error("Forbidden");
+    e.statusCode = 403;
+    e.code = "FORBIDDEN";
+    e.details = { required_any: allowedRoles, got: roles };
+    throw e;
+  }
 }
 
 function toUpperOrNull(v) {
@@ -363,4 +381,73 @@ export async function patchVendorService(app, req, vendorId, body) {
   });
 
   return updated;
+}
+
+export async function deleteVendorService(app, req, vendorId) {
+  const tenantId = getTenantIdStrict(req);
+  const idNum = Number(vendorId);
+
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    const e = new Error("Invalid vendor id");
+    e.statusCode = 400;
+    e.code = "BAD_REQUEST";
+    throw e;
+  }
+
+  mustHaveAnyRole(req, [
+    "SUPERADMIN",
+    "TENANT_ADMIN",
+    "ITAM_MANAGER",
+    "PROCUREMENT_CONTRACT_MANAGER",
+  ]);
+
+  const current = await findVendorByIdForDelete(app, tenantId, idNum);
+  if (!current) {
+    const e = new Error("Vendor not found");
+    e.statusCode = 404;
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  const dependencies = await countVendorDeleteDependencies(app, tenantId, idNum);
+  if (dependencies.total > 0) {
+    const e = new Error("Vendor is still in use");
+    e.statusCode = 409;
+    e.code = "VENDOR_IN_USE";
+    e.details = dependencies;
+    throw e;
+  }
+
+  await app.pg.query("BEGIN");
+  try {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorStr(req),
+      action: "VENDOR_DELETED",
+      entityType: "VENDOR",
+      entityId: idNum,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        vendor_code: current.vendor_code,
+        vendor_name: current.vendor_name,
+        vendor_type: current.vendor_type,
+        status: current.status,
+      },
+    });
+
+    const deleted = await deleteVendorById(app, tenantId, idNum);
+    if (!deleted) {
+      throw Object.assign(new Error("Vendor not found"), {
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    }
+
+    await app.pg.query("COMMIT");
+    return deleted;
+  } catch (error) {
+    await app.pg.query("ROLLBACK");
+    throw error;
+  }
 }

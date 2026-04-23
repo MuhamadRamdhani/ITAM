@@ -133,6 +133,10 @@ export async function findSoftwareProductById(app, tenantId, softwareProductId) 
   return rows[0] || null;
 }
 
+export async function findSoftwareProductByIdForDelete(app, tenantId, softwareProductId) {
+  return await findSoftwareProductById(app, tenantId, softwareProductId);
+}
+
 export async function findSoftwareProductByCode(
   app,
   tenantId,
@@ -315,6 +319,65 @@ export async function updateSoftwareProduct(app, tenantId, softwareProductId, pa
       updated_at
     `,
     params
+  );
+
+  return rows[0] || null;
+}
+
+export async function countSoftwareProductDeleteDependencies(app, tenantId, softwareProductId) {
+  const [installationRows, entitlementRows] = await Promise.all([
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.software_installations
+      WHERE tenant_id = $1
+        AND software_product_id = $2
+      `,
+      [tenantId, softwareProductId]
+    ),
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.software_entitlements
+      WHERE tenant_id = $1
+        AND software_product_id = $2
+      `,
+      [tenantId, softwareProductId]
+    ),
+  ]);
+
+  const installations = Number(installationRows.rows?.[0]?.total ?? 0);
+  const entitlements = Number(entitlementRows.rows?.[0]?.total ?? 0);
+
+  return {
+    installations,
+    entitlements,
+    total: installations + entitlements,
+  };
+}
+
+export async function deleteSoftwareProductById(app, tenantId, softwareProductId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.software_products
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      product_code,
+      product_name,
+      publisher_vendor_id,
+      category,
+      deployment_model,
+      licensing_metric,
+      status,
+      version_policy,
+      notes,
+      created_at,
+      updated_at
+    `,
+    [tenantId, softwareProductId]
   );
 
   return rows[0] || null;

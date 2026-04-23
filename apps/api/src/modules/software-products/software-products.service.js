@@ -4,9 +4,12 @@ import {
   countSoftwareProducts,
   listSoftwareProducts,
   findSoftwareProductById,
+  findSoftwareProductByIdForDelete,
   findSoftwareProductByCode,
   insertSoftwareProduct,
   updateSoftwareProduct,
+  countSoftwareProductDeleteDependencies,
+  deleteSoftwareProductById,
 } from "./software-products.repo.js";
 
 const CATEGORIES = [
@@ -65,6 +68,21 @@ function getTenantIdStrict(req) {
     throw e;
   }
   return Number(tenantId);
+}
+
+function mustHaveAnyRole(req, allowedRoles) {
+  const raw = Array.isArray(req?.requestContext?.roles) ? req.requestContext.roles : [];
+  const roles = raw
+    .map((role) => String(role || "").trim().toUpperCase())
+    .filter(Boolean);
+  const ok = allowedRoles.some((role) => roles.includes(role));
+  if (!ok) {
+    const e = new Error("Forbidden");
+    e.statusCode = 403;
+    e.code = "FORBIDDEN";
+    e.details = { required_any: allowedRoles, got: roles };
+    throw e;
+  }
 }
 
 function toUpperOrNull(v) {
@@ -439,4 +457,77 @@ export async function patchSoftwareProductService(app, req, softwareProductId, b
   });
 
   return after;
+}
+
+export async function deleteSoftwareProductService(app, req, softwareProductId) {
+  const tenantId = getTenantIdStrict(req);
+  const idNum = Number(softwareProductId);
+
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    const e = new Error("Invalid software product id");
+    e.statusCode = 400;
+    e.code = "BAD_REQUEST";
+    throw e;
+  }
+
+  mustHaveAnyRole(req, [
+    "SUPERADMIN",
+    "TENANT_ADMIN",
+    "ITAM_MANAGER",
+    "PROCUREMENT_CONTRACT_MANAGER",
+  ]);
+
+  const current = await findSoftwareProductByIdForDelete(app, tenantId, idNum);
+  if (!current) {
+    const e = new Error("Software product not found");
+    e.statusCode = 404;
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  const dependencies = await countSoftwareProductDeleteDependencies(app, tenantId, idNum);
+  if (dependencies.total > 0) {
+    const e = new Error("Software product is still in use");
+    e.statusCode = 409;
+    e.code = "SOFTWARE_PRODUCT_IN_USE";
+    e.details = dependencies;
+    throw e;
+  }
+
+  await app.pg.query("BEGIN");
+  try {
+    await insertAuditEvent(app, {
+      tenantId,
+      actor: actorStr(req),
+      action: "SOFTWARE_PRODUCT_DELETED",
+      entityType: "SOFTWARE_PRODUCT",
+      entityId: idNum,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        product_code: current.product_code,
+        product_name: current.product_name,
+        publisher_vendor_id: current.publisher_vendor_id,
+        category: current.category,
+        deployment_model: current.deployment_model,
+        licensing_metric: current.licensing_metric,
+        status: current.status,
+        version_policy: current.version_policy,
+      },
+    });
+
+    const deleted = await deleteSoftwareProductById(app, tenantId, idNum);
+    if (!deleted) {
+      throw Object.assign(new Error("Software product not found"), {
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    }
+
+    await app.pg.query("COMMIT");
+    return deleted;
+  } catch (error) {
+    await app.pg.query("ROLLBACK");
+    throw error;
+  }
 }

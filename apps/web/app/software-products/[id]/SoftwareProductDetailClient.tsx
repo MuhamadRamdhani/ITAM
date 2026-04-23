@@ -2,10 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { apiGet, apiPatchJson } from "@/app/lib/api";
+import { useParams, useRouter } from "next/navigation";
+import { apiDelete, apiGet, apiPatchJson } from "@/app/lib/api";
 import { ErrorState } from "@/app/lib/loadingComponents";
 import { canManageSoftwareProducts } from "@/app/lib/softwareProductAccess";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type SoftwareProduct = {
   id: number;
@@ -152,6 +154,7 @@ function deploymentPillClass(value: string) {
 
 export default function SoftwareProductDetailClient() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = String(params?.id || "");
 
   const [item, setItem] = useState<SoftwareProduct | null>(null);
@@ -166,6 +169,11 @@ export default function SoftwareProductDetailClient() {
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const detailUrl = useMemo(() => `${API_BASE}/${id}`, [id]);
 
@@ -318,6 +326,42 @@ export default function SoftwareProductDetailClient() {
     }
   }
 
+  async function confirmDeleteSoftwareProduct() {
+    if (!item || deleteLoading) return;
+
+    setDeleteLoading(true);
+    setSaveErr(null);
+    setSaveOk(null);
+
+    try {
+      await apiDelete(`${API_BASE}/${item.id}`);
+      setDeleteOpen(false);
+      setToast({
+        type: "success",
+        message: `Software product ${item.product_code} deleted.`,
+      });
+
+      window.setTimeout(() => {
+        router.push("/software-products");
+      }, 700);
+    } catch (error) {
+      const code = (error as any)?.code;
+      if (code === "SOFTWARE_PRODUCT_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Software product masih dipakai oleh installation atau entitlement.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: getErrorMessage(error, "Gagal menghapus software product."),
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -349,6 +393,22 @@ export default function SoftwareProductDetailClient() {
 
   return (
     <div className="space-y-6">
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={deleteOpen}
+        title="Delete software product"
+        description={`Software product ${item.product_code} akan dihapus permanen jika tidak sedang dipakai oleh installation atau entitlement.`}
+        confirmLabel="Delete Product"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void confirmDeleteSoftwareProduct()}
+      />
+
       <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -369,12 +429,22 @@ export default function SoftwareProductDetailClient() {
             </div>
           </div>
 
-          <Link
-            href="/software-products"
-            className="itam-secondary-action"
-          >
-            Back
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {canWrite ? (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                disabled={saving || deleteLoading}
+              >
+                Delete
+              </button>
+            ) : null}
+
+            <Link href="/software-products" className="itam-secondary-action">
+              Back
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

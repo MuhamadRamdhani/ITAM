@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { apiGet, apiPatchJson } from "@/app/lib/api";
+import { apiDelete, apiGet, apiPatchJson } from "@/app/lib/api";
 import { canManageVendors } from "@/app/lib/vendorAccess";
 import Link from "next/link";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type Vendor = {
   id: number;
@@ -98,6 +100,11 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
   const [saveOk, setSaveOk] = useState<string | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [canWrite, setCanWrite] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -181,8 +188,60 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
     }
   }
 
+  async function confirmDeleteVendor() {
+    if (!vendor || deleteLoading) return;
+
+    setDeleteLoading(true);
+    setSaveErr(null);
+    setSaveOk(null);
+
+    try {
+      await apiDelete(`${API_BASE}/${vendor.id}`);
+      setDeleteOpen(false);
+      setToast({
+        type: "success",
+        message: `Vendor ${vendor.vendor_code} deleted.`,
+      });
+
+      window.setTimeout(() => {
+        router.push("/vendors");
+      }, 700);
+    } catch (err) {
+      const code = (err as any)?.code;
+      if (code === "VENDOR_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Vendor masih dipakai oleh contract atau software product.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: getErrorMessage(err, "Gagal menghapus vendor."),
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={deleteOpen}
+        title="Delete vendor"
+        description={`Vendor ${vendor?.vendor_code || vendor?.vendor_name || ""} akan dihapus permanen jika tidak sedang dipakai oleh contract atau software product.`}
+        confirmLabel="Delete Vendor"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void confirmDeleteVendor()}
+      />
+
       <div className="rounded-3xl border border-white bg-white/80 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -199,12 +258,25 @@ export default function VendorDetailClient({ vendorId }: { vendorId: string }) {
             </p>
           </div>
 
-          <Link
-  href={backHref}
-  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
->
-  Back
-</Link>
+          <div className="flex flex-wrap gap-2">
+            {canWrite ? (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                disabled={saving || deleteLoading}
+              >
+                Delete
+              </button>
+            ) : null}
+
+            <Link
+              href={backHref}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Back
+            </Link>
+          </div>
         </div>
       </div>
 

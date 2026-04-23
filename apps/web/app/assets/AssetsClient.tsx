@@ -52,13 +52,17 @@ function buildAssetsHref(params: {
   state_code: string;
   page?: number;
   pageSize?: number;
+  returnTo?: string;
 }) {
   const p = new URLSearchParams();
+
   if (params.q) p.set("q", params.q);
   if (params.type_code) p.set("type_code", params.type_code);
   if (params.state_code) p.set("state_code", params.state_code);
   if (params.pageSize && params.pageSize > 0) p.set("page_size", String(params.pageSize));
   if (params.page && params.page > 0) p.set("page", String(params.page));
+  if (params.returnTo) p.set("return_to", params.returnTo);
+
   const qs = p.toString();
   return qs ? `/assets?${qs}` : "/assets";
 }
@@ -96,6 +100,7 @@ export default function AssetsClient() {
   const q = searchParams.get("q")?.trim() || "";
   const type_code = searchParams.get("type_code")?.trim() || "";
   const state_code = searchParams.get("state_code")?.trim() || "";
+  const returnTo = searchParams.get("return_to")?.trim() || "";
   const page = pickInt(searchParams.get("page"), 1);
 
   const pageSize = useMemo(() => {
@@ -111,8 +116,9 @@ export default function AssetsClient() {
         state_code,
         page,
         pageSize,
+        returnTo,
       }),
-    [q, type_code, state_code, page, pageSize]
+    [q, type_code, state_code, page, pageSize, returnTo]
   );
 
   const canCreateAsset = useMemo(() => canCreateOrEditAsset(roles), [roles]);
@@ -282,6 +288,7 @@ export default function AssetsClient() {
       state_code: stateCodeInput.trim(),
       page: 1,
       pageSize: Number(pageSizeInput),
+      returnTo,
     });
 
     router.push(nextHref);
@@ -316,15 +323,12 @@ export default function AssetsClient() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
-          <form
-            className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
-            onSubmit={onSearchSubmit}
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <form className="w-full" onSubmit={onSearchSubmit}>
+            <div className="flex flex-wrap items-end gap-3">
               <select
                 value={typeCodeInput}
                 onChange={(e) => setTypeCodeInput(e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-full sm:w-[220px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">All types</option>
                 {assetTypesItems.map((t) => (
@@ -337,7 +341,7 @@ export default function AssetsClient() {
               <select
                 value={stateCodeInput}
                 onChange={(e) => setStateCodeInput(e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-full sm:w-[220px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">All states</option>
                 {statesItems.map((s) => (
@@ -350,7 +354,7 @@ export default function AssetsClient() {
               <select
                 value={pageSizeInput}
                 onChange={(e) => setPageSizeInput(e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-full sm:w-[140px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               >
                 {pageSizeOptions.map((n) => (
                   <option key={n} value={String(n)}>
@@ -363,10 +367,13 @@ export default function AssetsClient() {
                 value={qInput}
                 onChange={(e) => setQInput(e.target.value)}
                 placeholder="Search tag/name..."
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:w-72"
+                className="min-w-0 w-full sm:flex-1 sm:min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
 
-              <button className="itam-primary-action">
+              <button
+                type="submit"
+                className="itam-primary-action w-full shrink-0 sm:w-auto"
+              >
                 Search
               </button>
             </div>
@@ -401,6 +408,12 @@ export default function AssetsClient() {
                     </tr>
                   ) : (
                     items.map((a) => {
+                      const assetDetailHref = `/assets/${a.id}?return_to=${encodeURIComponent(
+                        currentAssetsHref
+                      )}`;
+                      const assetEditHref = `/assets/${a.id}/edit?return_to=${encodeURIComponent(
+                        currentAssetsHref
+                      )}`;
                       const transferHref = `/asset-transfer-requests/new?asset_id=${a.id}&return_to=${encodeURIComponent(
                         currentAssetsHref
                       )}`;
@@ -410,7 +423,7 @@ export default function AssetsClient() {
                           <td className="px-4 py-5 pr-6 font-mono text-xs">
                             <Link
                               className="text-blue-700 hover:underline"
-                              href={`/assets/${a.id}`}
+                              href={assetDetailHref}
                             >
                               {a.asset_tag}
                             </Link>
@@ -429,7 +442,7 @@ export default function AssetsClient() {
                           <td className="whitespace-nowrap px-4 py-5 pr-6 text-right">
                             <Link
                               className="text-cyan-700 hover:underline"
-                              href={`/assets/${a.id}`}
+                              href={assetDetailHref}
                             >
                               View
                             </Link>
@@ -451,7 +464,7 @@ export default function AssetsClient() {
                                 <span className="mx-2 text-slate-300">|</span>
                                 <Link
                                   className="text-cyan-700 hover:underline"
-                                  href={`/assets/${a.id}/edit`}
+                                  href={assetEditHref}
                                 >
                                   Edit
                                 </Link>
@@ -482,6 +495,7 @@ export default function AssetsClient() {
                     state_code,
                     page: page - 1,
                     pageSize,
+                    returnTo,
                   })}
                 >
                   Prev
@@ -501,6 +515,7 @@ export default function AssetsClient() {
                     state_code,
                     page: page + 1,
                     pageSize,
+                    returnTo,
                   })}
                 >
                   Next

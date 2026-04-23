@@ -89,6 +89,24 @@ async function apiPostJson(page: Page, pathUrl: string, body: unknown) {
   );
 }
 
+async function apiDelete(page: Page, pathUrl: string) {
+  return page.evaluate(async (url) => {
+    const res = await fetch(url, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    let json: any = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+
+    return { status: res.status, json };
+  }, `${API_BASE}${pathUrl}`);
+}
+
 async function openDocuments(page: Page) {
   await page.goto("/documents");
   await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible({
@@ -159,6 +177,53 @@ async function openDocument(page: Page, documentId: number) {
   });
 }
 
+async function createVendorViaApi(page: Page, suffix: string) {
+  const res = await apiPostJson(page, "/api/v1/vendors", {
+    vendor_code: `PW-DOC-VEND-${suffix}`.toUpperCase(),
+    vendor_name: `Playwright Document Vendor ${suffix}`,
+    vendor_type: "SOFTWARE_PUBLISHER",
+    status: "ACTIVE",
+    primary_contact_name: "Playwright Document Contact",
+    primary_contact_email: `document.vendor.${suffix}@example.com`,
+  });
+
+  expect([200, 201]).toContain(res.status);
+
+  const vendorId = Number(res.json?.data?.id ?? res.json?.data?.vendor?.id ?? 0);
+  expect(vendorId).toBeGreaterThan(0);
+  return vendorId;
+}
+
+async function createDraftContractWithDocumentRelation(page: Page, documentId: number) {
+  const suffix = uniqueSuffix();
+  const vendorId = await createVendorViaApi(page, suffix);
+
+  const contractRes = await apiPostJson(page, "/api/v1/contracts", {
+    vendor_id: vendorId,
+    contract_code: `PW-DOC-CT-${suffix}`,
+    contract_name: `Playwright Document Contract ${suffix}`,
+    contract_type: "SOFTWARE",
+    status: "DRAFT",
+    start_date: "2026-01-01",
+    end_date: "2026-12-31",
+    renewal_notice_days: 30,
+    owner_identity_id: null,
+    notes: "Playwright document contract blocker",
+  });
+
+  expect([200, 201]).toContain(contractRes.status);
+  const contractId = Number(contractRes.json?.data?.id ?? contractRes.json?.data?.contract?.id ?? 0);
+  expect(contractId).toBeGreaterThan(0);
+
+  const attachRes = await apiPostJson(page, `/api/v1/contracts/${contractId}/documents`, {
+    document_id: documentId,
+    note: "Document blocker relation",
+  });
+  expect([200, 201]).toContain(attachRes.status);
+
+  return contractId;
+}
+
 test.describe.serial("Documents", () => {
   test.setTimeout(240_000);
 
@@ -173,16 +238,27 @@ test.describe.serial("Documents", () => {
 
   test("DOC-002 and DOC-006 ITAM manager can create document and version history updates", async ({ page }) => {
     const created = await createDocumentViaUi(page, USERS.itamManager, "manager-flow");
+    const versionText = `Version 2 ${uniqueSuffix()}`;
 
     await expect(page.locator("span.rounded-full", { hasText: "DRAFT" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Add Version" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Add Version" }).click();
     await page.locator('input[placeholder="Note (optional)"]').fill("Added by Playwright");
-    await page.locator('textarea[placeholder="Ketik bebas di sini..."]').fill(`Version 2 ${uniqueSuffix()}`);
-    await page.getByRole("button", { name: "Add Version" }).click();
-    await expect(page.getByText("Version 2")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText("Current version: v2")).toBeVisible({ timeout: 30_000 });
+    await page.locator('textarea[placeholder="Ketik bebas di sini..."]').fill(versionText);
+    await Promise.all([
+      page.waitForResponse((response) => {
+        return (
+          response.url().includes(`/api/v1/documents/${created.documentId}/versions`) &&
+          response.request().method() === "POST" &&
+          response.ok()
+        );
+      }),
+      page.getByRole("button", { name: "Add Version" }).click(),
+    ]);
+    await expect(page.getByRole("cell", { name: "v2" })).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.locator("div").filter({ hasText: "Current version:" }).first()
+    ).toContainText("v2", { timeout: 30_000 });
     await expect(page.getByRole("cell", { name: "v1" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "v2" })).toBeVisible();
     await expect(page.getByText(created.title)).toBeVisible();
@@ -249,6 +325,52 @@ test.describe.serial("Documents", () => {
     await expect(page.getByRole("button", { name: "Archive" })).toBeDisabled();
   });
 
+  test("DOC-015 tenant admin can delete draft document", async ({ page }) => {
+    const created = await createDocumentViaUi(page, USERS.itamManager, "delete-draft");
+
+    await loginAs(page, USERS.tenantAdmin);
+    await openDocument(page, created.documentId);
+
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Draft" }).click();
+    const confirmModal = page.locator("div.fixed.inset-0.z-50");
+    await expect(confirmModal.getByText(/dihapus permanen/i)).toBeVisible();
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/api/v1/documents/${created.documentId}`),
+      { timeout: 30_000 }
+    );
+    await page.getByRole("button", { name: "Delete Draft" }).last().click();
+    const deleteResponseResult = await deleteResponse;
+    expect(deleteResponseResult.status()).toBe(200);
+
+    await page.goto(`/documents/${created.documentId}`);
+    await expect(page.getByText(/Document not found|not ditemukan/i)).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
+  test("DOC-016 document delete is blocked when contract_documents relation exists", async ({ page }) => {
+    const created = await createDocumentViaUi(page, USERS.itamManager, "delete-blocked");
+    await loginAs(page, USERS.tenantAdmin);
+    await createDraftContractWithDocumentRelation(page, created.documentId);
+
+    await openDocument(page, created.documentId);
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Draft" }).click();
+    const confirmModal = page.locator("div.fixed.inset-0.z-50");
+    await page.getByRole("button", { name: "Delete Draft" }).last().click();
+
+    await expect(page.getByText("Document is still in use").first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const blocked = await apiDelete(page, `/api/v1/documents/${created.documentId}`);
+    expect(blocked.status).toBe(409);
+    expect(blocked.json?.error?.code).toBe("DOCUMENT_IN_USE");
+  });
+
   test("DOC-009 document evidence can be attached and downloaded", async ({ page, }, testInfo) => {
     const doc = await createDocumentViaUi(page, USERS.itamManager, "attach");
 
@@ -311,6 +433,15 @@ test.describe.serial("Documents", () => {
     await openDocument(page, created.documentId);
     await expect(page.getByText("Current version: v1")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("cell", { name: "v1" })).toBeVisible();
+  });
+
+  test("DOC-017 auditor cannot see delete draft action", async ({ page }) => {
+    const created = await createDocumentViaUi(page, USERS.itamManager, "auditor-delete-guard");
+
+    await loginAs(page, USERS.auditor);
+    await openDocument(page, created.documentId);
+
+    await expect(page.getByRole("button", { name: "Delete Draft" })).toHaveCount(0);
   });
 
   test("DOC-012 tenant isolation blocks another tenant role from opening the document", async ({ page }) => {

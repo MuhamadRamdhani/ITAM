@@ -12,6 +12,10 @@ export async function getLocationById(app, tenantId, locationId) {
   return rows[0] || null;
 }
 
+export async function getLocationByIdForDelete(app, tenantId, locationId) {
+  return await getLocationById(app, tenantId, locationId);
+}
+
 export async function locationCodeExists(app, tenantId, code, excludeId = null) {
   if (!code) return false;
 
@@ -101,4 +105,50 @@ export async function updateLocation(app, tenantId, locationId, { code, name }) 
   );
 
   return rowCount;
+}
+
+export async function countLocationDeleteDependencies(app, tenantId, locationId) {
+  const [assetRows, historyRows] = await Promise.all([
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.assets
+      WHERE tenant_id = $1
+        AND location_id = $2
+      `,
+      [tenantId, locationId]
+    ),
+    app.pg.query(
+      `
+      SELECT COUNT(1)::int AS total
+      FROM public.asset_ownership_history
+      WHERE tenant_id = $1
+        AND location_id = $2
+      `,
+      [tenantId, locationId]
+    ),
+  ]);
+
+  const assets = Number(assetRows.rows?.[0]?.total ?? 0);
+  const history = Number(historyRows.rows?.[0]?.total ?? 0);
+
+  return {
+    assets,
+    history,
+    total: assets + history,
+  };
+}
+
+export async function deleteLocationById(app, tenantId, locationId) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.locations
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING id, tenant_id, code, name
+    `,
+    [tenantId, locationId]
+  );
+
+  return rows[0] || null;
 }

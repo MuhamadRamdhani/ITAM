@@ -1,19 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   KpiCreatePayload,
   KpiDefinition,
-  KpiMetadata,
   canManageKpis,
   canViewKpiModule,
   createKpi,
   extractRoleCodes,
   formatKpiValue,
   getAuthMe,
-  getCurrentPeriodKey,
   getErrorMessage,
   getKpiMetadata,
   getKpis,
@@ -22,6 +20,31 @@ import {
 } from '@/app/lib/kpi';
 
 type FormMode = 'create' | 'edit';
+
+type KpiCategoryOption = {
+  code: string;
+  label: string;
+};
+
+type KpiUnitOption = {
+  code: string;
+  label: string;
+};
+
+type KpiSystemMetricOption = {
+  key: string;
+  label: string;
+  category_code: string;
+  default_unit_code: string;
+  default_direction: 'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER';
+  supported_period_types: Array<'MONTHLY' | 'QUARTERLY' | 'YEARLY'>;
+};
+
+type KpiMetadataView = {
+  categories: KpiCategoryOption[];
+  units: KpiUnitOption[];
+  system_metrics: KpiSystemMetricOption[];
+};
 
 type KpiFormState = {
   code: string;
@@ -59,17 +82,137 @@ const DEFAULT_FORM: KpiFormState = {
   display_order: '100',
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function normalizeMetadata(input: unknown): KpiMetadataView {
+  const raw = isRecord(input) ? input : {};
+
+  const rawCategories = Array.isArray(raw.categories) ? raw.categories : [];
+  const rawUnits = Array.isArray(raw.units) ? raw.units : [];
+  const rawSystemMetrics = Array.isArray(raw.system_metrics) ? raw.system_metrics : [];
+
+  const categories: KpiCategoryOption[] = rawCategories
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const code = asString(item.code);
+      if (!code) return null;
+      return {
+        code,
+        label: asString(item.label, code),
+      };
+    })
+    .filter((item): item is KpiCategoryOption => item !== null);
+
+  const units: KpiUnitOption[] = rawUnits
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const code = asString(item.code);
+      if (!code) return null;
+      return {
+        code,
+        label: asString(item.label, code),
+      };
+    })
+    .filter((item): item is KpiUnitOption => item !== null);
+
+  const system_metrics: KpiSystemMetricOption[] = rawSystemMetrics
+    .map((item) => {
+      if (!isRecord(item)) return null;
+
+      const key = asString(item.key);
+      if (!key) return null;
+
+      const supportedRaw = Array.isArray(item.supported_period_types)
+        ? item.supported_period_types
+        : [];
+
+      const supported_period_types = supportedRaw.filter(
+        (value): value is 'MONTHLY' | 'QUARTERLY' | 'YEARLY' =>
+          value === 'MONTHLY' || value === 'QUARTERLY' || value === 'YEARLY',
+      );
+
+      return {
+        key,
+        label: asString(item.label, key),
+        category_code: asString(item.category_code),
+        default_unit_code: asString(item.default_unit_code),
+        default_direction:
+          item.default_direction === 'LOWER_IS_BETTER'
+            ? 'LOWER_IS_BETTER'
+            : 'HIGHER_IS_BETTER',
+        supported_period_types:
+          supported_period_types.length > 0 ? supported_period_types : ['MONTHLY'],
+      };
+    })
+    .filter((item): item is KpiSystemMetricOption => item !== null);
+
+  return {
+    categories,
+    units,
+    system_metrics,
+  };
+}
+
+function PanelCard({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+          {description ? (
+            <p className="mt-1 text-sm text-slate-600">{description}</p>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ActiveBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+        active
+          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+          : 'bg-slate-100 text-slate-700 ring-slate-200'
+      }`}
+    >
+      {active ? 'ACTIVE' : 'INACTIVE'}
+    </span>
+  );
+}
+
 export default function KpisClient() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
   const [roles, setRoles] = useState<string[]>([]);
-  const [metadata, setMetadata] = useState<KpiMetadata | null>(null);
+  const [metadata, setMetadata] = useState<KpiMetadataView | null>(null);
+
   const [items, setItems] = useState<KpiDefinition[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
   const [q, setQ] = useState('');
@@ -88,23 +231,47 @@ export default function KpisClient() {
 
   const canManage = useMemo(() => canManageKpis(roles), [roles]);
 
-  async function loadPage(nextPage = page) {
+  const categoryOptions = useMemo<KpiCategoryOption[]>(
+    () => metadata?.categories ?? [],
+    [metadata],
+  );
+
+  const unitOptions = useMemo<KpiUnitOption[]>(
+    () => metadata?.units ?? [],
+    [metadata],
+  );
+
+  const systemMetrics = useMemo<KpiSystemMetricOption[]>(
+    () => metadata?.system_metrics ?? [],
+    [metadata],
+  );
+
+  async function loadPage(
+    nextPage = page,
+    filters?: {
+      q?: string;
+      category_code?: string;
+      source_type?: string;
+      period_type?: string;
+      is_active?: string;
+    },
+  ) {
     setErrorMessage('');
 
     const result = await getKpis({
-      q,
-      category_code: categoryCode || undefined,
-      source_type: sourceType || undefined,
-      period_type: periodType || undefined,
-      is_active: isActive || undefined,
-      page: nextPage,
-      page_size: pageSize,
-    });
+  q: (filters?.q ?? q) || undefined,
+  category_code: (filters?.category_code ?? categoryCode) || undefined,
+  source_type: (filters?.source_type ?? sourceType) || undefined,
+  period_type: (filters?.period_type ?? periodType) || undefined,
+  is_active: (filters?.is_active ?? isActive) || undefined,
+  page: nextPage,
+  page_size: pageSize,
+});
 
-    setItems(result.items);
-    setPage(result.page);
-    setTotalPages(result.total_pages);
-    setTotal(result.total);
+    setItems(result.items ?? []);
+    setPage(result.page ?? 1);
+    setTotalPages(result.total_pages ?? 1);
+    setTotal(result.total ?? 0);
   }
 
   useEffect(() => {
@@ -129,7 +296,7 @@ export default function KpisClient() {
           return;
         }
 
-        setMetadata(metadataResult);
+        setMetadata(normalizeMetadata(metadataResult));
 
         const result = await getKpis({
           page: 1,
@@ -138,13 +305,14 @@ export default function KpisClient() {
 
         if (cancelled) return;
 
-        setItems(result.items);
-        setPage(result.page);
-        setTotalPages(result.total_pages);
-        setTotal(result.total);
+        setItems(result.items ?? []);
+        setPage(result.page ?? 1);
+        setTotalPages(result.total_pages ?? 1);
+        setTotal(result.total ?? 0);
       } catch (error) {
-        if (cancelled) return;
-        setErrorMessage(getErrorMessage(error));
+        if (!cancelled) {
+          setErrorMessage(getErrorMessage(error));
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -152,7 +320,7 @@ export default function KpisClient() {
       }
     }
 
-    bootstrap();
+    void bootstrap();
 
     return () => {
       cancelled = true;
@@ -201,7 +369,7 @@ export default function KpisClient() {
 
   function updateForm<K extends keyof KpiFormState>(key: K, value: KpiFormState[K]) {
     setForm((current) => {
-      const next = {
+      const next: KpiFormState = {
         ...current,
         [key]: value,
       };
@@ -209,8 +377,8 @@ export default function KpisClient() {
       if (key === 'source_type') {
         if (value === 'MANUAL') {
           next.metric_key = '';
-        } else if (metadata?.system_metrics?.length) {
-          const metric = metadata.system_metrics[0];
+        } else if (systemMetrics.length > 0) {
+          const metric: KpiSystemMetricOption = systemMetrics[0];
           next.metric_key = metric.key;
           next.category_code = metric.category_code;
           next.unit_code = metric.default_unit_code;
@@ -221,21 +389,19 @@ export default function KpisClient() {
       if (
         (key === 'metric_key' || key === 'source_type') &&
         next.source_type === 'SYSTEM' &&
-        metadata?.system_metrics?.length
+        systemMetrics.length > 0
       ) {
-        const metric =
-          metadata.system_metrics.find((item) => item.key === next.metric_key) ??
-          metadata.system_metrics[0];
+        const metric: KpiSystemMetricOption =
+          systemMetrics.find((item) => item.key === next.metric_key) ??
+          systemMetrics[0];
 
-        if (metric) {
-          next.metric_key = metric.key;
-          next.category_code = metric.category_code;
-          next.unit_code = metric.default_unit_code;
-          next.direction = metric.default_direction;
+        next.metric_key = metric.key;
+        next.category_code = metric.category_code;
+        next.unit_code = metric.default_unit_code;
+        next.direction = metric.default_direction;
 
-          if (!metric.supported_period_types.includes(next.period_type)) {
-            next.period_type = metric.supported_period_types[0];
-          }
+        if (!metric.supported_period_types.includes(next.period_type)) {
+          next.period_type = metric.supported_period_types[0];
         }
       }
 
@@ -243,7 +409,7 @@ export default function KpisClient() {
     });
   }
 
-  async function handleFilterSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
@@ -256,34 +422,56 @@ export default function KpisClient() {
     }
   }
 
-  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
+  async function handleResetFilters() {
+    try {
+      setLoading(true);
+      setQ('');
+      setCategoryCode('');
+      setSourceType('');
+      setPeriodType('');
+      setIsActive('');
+      await loadPage(1, {
+        q: '',
+        category_code: '',
+        source_type: '',
+        period_type: '',
+        is_active: '',
+      });
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setSubmitting(true);
+    setFormError('');
+    setErrorMessage('');
 
     try {
-      setSubmitting(true);
-      setFormError('');
-
       const payload: KpiCreatePayload = {
-        code: form.code,
-        name: form.name,
-        description: form.description || null,
+        code: form.code.trim(),
+        name: form.name.trim(),
+        description: form.description.trim() || null,
+        category_code: form.category_code,
+        unit_code: form.unit_code,
         source_type: form.source_type,
+        metric_key:
+          form.source_type === 'SYSTEM' ? form.metric_key.trim() || null : null,
+        direction: form.direction,
         period_type: form.period_type,
         target_value: form.target_value === '' ? null : Number(form.target_value),
         warning_value: form.warning_value === '' ? null : Number(form.warning_value),
         critical_value: form.critical_value === '' ? null : Number(form.critical_value),
         baseline_value: form.baseline_value === '' ? null : Number(form.baseline_value),
         is_active: form.is_active,
-        display_order: Number(form.display_order || '100'),
+        display_order: Number(form.display_order || 0),
       };
 
-      if (form.source_type === 'SYSTEM') {
-        payload.metric_key = form.metric_key;
-      } else {
-        payload.category_code = form.category_code;
-        payload.unit_code = form.unit_code;
-        payload.direction = form.direction;
-      }
+      if (!payload.code) throw new Error('Code is required.');
+      if (!payload.name) throw new Error('Name is required.');
 
       if (formMode === 'create') {
         await createKpi(payload);
@@ -292,622 +480,567 @@ export default function KpisClient() {
       }
 
       closeModal();
-      setLoading(true);
-      await loadPage(formMode === 'create' ? 1 : page);
+      await loadPage(page);
     } catch (error) {
       setFormError(getErrorMessage(error));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function goToPage(nextPage: number) {
+    if (nextPage < 1 || nextPage > totalPages) return;
+
+    try {
+      setLoading(true);
+      await loadPage(nextPage);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
       setLoading(false);
     }
   }
 
-  const selectedMetric = useMemo(() => {
-    if (!metadata || form.source_type !== 'SYSTEM') return null;
-    return metadata.system_metrics.find((item) => item.key === form.metric_key) ?? null;
-  }, [form.metric_key, form.source_type, metadata]);
-
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-6 py-10 space-y-8">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-600">MVP 3.0</p>
-              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <section className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
+                MVP 3.0
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 KPI Library
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-gray-600">
+
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
                 Kelola KPI master, target, source manual/system, dan definisi scorecard
                 untuk tenant ini.
               </p>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-3">
-              <Link
-                href="/"
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
+            <div className="shrink-0">
+              <Link href="/" className="itam-secondary-action">
                 Back
               </Link>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap justify-end gap-3">
-              <Link
-                href="/kpi-scorecard"
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
-                Open Scorecard
-              </Link>
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-black"
-                >
-                  Create KPI
-                </button>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <form
-                onSubmit={handleFilterSubmit}
-                className="grid gap-4 md:grid-cols-2 xl:grid-cols-6"
-              >
-                <div className="xl:col-span-2">
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Search
-                  </label>
-                  <input
-                    value={q}
-                    onChange={(event) => setQ(event.target.value)}
-                    placeholder="Search code or name"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Category
-                  </label>
-                  <select
-                    value={categoryCode}
-                    onChange={(event) => setCategoryCode(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                  >
-                    <option value="">All</option>
-                    {metadata?.category_options.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Source
-                  </label>
-                  <select
-                    value={sourceType}
-                    onChange={(event) => setSourceType(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                  >
-                    <option value="">All</option>
-                    {metadata?.source_types.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Period
-                  </label>
-                  <select
-                    value={periodType}
-                    onChange={(event) => setPeriodType(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                  >
-                    <option value="">All</option>
-                    {metadata?.period_types.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Active
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={isActive}
-                      onChange={(event) => setIsActive(event.target.value)}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                    >
-                      <option value="">All</option>
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
-                    <button
-                      type="submit"
-                      className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              </form>
-
-              {errorMessage && (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {errorMessage}
-                </div>
-              )}
-
-              <div className="mt-6 overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                      <th className="px-4 py-3">Code</th>
-                      <th className="px-4 py-3">Name</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Period</th>
-                      <th className="px-4 py-3">Target</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
-                          Loading KPI library...
-                        </td>
-                      </tr>
-                    ) : items.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
-                          No KPI found.
-                        </td>
-                      </tr>
-                    ) : (
-                      items.map((item) => (
-                        <tr key={item.id} className="align-top">
-                          <td className="px-4 py-4 font-mono text-xs text-gray-700">
-                            {item.code}
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="font-medium text-gray-900">{item.name}</div>
-                            <div className="mt-1 text-xs text-gray-500">
-                              {item.description || '-'}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
-                                item.source_type
-                              )}`}
-                            >
-                              {item.source_type}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 text-gray-700">{item.category_code}</td>
-                          <td className="px-4 py-4 text-gray-700">{item.period_type}</td>
-                          <td className="px-4 py-4 text-gray-700">
-                            {formatKpiValue(item.target_value, item.unit_code)}
-                          </td>
-                          <td className="px-4 py-4">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                                item.is_active
-                                  ? 'border border-green-200 bg-green-50 text-green-700'
-                                  : 'border border-gray-200 bg-gray-100 text-gray-600'
-                              }`}
-                            >
-                              {item.is_active ? 'ACTIVE' : 'INACTIVE'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="flex justify-end gap-2">
-                              <Link
-                                href={`/kpis/${item.id}`}
-                                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                              >
-                                Detail
-                              </Link>
-                              {canManage && (
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(item)}
-                                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-                                >
-                                  Edit
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-6 flex items-center justify-between text-sm text-gray-600">
-                <div>
-                  Total: <span className="font-medium text-gray-900">{total}</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={loading || page <= 1}
-                    onClick={async () => {
-                      try {
-                        setLoading(true);
-                        await loadPage(page - 1);
-                      } catch (error) {
-                        setErrorMessage(getErrorMessage(error));
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    className="rounded-xl border border-gray-200 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  <span>
-                    Page {page} / {Math.max(totalPages, 1)}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={loading || page >= totalPages}
-                    onClick={async () => {
-                      try {
-                        setLoading(true);
-                        await loadPage(page + 1);
-                      } catch (error) {
-                        setErrorMessage(getErrorMessage(error));
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    className="rounded-xl border border-gray-200 px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </div>
+        {errorMessage ? (
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {errorMessage}
           </div>
-        </div>
-      </div>
+        ) : null}
 
-      {isModalOpen && metadata && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {formMode === 'create' ? 'Create KPI' : 'Edit KPI'}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                {formMode === 'create'
-                  ? 'Tambahkan KPI baru untuk scorecard tenant.'
-                  : 'Ubah KPI master tanpa mengubah histori measurement yang sudah tersimpan.'}
-              </p>
-            </div>
-
-            <form onSubmit={handleSave} className="space-y-6 px-6 py-6">
-              {formError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formError}
-                </div>
-              )}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Code
-                  </label>
-                  <input
-                    value={form.code}
-                    onChange={(event) => updateForm('code', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                    placeholder="ASSET_DATA_COMPLETENESS"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Name
-                  </label>
-                  <input
-                    value={form.name}
-                    onChange={(event) => updateForm('name', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                    placeholder="Asset Data Completeness"
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Description
-                  </label>
-                  <textarea
-                    value={form.description}
-                    onChange={(event) => updateForm('description', event.target.value)}
-                    rows={3}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                    placeholder="Optional description"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Source Type
-                  </label>
-                  <select
-                    value={form.source_type}
-                    onChange={(event) =>
-                      updateForm('source_type', event.target.value as 'MANUAL' | 'SYSTEM')
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
+        <section className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <PanelCard
+            title="KPI Library"
+            description={`Total KPI: ${total}`}
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href="/kpi-scorecard" className="itam-secondary-action">
+                  Open Scorecard
+                </Link>
+                {canManage ? (
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="itam-primary-action"
                   >
-                    {metadata.source_types.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Period Type
-                  </label>
-                  <select
-                    value={form.period_type}
-                    onChange={(event) =>
-                      updateForm(
-                        'period_type',
-                        event.target.value as 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
-                      )
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  >
-                    {(form.source_type === 'SYSTEM' && selectedMetric
-                      ? metadata.period_types.filter((item) =>
-                          selectedMetric.supported_period_types.includes(
-                            item.code as 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
-                          )
-                        )
-                      : metadata.period_types
-                    ).map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {form.source_type === 'SYSTEM' ? (
-                  <>
-                    <div className="md:col-span-2">
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                        System Metric
-                      </label>
-                      <select
-                        value={form.metric_key}
-                        onChange={(event) => updateForm('metric_key', event.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                      >
-                        {metadata.system_metrics.map((metric) => (
-                          <option key={metric.key} value={metric.key}>
-                            {metric.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="md:col-span-2 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                      <div className="text-sm font-medium text-blue-900">
-                        {selectedMetric?.name || '-'}
-                      </div>
-                      <p className="mt-1 text-sm text-blue-800">
-                        {selectedMetric?.description || '-'}
-                      </p>
-                      <div className="mt-3 grid gap-3 text-xs text-blue-900 md:grid-cols-3">
-                        <div>
-                          <span className="font-semibold">Category:</span>{' '}
-                          {selectedMetric?.category_code || '-'}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Unit:</span>{' '}
-                          {selectedMetric?.default_unit_code || '-'}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Direction:</span>{' '}
-                          {selectedMetric?.default_direction || '-'}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Category
-                      </label>
-                      <select
-                        value={form.category_code}
-                        onChange={(event) => updateForm('category_code', event.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                      >
-                        {metadata.category_options.map((item) => (
-                          <option key={item.code} value={item.code}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Unit
-                      </label>
-                      <select
-                        value={form.unit_code}
-                        onChange={(event) => updateForm('unit_code', event.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                      >
-                        {metadata.unit_options.map((item) => (
-                          <option key={item.code} value={item.code}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Direction
-                      </label>
-                      <select
-                        value={form.direction}
-                        onChange={(event) =>
-                          updateForm(
-                            'direction',
-                            event.target.value as 'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER'
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                      >
-                        {metadata.direction_types.map((item) => (
-                          <option key={item.code} value={item.code}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Target
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={form.target_value}
-                    onChange={(event) => updateForm('target_value', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Warning
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={form.warning_value}
-                    onChange={(event) => updateForm('warning_value', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Critical
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={form.critical_value}
-                    onChange={(event) => updateForm('critical_value', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Baseline
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={form.baseline_value}
-                    onChange={(event) => updateForm('baseline_value', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Display Order
-                  </label>
-                  <input
-                    type="number"
-                    value={form.display_order}
-                    onChange={(event) => updateForm('display_order', event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 pt-6">
-                  <input
-                    id="kpi-is-active"
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(event) => updateForm('is_active', event.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                  <label htmlFor="kpi-is-active" className="text-sm text-gray-700">
-                    Active KPI
-                  </label>
-                </div>
+                    Create KPI
+                  </button>
+                ) : null}
+              </div>
+            }
+          >
+            <form
+              onSubmit={handleFilterSubmit}
+              className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_160px_160px_160px_120px_auto]"
+            >
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Search
+                </label>
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search code or name"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                />
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700"
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Category
+                </label>
+                <select
+                  value={categoryCode}
+                  onChange={(e) => setCategoryCode(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
                 >
-                  Cancel
+                  <option value="">All</option>
+                  {categoryOptions.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.label || item.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Source
+                </label>
+                <select
+                  value={sourceType}
+                  onChange={(e) => setSourceType(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="">All</option>
+                  <option value="MANUAL">MANUAL</option>
+                  <option value="SYSTEM">SYSTEM</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Period
+                </label>
+                <select
+                  value={periodType}
+                  onChange={(e) => setPeriodType(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="">All</option>
+                  <option value="MONTHLY">MONTHLY</option>
+                  <option value="QUARTERLY">QUARTERLY</option>
+                  <option value="YEARLY">YEARLY</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Active
+                </label>
+                <select
+                  value={isActive}
+                  onChange={(e) => setIsActive(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="">All</option>
+                  <option value="true">ACTIVE</option>
+                  <option value="false">INACTIVE</option>
+                </select>
+              </div>
+
+              <div className="flex items-end gap-2">
+                <button type="submit" className="itam-primary-action">
+                  Apply
                 </button>
                 <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="itam-secondary-action"
                 >
-                  {submitting
-                    ? 'Saving...'
-                    : formMode === 'create'
-                    ? 'Create KPI'
-                    : 'Save Changes'}
+                  Reset
                 </button>
               </div>
             </form>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-[1100px] w-full text-sm">
+                <thead className="bg-slate-50 text-left text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Code</th>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Source</th>
+                    <th className="px-4 py-3 font-medium">Category</th>
+                    <th className="px-4 py-3 font-medium">Period</th>
+                    <th className="px-4 py-3 font-medium">Target</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium text-right">Action</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                        Loading KPI library...
+                      </td>
+                    </tr>
+                  ) : items.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                        No KPI found.
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((item) => (
+                      <tr key={item.id} className="align-top">
+                        <td className="px-4 py-4">
+                          <div className="font-mono text-xs text-slate-700">{item.code}</div>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-slate-900">{item.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {item.description || '-'}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span className={getSourceBadgeClass(item.source_type)}>
+                            {item.source_type}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-700">{item.category_code}</td>
+                        <td className="px-4 py-4 text-slate-700">{item.period_type}</td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {formatKpiValue(item.target_value, item.unit_code)}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <ActiveBadge active={item.is_active} />
+                        </td>
+
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`/kpis/${item.id}`}
+                              className="inline-flex min-w-[92px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium leading-none text-slate-700 transition hover:bg-slate-50"
+                            >
+                              Detail
+                            </Link>
+
+                            {canManage ? (
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(item)}
+                                className="inline-flex min-w-[76px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium leading-none text-slate-700 transition hover:bg-slate-50"
+                              >
+                                Edit
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-sm text-slate-500">
+                Page {page} of {Math.max(1, totalPages)}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1 || loading}
+                  onClick={() => goToPage(page - 1)}
+                  className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => goToPage(page + 1)}
+                  className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </PanelCard>
+        </section>
+
+        {isModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div className="w-full max-w-4xl rounded-[2rem] border border-white/80 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {formMode === 'create' ? 'Create KPI' : 'Edit KPI'}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formMode === 'create'
+                      ? 'Define a new KPI master.'
+                      : 'Update KPI definition and thresholds.'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="itam-secondary-action-sm"
+                >
+                  Close
+                </button>
+              </div>
+
+              <form onSubmit={handleSave} className="px-6 py-5">
+                {formError ? (
+                  <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {formError}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Code
+                    </label>
+                    <input
+                      value={form.code}
+                      onChange={(e) => updateForm('code', e.target.value)}
+                      disabled={formMode === 'edit'}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Name
+                    </label>
+                    <input
+                      value={form.name}
+                      onChange={(e) => updateForm('name', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => updateForm('description', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Source Type
+                    </label>
+                    <select
+                      value={form.source_type}
+                      onChange={(e) =>
+                        updateForm(
+                          'source_type',
+                          e.target.value as KpiFormState['source_type'],
+                        )
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    >
+                      <option value="MANUAL">MANUAL</option>
+                      <option value="SYSTEM">SYSTEM</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Metric Key
+                    </label>
+                    <select
+                      value={form.metric_key}
+                      onChange={(e) => updateForm('metric_key', e.target.value)}
+                      disabled={form.source_type !== 'SYSTEM'}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
+                    >
+                      <option value="">
+                        {form.source_type === 'SYSTEM'
+                          ? 'Select metric'
+                          : 'Manual KPI'}
+                      </option>
+                      {systemMetrics.map((metric) => (
+                        <option key={metric.key} value={metric.key}>
+                          {metric.label || metric.key}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Category
+                    </label>
+                    <select
+                      value={form.category_code}
+                      onChange={(e) => updateForm('category_code', e.target.value)}
+                      disabled={form.source_type === 'SYSTEM'}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
+                    >
+                      {categoryOptions.map((item) => (
+                        <option key={item.code} value={item.code}>
+                          {item.label || item.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Unit
+                    </label>
+                    <select
+                      value={form.unit_code}
+                      onChange={(e) => updateForm('unit_code', e.target.value)}
+                      disabled={form.source_type === 'SYSTEM'}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
+                    >
+                      {unitOptions.map((item) => (
+                        <option key={item.code} value={item.code}>
+                          {item.label || item.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Direction
+                    </label>
+                    <select
+                      value={form.direction}
+                      onChange={(e) =>
+                        updateForm(
+                          'direction',
+                          e.target.value as KpiFormState['direction'],
+                        )
+                      }
+                      disabled={form.source_type === 'SYSTEM'}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100 disabled:bg-slate-50"
+                    >
+                      <option value="HIGHER_IS_BETTER">HIGHER_IS_BETTER</option>
+                      <option value="LOWER_IS_BETTER">LOWER_IS_BETTER</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Period Type
+                    </label>
+                    <select
+                      value={form.period_type}
+                      onChange={(e) =>
+                        updateForm(
+                          'period_type',
+                          e.target.value as KpiFormState['period_type'],
+                        )
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    >
+                      <option value="MONTHLY">MONTHLY</option>
+                      <option value="QUARTERLY">QUARTERLY</option>
+                      <option value="YEARLY">YEARLY</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Target
+                    </label>
+                    <input
+                      value={form.target_value}
+                      onChange={(e) => updateForm('target_value', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Warning
+                    </label>
+                    <input
+                      value={form.warning_value}
+                      onChange={(e) => updateForm('warning_value', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Critical
+                    </label>
+                    <input
+                      value={form.critical_value}
+                      onChange={(e) => updateForm('critical_value', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Baseline
+                    </label>
+                    <input
+                      value={form.baseline_value}
+                      onChange={(e) => updateForm('baseline_value', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Display Order
+                    </label>
+                    <input
+                      value={form.display_order}
+                      onChange={(e) => updateForm('display_order', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-8">
+                    <input
+                      id="kpi-is-active"
+                      type="checkbox"
+                      checked={form.is_active}
+                      onChange={(e) => updateForm('is_active', e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                    <label htmlFor="kpi-is-active" className="text-sm text-slate-700">
+                      Active KPI
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="itam-secondary-action"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="itam-primary-action disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting
+                      ? 'Saving...'
+                      : formMode === 'create'
+                        ? 'Create KPI'
+                        : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
     </main>
   );
 }

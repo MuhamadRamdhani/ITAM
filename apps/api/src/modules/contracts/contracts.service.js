@@ -1,13 +1,18 @@
 import {
   countContracts,
+  countContractDeleteDependencies,
   findContractByCode,
   getContractById,
+  getContractByIdForDelete,
   getIdentityByIdForTenant,
   getVendorByIdForTenant,
+  deleteContractById,
   insertContract,
   listContracts,
+  lockContractDeleteRelatedTables,
   updateContract,
 } from "./contracts.repo.js";
+import { insertAuditEvent } from "../../lib/audit.js";
 
 import { listSoftwareEntitlementsByContract } from "../software-entitlements/software-entitlements.repo.js";
 import { getActiveAllocatedQuantitiesByEntitlementIds } from "../software-entitlement-allocations/software-entitlement-allocations.repo.js";
@@ -44,9 +49,11 @@ const CONTRACT_WRITE_ROLES = [
   "PROCUREMENT_CONTRACT_MANAGER",
 ];
 
-function httpError(statusCode, message) {
+function httpError(statusCode, message, code = null, details = undefined) {
   const err = new Error(message);
   err.statusCode = statusCode;
+  if (code) err.code = code;
+  if (details !== undefined) err.details = details;
   return err;
 }
 
@@ -92,6 +99,29 @@ function mustHaveAnyRole(req, allowedRoles) {
     err.details = { required_any: allowedRoles, got: roles };
     throw err;
   }
+}
+
+async function withTransaction(app, fn) {
+  const client = await app.pg.connect();
+
+  try {
+    await client.query("BEGIN");
+    const result = await fn({ pg: client });
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function actorFromIdentityId(identityId) {
+  if (Number.isFinite(identityId) && identityId > 0) return `IDENTITY:${identityId}`;
+  return "SYSTEM";
 }
 
 function normalizeDate(value) {
@@ -1232,4 +1262,60 @@ export async function updateContractService(app, req) {
   await writeContractAudit(app, req, "CONTRACT_UPDATED", row);
 
   return row;
+}
+
+export async function deleteContractService(app, req, contractId) {
+  const tenantId = mustTenantId(req);
+  mustHaveAnyRole(req, CONTRACT_WRITE_ROLES);
+  const numericId = mustPositiveInt(contractId, "contract id");
+  const actorId = req?.requestContext?.identityId ?? null;
+
+  return withTransaction(app, async (tx) => {
+    const current = await getContractByIdForDelete(tx, tenantId, numericId);
+    if (!current) {
+      throw httpError(404, "Contract not found");
+    }
+
+    if (String(current.status || "").toUpperCase() !== "DRAFT") {
+      throw httpError(
+        409,
+        "Only DRAFT contracts can be deleted",
+        "CONTRACT_NOT_DELETABLE",
+        { status: current.status ?? null }
+      );
+    }
+
+    await lockContractDeleteRelatedTables(tx);
+
+    const dependencies = await countContractDeleteDependencies(tx, tenantId, numericId);
+    if (dependencies.total > 0) {
+      throw httpError(409, "Contract is still in use", "CONTRACT_IN_USE", dependencies);
+    }
+
+    await insertAuditEvent(tx, {
+      tenantId,
+      actor: actorFromIdentityId(actorId),
+      action: "CONTRACT_DELETED",
+      entityType: "CONTRACT",
+      entityId: numericId,
+      payload: {
+        id: Number(current.id),
+        tenant_id: Number(current.tenant_id),
+        vendor_id: current.vendor_id == null ? null : Number(current.vendor_id),
+        contract_code: current.contract_code ?? null,
+        contract_name: current.contract_name ?? null,
+        contract_type: current.contract_type ?? null,
+        status: current.status ?? null,
+        start_date: current.start_date ?? null,
+        end_date: current.end_date ?? null,
+      },
+    });
+
+    const deleted = await deleteContractById(tx, tenantId, numericId);
+    if (!deleted) {
+      throw httpError(404, "Contract not found");
+    }
+
+    return deleted;
+  });
 }

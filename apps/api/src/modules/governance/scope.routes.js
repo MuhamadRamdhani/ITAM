@@ -2,6 +2,7 @@ import {
   listScopeVersionsService,
   getScopeVersionDetailService,
   createScopeVersionService,
+  deleteScopeVersionService,
   submitScopeVersionService,
   approveScopeVersionService,
   activateScopeVersionService,
@@ -95,6 +96,15 @@ export default async function governanceScopeRoutes(fastify) {
         request.params.id,
         request.body ?? {}
       );
+      reply.send({ ok: true, data });
+    } catch (err) {
+      sendError(reply, err);
+    }
+  });
+
+  fastify.delete("/:id", async function handler(request, reply) {
+    try {
+      const data = await deleteScopeVersionService(db, request, request.params.id);
       reply.send({ ok: true, data });
     } catch (err) {
       sendError(reply, err);

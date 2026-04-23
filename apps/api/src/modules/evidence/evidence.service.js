@@ -15,6 +15,8 @@ import {
   insertEvidenceLink,
   listEvidenceLinksByTarget,
   deleteEvidenceLinkById,
+  countEvidenceLinksByFileId,
+  deleteEvidenceFileById,
 } from "./evidence.repo.js";
 import {
   validateFileUpload,
@@ -91,6 +93,26 @@ const WEBP_QUALITY = 82;
 
 function safeUnlink(filePath) {
   return fs.promises.unlink(filePath).catch(() => {});
+}
+
+function getUploadsRoot() {
+  return path.join(process.cwd(), "uploads");
+}
+
+function buildDeleteStagingPath(originalPath) {
+  const dir = path.dirname(originalPath);
+  const base = path.basename(originalPath);
+  return path.join(dir, `${base}.deleting-${crypto.randomUUID()}`);
+}
+
+async function restoreFileFromStaging(stagedPath, originalPath) {
+  try {
+    await fs.promises.rename(stagedPath, originalPath);
+    return;
+  } catch {
+    await fs.promises.copyFile(stagedPath, originalPath);
+    await safeUnlink(stagedPath);
+  }
 }
 
 function isCompressibleImageMimeType(mimeType) {
@@ -467,4 +489,144 @@ export async function detachEvidenceLinkService(app, { tenantId, actorId, linkId
   });
 
   return deleted;
+}
+
+export async function deleteEvidenceFileService(app, { tenantId, actorId, fileId }) {
+  const idNum = Number(fileId);
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    const e = new Error("Invalid file id");
+    e.statusCode = 400;
+    e.code = "BAD_REQUEST";
+    throw e;
+  }
+
+  const current = await getEvidenceFileById(app, tenantId, idNum);
+  if (!current) {
+    const e = new Error("Evidence file not found");
+    e.statusCode = 404;
+    e.code = "NOT_FOUND";
+    throw e;
+  }
+
+  const linkedCount = await countEvidenceLinksByFileId(app, tenantId, idNum);
+  if (linkedCount > 0) {
+    const e = new Error("Evidence file is still attached to other records");
+    e.statusCode = 409;
+    e.code = "EVIDENCE_FILE_IN_USE";
+    e.details = {
+      linked_count: linkedCount,
+    };
+    throw e;
+  }
+
+  await insertAuditEvent(app, {
+    tenantId,
+    actor: actorFromIdentityId(actorId),
+    action: "EVIDENCE_FILE_DELETED",
+    entityType: "EVIDENCE_FILE",
+    entityId: idNum,
+    payload: {
+      id: Number(current.id),
+      tenant_id: Number(current.tenant_id),
+      storage_path: current.storage_path,
+      original_name: current.original_name,
+      mime_type: current.mime_type,
+      size_bytes: Number(current.size_bytes ?? 0),
+      sha256: current.sha256 ?? null,
+      uploaded_by_identity_id:
+        current.uploaded_by_identity_id == null
+          ? null
+          : Number(current.uploaded_by_identity_id),
+    },
+  });
+
+  const uploadsRoot = getUploadsRoot();
+  const fullPath = path.join(uploadsRoot, current.storage_path);
+
+  if (!isSafeFilePath(uploadsRoot, fullPath)) {
+    const e = new Error("Invalid stored file path");
+    e.statusCode = 400;
+    e.code = "INVALID_FILE_PATH";
+    throw e;
+  }
+
+  const stagedPath = buildDeleteStagingPath(fullPath);
+  if (!isSafeFilePath(uploadsRoot, stagedPath)) {
+    const e = new Error("Invalid staged file path");
+    e.statusCode = 400;
+    e.code = "INVALID_FILE_PATH";
+    throw e;
+  }
+
+  try {
+    await fs.promises.rename(fullPath, stagedPath);
+  } catch (error) {
+    const e = new Error("Failed to delete stored evidence file from disk");
+    e.statusCode = 500;
+    e.code = "EVIDENCE_FILE_DELETE_FAILED";
+    e.details = {
+      storage_path: current.storage_path,
+      reason: error?.message || "stage_failed",
+    };
+    throw e;
+  }
+
+  await app.pg.query("BEGIN");
+  try {
+    const deleted = await deleteEvidenceFileById(app, tenantId, idNum);
+    if (!deleted) {
+      throw Object.assign(new Error("Evidence file not found"), {
+        statusCode: 404,
+        code: "NOT_FOUND",
+      });
+    }
+
+    await app.pg.query("COMMIT");
+    await safeUnlink(stagedPath);
+    return deleted;
+  } catch (error) {
+    let rollbackError = null;
+    try {
+      await app.pg.query("ROLLBACK");
+    } catch (err) {
+      rollbackError = err;
+    }
+
+    try {
+      await restoreFileFromStaging(stagedPath, fullPath);
+    } catch (restoreError) {
+      const e = new Error("Failed to restore stored evidence file after delete failure");
+      e.statusCode = 500;
+      e.code = "EVIDENCE_FILE_DELETE_FAILED";
+      e.details = {
+        storage_path: current.storage_path,
+        reason: restoreError?.message || "restore_failed",
+      };
+      throw e;
+    }
+
+    if (error?.code === "NOT_FOUND" || error?.statusCode === 404) {
+      throw error;
+    }
+
+    if (rollbackError) {
+      const e = new Error("Failed to delete stored evidence file from database");
+      e.statusCode = 500;
+      e.code = "EVIDENCE_FILE_DELETE_FAILED";
+      e.details = {
+        storage_path: current.storage_path,
+        reason: rollbackError?.message || "rollback_failed",
+      };
+      throw e;
+    }
+
+    const e = new Error("Failed to delete stored evidence file from database");
+    e.statusCode = 500;
+    e.code = "EVIDENCE_FILE_DELETE_FAILED";
+    e.details = {
+      storage_path: current.storage_path,
+      reason: error?.message || "db_delete_failed",
+    };
+    throw e;
+  }
 }

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   KpiDefinition,
   KpiMeasurement,
@@ -23,7 +23,6 @@ import {
   getKpiTrend,
   getPeriodKeyRangeForYear,
   getSourceBadgeClass,
-  getStatusBadgeClass,
   parsePeriodKeyToParts,
 } from '@/app/lib/kpi';
 
@@ -39,10 +38,54 @@ type MeasurementFormState = {
   measurement_note: string;
 };
 
+function PanelCard({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+          {description ? (
+            <p className="mt-1 text-sm text-slate-600">{description}</p>
+          ) : null}
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ValueCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
 function Sparkline({ values }: { values: number[] }) {
   if (values.length === 0) {
     return (
-      <div className="flex h-36 items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm text-gray-500">
+      <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm text-slate-500">
         No trend data yet
       </div>
     );
@@ -69,7 +112,7 @@ function Sparkline({ values }: { values: number[] }) {
     .join(' ');
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-40 w-full"
@@ -80,10 +123,10 @@ function Sparkline({ values }: { values: number[] }) {
           stroke="currentColor"
           strokeWidth="3"
           points={points}
-          className="text-gray-900"
+          className="text-slate-900"
         />
       </svg>
-      <div className="mt-2 text-xs text-gray-500">
+      <div className="mt-2 text-xs text-slate-500">
         Min: {min.toFixed(2)} · Max: {max.toFixed(2)}
       </div>
     </div>
@@ -101,7 +144,7 @@ function EmptyHistoryState({
   const isCurrentYear = selectedYear === currentYear;
 
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
       <div className="mx-auto max-w-2xl">
         <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">
           No measurement data
@@ -116,22 +159,19 @@ function EmptyHistoryState({
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/kpi-scorecard"
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-          >
+          <Link href="/kpi-scorecard" className="itam-secondary-action">
             Open KPI Scorecard
           </Link>
 
-          {!isCurrentYear && (
+          {!isCurrentYear ? (
             <button
               type="button"
               onClick={onBackToCurrentYear}
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
+              className="itam-primary-action"
             >
               Back to {currentYear}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -145,6 +185,7 @@ function getYearOptions() {
 
 export default function KpiDetailClient({ id }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -156,7 +197,7 @@ export default function KpiDetailClient({ id }: Props) {
   const [measurements, setMeasurements] = useState<KpiMeasurement[]>([]);
   const [trend, setTrend] = useState<KpiTrendSeries | null>(null);
   const [selectedTrendYear, setSelectedTrendYear] = useState<number>(
-    new Date().getFullYear()
+    new Date().getFullYear(),
   );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -169,6 +210,12 @@ export default function KpiDetailClient({ id }: Props) {
   const canManage = useMemo(() => canManageKpis(roles), [roles]);
   const yearOptions = useMemo(() => getYearOptions(), []);
 
+  const backHref = useMemo(() => {
+    const raw = searchParams.get('returnTo');
+    if (raw && raw.startsWith('/')) return raw;
+    return '/kpis';
+  }, [searchParams]);
+
   async function loadBaseData() {
     const me = await getAuthMe();
     const roleCodes = extractRoleCodes(me);
@@ -180,12 +227,11 @@ export default function KpiDetailClient({ id }: Props) {
     }
 
     const detail = await getKpiDetail(id);
-
     setKpi(detail);
 
     const currentParts = parsePeriodKeyToParts(
       detail.period_type,
-      getCurrentPeriodKey(detail.period_type)
+      getCurrentPeriodKey(detail.period_type),
     );
 
     setMeasurementForm({
@@ -210,14 +256,13 @@ export default function KpiDetailClient({ id }: Props) {
       getKpiTrend(id, range),
     ]);
 
-    setMeasurements(measurementResult.items);
+    setMeasurements(measurementResult.items ?? []);
     setTrend(trendResult);
   }
 
   async function loadAll(initialYear = selectedTrendYear) {
     const detail = await loadBaseData();
     if (!detail) return;
-
     await loadTrendAndHistory(detail, initialYear);
   }
 
@@ -239,7 +284,7 @@ export default function KpiDetailClient({ id }: Props) {
       }
     }
 
-    bootstrap();
+    void bootstrap();
 
     return () => {
       cancelled = true;
@@ -247,49 +292,29 @@ export default function KpiDetailClient({ id }: Props) {
   }, [id, router]);
 
   useEffect(() => {
-    const currentKpi = kpi as KpiDefinition | null;
-    if (!currentKpi) return;
-    const detail = currentKpi as KpiDefinition;
+   if (!kpi) return;
+const currentKpi: KpiDefinition = kpi;
 
-    let cancelled = false;
+let cancelled = false;
 
-    async function refreshTrendByYear() {
-      try {
-        setTrendLoading(true);
-        setErrorMessage('');
-
-        await loadTrendAndHistory(detail, selectedTrendYear);
-      } catch (error) {
-        if (!cancelled) {
-          setErrorMessage(getErrorMessage(error));
-          setMeasurements([]);
-          setTrend({
-            kpi: {
-              id: detail.id,
-              code: detail.code,
-              name: detail.name,
-              category_code: detail.category_code,
-              unit_code: detail.unit_code,
-              source_type: detail.source_type,
-              metric_key: detail.metric_key,
-              direction: detail.direction,
-              period_type: detail.period_type,
-              target_value: detail.target_value,
-              warning_value: detail.warning_value,
-              critical_value: detail.critical_value,
-              baseline_value: detail.baseline_value,
-            },
-            items: [],
-          });
-        }
-      } finally {
-        if (!cancelled) {
-          setTrendLoading(false);
-        }
-      }
+async function refreshTrendByYear() {
+  try {
+    setTrendLoading(true);
+    setErrorMessage('');
+    await loadTrendAndHistory(currentKpi, selectedTrendYear);
+  } catch (error) {
+    if (!cancelled) {
+      setErrorMessage(getErrorMessage(error));
+      setMeasurements([]);
     }
+  } finally {
+    if (!cancelled) {
+      setTrendLoading(false);
+    }
+  }
+}
 
-    refreshTrendByYear();
+    void refreshTrendByYear();
 
     return () => {
       cancelled = true;
@@ -303,7 +328,7 @@ export default function KpiDetailClient({ id }: Props) {
 
     const currentParts = parsePeriodKeyToParts(
       kpi.period_type,
-      getCurrentPeriodKey(kpi.period_type)
+      getCurrentPeriodKey(kpi.period_type),
     );
 
     setMeasurementForm({
@@ -321,625 +346,466 @@ export default function KpiDetailClient({ id }: Props) {
     setFormError('');
   }
 
-  async function handleCreateMeasurement(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateMeasurement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!kpi) return;
 
+    setSubmitting(true);
+    setFormError('');
+    setErrorMessage('');
+
     try {
-      setSubmitting(true);
-      setFormError('');
+      const period_key = (() => {
+        const parts = {
+          year: measurementForm.year,
+          month: measurementForm.month,
+          quarter: measurementForm.quarter,
+        };
+        return getCurrentPeriodKey(kpi.period_type)
+          ? buildPeriodKeyFromParts(kpi.period_type, parts)
+          : buildPeriodKeyFromParts(kpi.period_type, parts);
+      })();
 
-      const periodKey = buildPeriodKeyFromParts(kpi.period_type, {
-        year: measurementForm.year,
-        month: measurementForm.month,
-        quarter: measurementForm.quarter,
+      await createKpiMeasurement(id, {
+        period_key,
+        actual_value: Number(measurementForm.actual_value),
+        measurement_note: measurementForm.measurement_note.trim() || null,
       });
 
-      await createKpiMeasurement(kpi.id, {
-        period_key: periodKey,
-        actual_value:
-          kpi.source_type === 'MANUAL'
-            ? Number(measurementForm.actual_value)
-            : undefined,
-        measurement_note: measurementForm.measurement_note || null,
-      });
-
-      closeMeasurementModal();
-      setLoading(true);
-      await loadAll(selectedTrendYear);
+      setIsModalOpen(false);
+      await loadTrendAndHistory(kpi, selectedTrendYear);
     } catch (error) {
       setFormError(getErrorMessage(error));
     } finally {
       setSubmitting(false);
-      setLoading(false);
     }
   }
 
+  const currentYear = new Date().getFullYear();
+  const trendValues = useMemo(
+    () =>
+      (trend?.items ?? [])
+        .map((item: any) => Number(item.actual_value))
+        .filter((value: number) => Number.isFinite(value)),
+    [trend],
+  );
+
   const latestMeasurement = measurements[0] ?? null;
-  const sparklineValues = trend?.items.map((item) => item.actual_value) ?? [];
-  const hasTrendData = (trend?.items.length ?? 0) > 0;
-  const hasHistoryData = measurements.length > 0;
+  const hasTrendData = (trend?.items?.length ?? 0) > 0;
+  const hasHistory = measurements.length > 0;
 
-  function renderPeriodPicker() {
-    if (!kpi) return null;
-
-    if (kpi.period_type === 'MONTHLY') {
-      return (
-        <input
-          type="month"
-          value={`${measurementForm.year}-${measurementForm.month}`}
-          onChange={(event) => {
-            const [year, month] = event.target.value.split('-');
-            if (!year || !month) return;
-
-            setMeasurementForm((current) => ({
-              ...current,
-              year,
-              month,
-              quarter: String(Math.floor((Number(month) - 1) / 3) + 1),
-            }));
-          }}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-        />
-      );
-    }
-
-    if (kpi.period_type === 'QUARTERLY') {
-      return (
-        <div className="grid grid-cols-2 gap-3">
-          <select
-            value={measurementForm.year}
-            onChange={(event) =>
-              setMeasurementForm((current) => ({
-                ...current,
-                year: event.target.value,
-              }))
-            }
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-          >
-            {yearOptions.map((year) => (
-              <option key={year} value={String(year)}>
-                {year}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={measurementForm.quarter}
-            onChange={(event) =>
-              setMeasurementForm((current) => ({
-                ...current,
-                quarter: event.target.value,
-              }))
-            }
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-          >
-            <option value="1">Quarter 1 (Jan–Mar)</option>
-            <option value="2">Quarter 2 (Apr–Jun)</option>
-            <option value="3">Quarter 3 (Jul–Sep)</option>
-            <option value="4">Quarter 4 (Oct–Dec)</option>
-          </select>
-        </div>
-      );
-    }
-
+  if (loading) {
     return (
-      <select
-        value={measurementForm.year}
-        onChange={(event) =>
-          setMeasurementForm((current) => ({
-            ...current,
-            year: event.target.value,
-          }))
-        }
-        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-      >
-        {yearOptions.map((year) => (
-          <option key={year} value={String(year)}>
-            {year}
-          </option>
-        ))}
-      </select>
+      <main className="itam-page-shell">
+        <div className="itam-page-shell-inner">
+          <div className="rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="text-sm text-slate-600">Loading KPI detail...</div>
+          </div>
+        </div>
+      </main>
     );
   }
 
-  const computedPeriodKey = kpi
-    ? buildPeriodKeyFromParts(kpi.period_type, {
-        year: measurementForm.year,
-        month: measurementForm.month,
-        quarter: measurementForm.quarter,
-      })
-    : '-';
+  if (!kpi) {
+    return (
+      <main className="itam-page-shell">
+        <div className="itam-page-shell-inner">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+            {errorMessage || 'KPI detail not found.'}
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+    <main className="itam-page-shell">
+      <div className="itam-page-shell-inner">
+        <section className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 KPI Detail
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-gray-600">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
                 Review KPI definition, capture measurement, dan lihat histori trend KPI.
               </p>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-3">
-              <Link
-                href="/kpis"
-                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
-                Back to KPI Library
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link href={backHref} className="itam-secondary-action">
+                Back
               </Link>
-
-              <Link
-                href="/kpi-scorecard"
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-              >
+              <Link href="/kpi-scorecard" className="itam-secondary-action">
                 Open Scorecard
               </Link>
-
-              {canManage && (
+              {canManage ? (
                 <button
                   type="button"
                   onClick={openMeasurementModal}
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-black"
+                  className="itam-primary-action"
                 >
                   Capture Measurement
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
-        </div>
+        </section>
 
-        {errorMessage && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {errorMessage ? (
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
-        {loading || !kpi ? (
-          <div className="rounded-3xl border border-gray-200 bg-white px-6 py-14 text-center text-sm text-gray-500 shadow-sm">
-            Loading KPI detail...
-          </div>
-        ) : (
-          <>
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div className="font-mono text-xs text-gray-500">{kpi.code}</div>
-                    <h2 className="mt-1 text-2xl font-semibold text-gray-900">
-                      {kpi.name}
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                      {kpi.description || 'No description.'}
-                    </p>
-                  </div>
+        <section className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_320px]">
+          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <PanelCard title={kpi.name} description={kpi.description || '-'}>
+              <div className="mb-4 font-mono text-xs text-slate-500">{kpi.code}</div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getSourceBadgeClass(
-                        kpi.source_type
-                      )}`}
-                    >
-                      {kpi.source_type}
-                    </span>
-                    <span className="inline-flex rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                      {kpi.period_type}
-                    </span>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                        kpi.is_active
-                          ? 'border border-green-200 bg-green-50 text-green-700'
-                          : 'border border-gray-200 bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {kpi.is_active ? 'ACTIVE' : 'INACTIVE'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Target</div>
-                    <div className="mt-2 text-xl font-semibold text-gray-900">
-                      {formatKpiValue(kpi.target_value, kpi.unit_code)}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Warning</div>
-                    <div className="mt-2 text-xl font-semibold text-gray-900">
-                      {formatKpiValue(kpi.warning_value, kpi.unit_code)}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Critical</div>
-                    <div className="mt-2 text-xl font-semibold text-gray-900">
-                      {formatKpiValue(kpi.critical_value, kpi.unit_code)}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Baseline</div>
-                    <div className="mt-2 text-xl font-semibold text-gray-900">
-                      {formatKpiValue(kpi.baseline_value, kpi.unit_code)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Category</div>
-                    <div className="mt-1 text-sm font-medium text-gray-900">
-                      {kpi.category_code}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Unit</div>
-                    <div className="mt-1 text-sm font-medium text-gray-900">{kpi.unit_code}</div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Direction</div>
-                    <div className="mt-1 text-sm font-medium text-gray-900">
-                      {kpi.direction}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Metric Key</div>
-                    <div className="mt-1 break-all text-sm font-medium text-gray-900">
-                      {kpi.metric_key || '-'}
-                    </div>
-                  </div>
-                </div>
+              <div className="mb-6 flex flex-wrap gap-2">
+                <span className={getSourceBadgeClass(kpi.source_type)}>
+                  {kpi.source_type}
+                </span>
+                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+                  {kpi.period_type}
+                </span>
+                <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  {kpi.is_active ? 'ACTIVE' : 'INACTIVE'}
+                </span>
               </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="text-sm font-semibold text-gray-900">Latest Snapshot</div>
-
-                {!latestMeasurement ? (
-                  <div className="mt-4 rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                    No measurement yet.
-                  </div>
-                ) : (
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">
-                        Period
-                      </div>
-                      <div className="mt-1 text-sm font-medium text-gray-900">
-                        {latestMeasurement.period_key}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">
-                        Actual
-                      </div>
-                      <div className="mt-1 text-2xl font-semibold text-gray-900">
-                        {formatKpiValue(latestMeasurement.actual_value, kpi.unit_code)}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">
-                        Achievement
-                      </div>
-                      <div className="mt-1 text-sm font-medium text-gray-900">
-                        {formatKpiValue(latestMeasurement.achievement_pct, 'PERCENT')}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">
-                        Status
-                      </div>
-                      <div className="mt-2">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                            latestMeasurement.status_code
-                          )}`}
-                        >
-                          {latestMeasurement.status_code}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">
-                        Measured At
-                      </div>
-                      <div className="mt-1 text-sm font-medium text-gray-900">
-                        {formatDateTime(latestMeasurement.measured_at)}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">
-                        Note
-                      </div>
-                      <div className="mt-1 text-sm text-gray-700">
-                        {latestMeasurement.measurement_note || '-'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Trend</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Baseline trend dari measurement snapshot yang sudah tersimpan.
-                      </p>
-                    </div>
-
-                    <div className="flex items-end gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                          Trend Year
-                        </label>
-                        <select
-                          value={selectedTrendYear}
-                          onChange={(event) => setSelectedTrendYear(Number(event.target.value))}
-                          className="rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-900"
-                        >
-                          {yearOptions.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!kpi) return;
-
-                          try {
-                            setTrendLoading(true);
-                            setErrorMessage('');
-                            await loadTrendAndHistory(kpi, selectedTrendYear);
-                          } catch (error) {
-                            setErrorMessage(getErrorMessage(error));
-                          } finally {
-                            setTrendLoading(false);
-                          }
-                        }}
-                        className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-                      >
-                        Refresh
-                      </button>
-                    </div>
-                  </div>
-
-                  {trendLoading ? (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500">
-                      Loading trend...
-                    </div>
-                  ) : !hasTrendData ? (
-                    <EmptyHistoryState
-                      selectedYear={selectedTrendYear}
-                      onBackToCurrentYear={() => setSelectedTrendYear(new Date().getFullYear())}
-                    />
-                  ) : (
-                    <>
-                      <Sparkline values={sparklineValues} />
-
-                      <div className="mt-4 overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead>
-                            <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                              <th className="px-4 py-3">Period</th>
-                              <th className="px-4 py-3">Actual</th>
-                              <th className="px-4 py-3">Target</th>
-                              <th className="px-4 py-3">Achievement</th>
-                              <th className="px-4 py-3">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {trend?.items.map((item) => (
-                              <tr key={item.period_key}>
-                                <td className="px-4 py-3 text-gray-700">{item.period_key}</td>
-                                <td className="px-4 py-3 text-gray-700">
-                                  {formatKpiValue(item.actual_value, kpi.unit_code)}
-                                </td>
-                                <td className="px-4 py-3 text-gray-700">
-                                  {formatKpiValue(item.target_value, kpi.unit_code)}
-                                </td>
-                                <td className="px-4 py-3 text-gray-700">
-                                  {formatKpiValue(item.achievement_pct, 'PERCENT')}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span
-                                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                                      item.status_code
-                                    )}`}
-                                  >
-                                    {item.status_code}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Measurement History
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Snapshot untuk tahun {selectedTrendYear}.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {!hasHistoryData ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                        No measurement history for {selectedTrendYear}.
-                      </div>
-                    ) : (
-                      measurements.map((item) => (
-                        <div
-                          key={item.id}
-                          className="rounded-xl border border-gray-200 bg-gray-50 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900">
-                                {item.period_key}
-                              </div>
-                              <div className="mt-1 text-xs text-gray-500">
-                                {formatDateTime(item.measured_at)}
-                              </div>
-                            </div>
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                                item.status_code
-                              )}`}
-                            >
-                              {item.status_code}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 text-sm text-gray-700">
-                            Actual:{' '}
-                            <span className="font-medium">
-                              {formatKpiValue(item.actual_value, kpi.unit_code)}
-                            </span>
-                          </div>
-
-                          <div className="mt-1 text-xs text-gray-500">
-                            {item.measurement_note || '-'}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {isModalOpen && kpi && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Capture Measurement
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Tambahkan snapshot measurement baru untuk KPI ini.
-              </p>
-            </div>
-
-            <form onSubmit={handleCreateMeasurement} className="space-y-5 px-6 py-6">
-              {formError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formError}
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Period Picker
-                </label>
-                {renderPeriodPicker()}
-                <div className="mt-2 text-xs text-gray-500">
-                  Computed period key:{' '}
-                  <span className="font-medium text-gray-900">{computedPeriodKey}</span>
-                </div>
-              </div>
-
-              {kpi.source_type === 'MANUAL' && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Actual Value
-                  </label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={measurementForm.actual_value}
-                    onChange={(event) =>
-                      setMeasurementForm((current) => ({
-                        ...current,
-                        actual_value: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                    required
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Note
-                </label>
-                <textarea
-                  value={measurementForm.measurement_note}
-                  onChange={(event) =>
-                    setMeasurementForm((current) => ({
-                      ...current,
-                      measurement_note: event.target.value,
-                    }))
-                  }
-                  rows={3}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
-                  placeholder="Optional note"
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <ValueCard
+                  label="Target"
+                  value={formatKpiValue(kpi.target_value, kpi.unit_code)}
+                />
+                <ValueCard
+                  label="Warning"
+                  value={formatKpiValue(kpi.warning_value, kpi.unit_code)}
+                />
+                <ValueCard
+                  label="Critical"
+                  value={formatKpiValue(kpi.critical_value, kpi.unit_code)}
+                />
+                <ValueCard
+                  label="Baseline"
+                  value={formatKpiValue(kpi.baseline_value, kpi.unit_code)}
                 />
               </div>
 
-              {kpi.source_type === 'SYSTEM' && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                  Actual value will be calculated automatically from backend system metric.
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Category
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-slate-900">
+                    {kpi.category_code}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Unit
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-slate-900">
+                    {kpi.unit_code}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Direction
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-slate-900">
+                    {kpi.direction}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Metric Key
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-slate-900">
+                    {kpi.metric_key || '-'}
+                  </div>
+                </div>
+              </div>
+            </PanelCard>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <PanelCard title="Latest Snapshot">
+              {latestMeasurement ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Period
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-slate-900">
+                      {latestMeasurement.period_key}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Actual
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-slate-900">
+                      {formatKpiValue(latestMeasurement.actual_value, kpi.unit_code)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Captured At
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-slate-900">
+                      {formatDateTime(latestMeasurement.created_at)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Note
+                    </div>
+                    <div className="mt-2 text-sm text-slate-700">
+                      (latestMeasurement as any).measurement_note || '-'
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
+                  No measurement yet.
                 </div>
               )}
+            </PanelCard>
+          </div>
+        </section>
 
-              <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+        <section className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_320px]">
+          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <PanelCard
+              title="Trend"
+              description="Baseline trend dari measurement snapshot yang sudah tersimpan."
+              action={
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Trend Year
+                  </label>
+                  <select
+                    value={String(selectedTrendYear)}
+                    onChange={(e) => setSelectedTrendYear(Number(e.target.value))}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                  >
+                    {yearOptions.map((year) => (
+                      <option key={year} value={String(year)}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              }
+            >
+              {trendLoading ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
+                  Loading trend...
+                </div>
+              ) : hasTrendData ? (
+                <Sparkline values={trendValues} />
+              ) : (
+                <EmptyHistoryState
+                  selectedYear={selectedTrendYear}
+                  onBackToCurrentYear={() => setSelectedTrendYear(currentYear)}
+                />
+              )}
+            </PanelCard>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <PanelCard
+              title="Measurement History"
+              description={`Snapshot untuk tahun ${selectedTrendYear}.`}
+            >
+              {hasHistory ? (
+                <div className="space-y-3">
+                  {measurements.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {item.period_key}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {formatDateTime(item.created_at)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 text-lg font-semibold text-slate-900">
+                        {formatKpiValue(item.actual_value, kpi.unit_code)}
+                      </div>
+
+                      <div className="mt-2 text-sm text-slate-600">
+                        {(item as any).measurement_note || '-'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
+                  No measurement history for {selectedTrendYear}.
+                </div>
+              )}
+            </PanelCard>
+          </div>
+        </section>
+
+        {isModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div className="w-full max-w-2xl rounded-[2rem] border border-white/80 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Capture Measurement
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Tambahkan measurement snapshot untuk KPI ini.
+                  </p>
+                </div>
+
                 <button
                   type="button"
                   onClick={closeMeasurementModal}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700"
+                  className="itam-secondary-action-sm"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {submitting ? 'Saving...' : 'Capture Measurement'}
+                  Close
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleCreateMeasurement} className="px-6 py-5">
+                {formError ? (
+                  <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {formError}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Year
+                    </label>
+                    <input
+                      value={measurementForm.year}
+                      onChange={(e) =>
+                        setMeasurementForm((current) => ({
+                          ...current,
+                          year: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  {kpi.period_type === 'MONTHLY' ? (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Month
+                      </label>
+                      <input
+                        value={measurementForm.month}
+                        onChange={(e) =>
+                          setMeasurementForm((current) => ({
+                            ...current,
+                            month: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                      />
+                    </div>
+                  ) : kpi.period_type === 'QUARTERLY' ? (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Quarter
+                      </label>
+                      <select
+                        value={measurementForm.quarter}
+                        onChange={(e) =>
+                          setMeasurementForm((current) => ({
+                            ...current,
+                            quarter: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                      >
+                        <option value="Q1">Q1</option>
+                        <option value="Q2">Q2</option>
+                        <option value="Q3">Q3</option>
+                        <option value="Q4">Q4</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div />
+                  )}
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Actual Value
+                    </label>
+                    <input
+                      value={measurementForm.actual_value}
+                      onChange={(e) =>
+                        setMeasurementForm((current) => ({
+                          ...current,
+                          actual_value: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Measurement Note
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={measurementForm.measurement_note}
+                      onChange={(e) =>
+                        setMeasurementForm((current) => ({
+                          ...current,
+                          measurement_note: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeMeasurementModal}
+                    className="itam-secondary-action"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="itam-primary-action disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitting ? 'Saving...' : 'Save Measurement'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
     </main>
   );
 }
-

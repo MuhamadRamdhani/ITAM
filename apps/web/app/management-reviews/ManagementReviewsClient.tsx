@@ -321,27 +321,27 @@ export default function ManagementReviewsClient() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-  <Link href="/" className="itam-secondary-action">
-    Back
-  </Link>
+                <Link href="/" className="itam-secondary-action">
+                  Back
+                </Link>
 
-  <Link
-    href="/management-reviews/action-items"
-    className="itam-secondary-action"
-  >
-    Open Action Tracker
-  </Link>
+                <Link
+                  href="/management-reviews/action-items"
+                  className="itam-secondary-action"
+                >
+                  Open Action Tracker
+                </Link>
 
-  {canManage ? (
-    <button
-      type="button"
-      onClick={openCreateModal}
-      className="itam-primary-action"
-    >
-      New Management Review
-    </button>
-  ) : null}
-</div>
+                {canManage ? (
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="itam-primary-action"
+                  >
+                    New Management Review
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -458,134 +458,140 @@ export default function ManagementReviewsClient() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-            <div className="border-b border-slate-200 px-6 py-5">
-              <h2 className="text-base font-semibold text-slate-900">Session List</h2>
-              <p className="mt-1 text-sm text-slate-500">Total matched sessions: {total}</p>
-            </div>
-
-            {loading ? (
-              <div className="px-6 py-10 text-sm text-slate-500">
-                {refreshing ? 'Refreshing...' : 'Loading management reviews...'}
+          <div className="mt-8 rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div className="rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+              <div className="border-b border-slate-200 px-6 py-5">
+                <h2 className="text-base font-semibold text-slate-900">Session List</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Total matched sessions: {total}
+                </p>
               </div>
-            ) : items.length === 0 ? (
-              <div className="px-6 py-12">
-                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-                  <div className="text-base font-medium text-slate-900">
-                    No management review sessions found
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Try changing the filter, or create a new management review session.
-                  </p>
-                  {canManage ? (
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        onClick={openCreateModal}
-                        className="itam-primary-action"
-                      >
-                        Create Session
-                      </button>
-                    </div>
-                  ) : null}
+
+              {loading ? (
+                <div className="px-6 py-10 text-sm text-slate-500">
+                  {refreshing ? 'Refreshing...' : 'Loading management reviews...'}
                 </div>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-600">
-                    <tr>
-                      <th className="px-6 py-3 font-medium">Session</th>
-                      <th className="px-6 py-3 font-medium">Review Date</th>
-                      <th className="px-6 py-3 font-medium">Chairperson</th>
-                      <th className="px-6 py-3 font-medium">Status</th>
-                      <th className="px-6 py-3 font-medium">Action Items</th>
-                      <th className="px-6 py-3 font-medium">Summary</th>
-                      <th className="px-6 py-3 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {items.map((item) => (
-                      <tr key={item.id} className="align-top">
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-slate-900">
-                            {item.session_code}
-                          </div>
-                          <div className="mt-1 text-sm text-slate-700">{item.title}</div>
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-700">
-                          {formatDate(item.review_date)}
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-700">
-                          {getIdentityName(item.chairperson_identity_id)}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(
-                              item.status,
-                            )}`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-700">
-                          <div>Total: {item.action_item_count}</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Open {item.open_action_item_count} · Done{' '}
-                            {item.done_action_item_count}
-                          </div>
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-700">
-                          <div>Decisions: {item.decision_count}</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Overdue: {item.overdue_action_item_count}
-                          </div>
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <Link
-                            href={`/management-reviews/${item.id}`}
-                            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                          >
-                            View Detail
-                          </Link>
-                        </td>
+              ) : items.length === 0 ? (
+                <div className="px-6 py-12">
+                  <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+                    <div className="text-base font-medium text-slate-900">
+                      No management review sessions found
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Try changing the filter, or create a new management review session.
+                    </p>
+                    {canManage ? (
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={openCreateModal}
+                          className="itam-primary-action"
+                        >
+                          Create Session
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-slate-600">
+                      <tr>
+                        <th className="px-6 py-3 font-medium">Session</th>
+                        <th className="px-6 py-3 font-medium">Review Date</th>
+                        <th className="px-6 py-3 font-medium">Chairperson</th>
+                        <th className="px-6 py-3 font-medium">Status</th>
+                        <th className="px-6 py-3 font-medium">Action Items</th>
+                        <th className="px-6 py-3 font-medium">Summary</th>
+                        <th className="px-6 py-3 font-medium">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
 
-            <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
-              <div className="text-sm text-slate-500">
-                Page {page} of {Math.max(1, totalPages)}
-              </div>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {items.map((item) => (
+                        <tr key={item.id} className="align-top">
+                          <td className="px-6 py-4">
+                            <div className="font-semibold text-slate-900">
+                              {item.session_code}
+                            </div>
+                            <div className="mt-1 text-sm text-slate-700">
+                              {item.title}
+                            </div>
+                          </td>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1 || loading}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Previous
-                </button>
+                          <td className="px-6 py-4 text-slate-700">
+                            {formatDate(item.review_date)}
+                          </td>
 
-                <button
-                  type="button"
-                  disabled={page >= totalPages || loading}
-                  onClick={() => setPage((current) => current + 1)}
-                  className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
+                          <td className="px-6 py-4 text-slate-700">
+                            {getIdentityName(item.chairperson_identity_id)}
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(
+                                item.status,
+                              )}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 text-slate-700">
+                            <div>Total: {item.action_item_count}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Open {item.open_action_item_count} · Done{' '}
+                              {item.done_action_item_count}
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4 text-slate-700">
+                            <div>Decisions: {item.decision_count}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Overdue: {item.overdue_action_item_count}
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <Link
+                              href={`/management-reviews/${item.id}`}
+                              className="inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                              View Detail
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+                <div className="text-sm text-slate-500">
+                  Page {page} of {Math.max(1, totalPages)}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={page >= totalPages || loading}
+                    onClick={() => setPage((current) => current + 1)}
+                    className="itam-secondary-action-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
           </div>

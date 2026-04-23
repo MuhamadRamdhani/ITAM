@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiGet, apiPatchJson, apiPostJson } from "../../lib/api";import { SkeletonTableRow, ErrorState } from "../../lib/loadingComponents";
+import { apiDelete, apiGet, apiPatchJson, apiPostJson } from "../../lib/api";
+import { SkeletonTableRow } from "../../lib/loadingComponents";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
+
 type MeData = {
   tenant_id: number;
   user_id: number;
@@ -64,9 +68,14 @@ export default function AdminLocationsClient() {
   const [editCode, setEditCode] = useState("");
   const [editName, setEditName] = useState("");
   const [editLoading, setEditLoading] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const canAccess = useMemo(() => {
     return hasAdminRole(Array.isArray(me?.roles) ? me!.roles : []);
@@ -273,6 +282,38 @@ export default function AdminLocationsClient() {
     setEditName("");
   }
 
+  async function onDeleteLocation() {
+    if (!deleteId || deleteLoading) return;
+
+    setErr(null);
+    setOk(null);
+    setDeleteLoading(true);
+
+    try {
+      await apiDelete(`/api/v1/admin/locations/${deleteId}`);
+      setToast({
+        type: "success",
+        message: "Location berhasil dihapus.",
+      });
+      setDeleteId(null);
+      await reloadLocations();
+    } catch (eAny: any) {
+      if (eAny?.code === "LOCATION_IN_USE") {
+        setToast({
+          type: "error",
+          message: "Location masih dipakai oleh asset atau history.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: eAny?.message || "Failed to delete location",
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   async function onSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editId) return;
@@ -325,6 +366,22 @@ export default function AdminLocationsClient() {
 
   return (
     <div className="space-y-6">
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={deleteId != null}
+        title="Delete location"
+        description="Location akan dihapus permanen jika tidak sedang dipakai oleh asset atau asset ownership history."
+        confirmLabel="Delete Location"
+        loading={deleteLoading}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => void onDeleteLocation()}
+      />
+
       {(err || ok) && (
         <div className="space-y-2">
           {err ? (
@@ -516,13 +573,23 @@ export default function AdminLocationsClient() {
                     <td className="py-4 pr-4 font-mono text-xs text-slate-500">{l.code || "-"}</td>
                     <td className="py-4 pr-4 text-slate-800">{l.name}</td>
                     <td className="py-3 pr-4 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(l)}
-                        className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100 hover:text-cyan-800"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(l)}
+                          className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100 hover:text-cyan-800"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeleteId(l.id)}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

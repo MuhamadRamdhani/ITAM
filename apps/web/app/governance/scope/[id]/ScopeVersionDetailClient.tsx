@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { canApproveActivateGovernance, canManageGovernance } from "../../../lib/governanceAccess";
-import { apiGet, apiPostJson } from "../../../lib/api";
+import { apiDelete, apiGet, apiPostJson } from "../../../lib/api";
 
 type ScopeVersion = {
   id: number | string;
@@ -171,6 +172,7 @@ function normalizeScopeDetail(res: any): ScopeDetailData | null {
 }
 
 export default function ScopeVersionDetailClient(props: { scopeVersionId: number }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<ScopeDetailData | null>(null);
@@ -182,6 +184,8 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
   const [actionNote, setActionNote] = useState("");
   const [acting, setActing] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingScopeVersion, setDeletingScopeVersion] = useState(false);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -247,6 +251,7 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
   const canSubmit = status === "DRAFT";
   const canApprove = status === "SUBMITTED";
   const canActivate = status === "APPROVED";
+  const canDeleteDraft = canManage && status === "DRAFT";
 
   async function callAction(action: "submit" | "approve" | "activate") {
     setActing(true);
@@ -263,6 +268,23 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
       setActionErr(getErrorMessage(error, `Failed to ${action} scope version`));
     } finally {
       setActing(false);
+    }
+  }
+
+  async function onDeleteDraft() {
+    if (!data) return;
+
+    setDeletingScopeVersion(true);
+    setActionErr(null);
+
+    try {
+      await apiDelete(`/api/v1/governance/scope/versions/${props.scopeVersionId}`);
+      setShowDeleteConfirm(false);
+      window.location.assign("/governance/scope");
+    } catch (error) {
+      setActionErr(getErrorMessage(error, "Failed to delete scope version"));
+    } finally {
+      setDeletingScopeVersion(false);
     }
   }
 
@@ -525,6 +547,17 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
               ) : null}
 
               <div className="mt-4 flex flex-col gap-2">
+                {canDeleteDraft ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={acting || deletingScopeVersion}
+                    className="itam-secondary-action-sm border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    Delete Draft
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
                   onClick={() => callAction("submit")}
@@ -607,6 +640,50 @@ export default function ScopeVersionDetailClient(props: { scopeVersionId: number
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && canDeleteDraft ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-white shadow-2xl">
+            <div className="border-b border-rose-100 bg-rose-50 px-5 py-4">
+              <div className="text-lg font-semibold text-rose-900">Delete Draft</div>
+              <div className="mt-1 text-sm text-rose-800">
+                Scope version draft ini akan dihapus permanen.
+              </div>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                Aksi ini hanya tersedia untuk scope version dengan status DRAFT.
+              </div>
+
+              {actionErr ? (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {actionErr}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  disabled={deletingScopeVersion}
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-rose-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                  disabled={deletingScopeVersion}
+                  onClick={() => void onDeleteDraft()}
+                >
+                  {deletingScopeVersion ? "Deleting..." : "Delete Draft"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -57,6 +57,20 @@ export async function getEvidenceFileById(app, tenantId, id) {
   };
 }
 
+export async function countEvidenceLinksByFileId(app, tenantId, evidenceFileId) {
+  const { rows } = await app.pg.query(
+    `
+    select count(*)::int as total
+    from public.evidence_links
+    where tenant_id = $1
+      and evidence_file_id = $2
+    `,
+    [tenantId, evidenceFileId]
+  );
+
+  return Number(rows?.[0]?.total ?? 0);
+}
+
 export async function listEvidenceFiles(app, tenantId, q, page, pageSize) {
   const offset = (page - 1) * pageSize;
 
@@ -233,5 +247,29 @@ export async function deleteEvidenceLinkById(
     created_by_identity_id:
       r.created_by_identity_id == null ? null : toNum(r.created_by_identity_id),
     created_at: r.created_at,
+  };
+}
+
+export async function deleteEvidenceFileById(app, tenantId, evidenceFileId) {
+  const { rows } = await app.pg.query(
+    `
+    delete from public.evidence_files
+    where tenant_id = $1
+      and id = $2
+    returning id, tenant_id, storage_path, original_name, mime_type, size_bytes, sha256, uploaded_by_identity_id, created_at
+    `,
+    [tenantId, evidenceFileId]
+  );
+
+  if (!rows[0]) return null;
+
+  const r = rows[0];
+  return {
+    ...r,
+    id: toNum(r.id),
+    tenant_id: toNum(r.tenant_id),
+    size_bytes: toNum(r.size_bytes),
+    uploaded_by_identity_id:
+      r.uploaded_by_identity_id == null ? null : toNum(r.uploaded_by_identity_id),
   };
 }

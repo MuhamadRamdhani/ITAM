@@ -3,6 +3,7 @@ import {
   listDepartmentsService,
   createDepartmentService,
   patchDepartmentService,
+  deleteDepartmentService,
 } from "./departments.service.js";
 
 export default async function departmentsRoutes(app) {
@@ -80,6 +81,33 @@ export default async function departmentsRoutes(app) {
         departmentId,
         req.body
       );
+
+      return reply.send({
+        ok: true,
+        data: { department },
+        meta: { request_id: req.id },
+      });
+    }
+  );
+
+  app.delete(
+    "/departments/:id",
+    {
+      schema: {
+        params: Type.Object({ id: Type.String() }),
+      },
+    },
+    async (req, reply) => {
+      const departmentId = Number(req.params.id);
+      if (!Number.isFinite(departmentId) || departmentId <= 0) {
+        return reply.code(400).send({
+          ok: false,
+          error: { code: "BAD_REQUEST", message: "Invalid department id" },
+          meta: { request_id: req.id },
+        });
+      }
+
+      const department = await deleteDepartmentService(app, req, departmentId);
 
       return reply.send({
         ok: true,

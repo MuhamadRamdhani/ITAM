@@ -1,6 +1,7 @@
 import {
   listScopeVersions,
   getScopeVersionById,
+  getScopeVersionByIdForDelete,
   listScopeEventsByVersionId,
   getNextScopeVersionNo,
   insertScopeVersion,
@@ -9,6 +10,9 @@ import {
   markScopeVersionSuperseded,
   forceScopeVersionActive,
   insertScopeEvent,
+  deleteScopeEventsByVersionId,
+  deleteScopeVersionById,
+  lockScopeVersionDeleteRelatedTables,
 } from "./scope.repo.js";
 import { insertAuditEventDb } from "../../lib/audit.js";
 
@@ -443,5 +447,70 @@ export async function activateScopeVersionService(db, request, id, body) {
     });
 
     return activated;
+  });
+}
+
+export async function deleteScopeVersionService(db, request, id) {
+  assertCanManageScope(request);
+
+  const tenantId = getTenantIdFromRequest(request);
+  const actorUserId = getActorUserIdFromRequest(request);
+  const numericId = Number(id);
+
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    throw makeError("Invalid scope version id", 400, "VALIDATION_ERROR");
+  }
+
+  return withTransaction(db, async (trx) => {
+    const target = await getScopeVersionByIdForDelete(trx, {
+      tenantId,
+      id: numericId,
+    });
+
+    if (!target) {
+      throw makeError("Scope version not found", 404, "NOT_FOUND");
+    }
+
+    if (String(target.status).toUpperCase() !== "DRAFT") {
+      throw makeError(
+        "Only DRAFT scope version can be deleted",
+        409,
+        "GOVERNANCE_SCOPE_NOT_DELETABLE",
+        { status: target.status }
+      );
+    }
+
+    await lockScopeVersionDeleteRelatedTables(trx);
+
+    await insertAuditEventDb(trx, {
+      tenantId,
+      actor: actorFromUserId(actorUserId),
+      action: "GOVERNANCE_SCOPE_VERSION_DELETED",
+      entityType: "GOVERNANCE_SCOPE_VERSION",
+      entityId: numericId,
+      payload: {
+        id: Number(target.id),
+        tenant_id: Number(target.tenant_id),
+        version_no: Number(target.version_no),
+        status: target.status,
+        note: target.note ?? null,
+      },
+    });
+
+    await deleteScopeEventsByVersionId(trx, {
+      tenantId,
+      scopeVersionId: numericId,
+    });
+
+    const deleted = await deleteScopeVersionById(trx, {
+      tenantId,
+      id: numericId,
+    });
+
+    if (!deleted) {
+      throw makeError("Scope version not found", 404, "NOT_FOUND");
+    }
+
+    return deleted;
   });
 }

@@ -4,6 +4,7 @@ import {
   getVendorDetailService,
   createVendorService,
   patchVendorService,
+  deleteVendorService,
 } from "./vendors.service.js";
 
 function mustHaveAnyRole(req, allowed) {
@@ -128,6 +129,22 @@ export default async function vendorsRoutes(app) {
     async (req, reply) => {
       mustHaveAnyRole(req, WRITE_ROLES);
       const data = await patchVendorService(app, req, req.params.id, req.body || {});
+      return reply.send({ ok: true, data });
+    }
+  );
+
+  app.delete(
+    "/:id",
+    {
+      schema: {
+        params: Type.Object({
+          id: Type.String(),
+        }),
+      },
+    },
+    async (req, reply) => {
+      mustHaveAnyRole(req, WRITE_ROLES);
+      const data = await deleteVendorService(app, req, req.params.id);
       return reply.send({ ok: true, data });
     }
   );

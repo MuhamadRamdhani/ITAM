@@ -236,13 +236,17 @@ export default function AssetTransferRequestsClient() {
   const pageSize = pickInt(searchParams.get("page_size"), 10);
 
   const currentTransferListHref = useMemo(() => {
-    return buildListHref({
-      q,
-      status,
-      page,
-      pageSize,
-    });
-  }, [q, status, page, pageSize]);
+  return buildListHref({
+    q,
+    status,
+    page,
+    pageSize,
+  });
+}, [q, status, page, pageSize]);
+
+const goToAssetsHref = useMemo(() => {
+  return `/assets?return_to=${encodeURIComponent(currentTransferListHref)}`;
+}, [currentTransferListHref]);
 
   const canCreateTransfer = useMemo(() => {
     return roles.some((role) => TRANSFER_ALLOWED_ROLES.includes(role));
@@ -395,12 +399,12 @@ export default function AssetTransferRequestsClient() {
 
         <div className="mt-8 rounded-2xl border border-white bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
           <div className="mb-4 flex flex-wrap justify-end gap-3">
-            <Link
-              href="/assets"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Go to Assets
-            </Link>
+           <Link
+  href={goToAssetsHref}
+  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+>
+  Go to Assets
+</Link>
 
             {canCreateTransfer ? (
               <Link href="/asset-transfer-requests/new" className="itam-primary-action">

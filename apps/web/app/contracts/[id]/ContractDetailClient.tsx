@@ -1,9 +1,10 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatchJson, apiPostJson } from "@/app/lib/api";
+import { canManageContracts } from "@/app/lib/contractAccess";
 import { ErrorState } from "@/app/lib/loadingComponents";
 import SoftwareEntitlementsPanel from "./SoftwareEntitlementsPanel";
 
@@ -284,6 +285,7 @@ async function apiDelete(path: string) {
 }
 
 export default function ContractDetailClient(props: { contractId: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const contractIdNum = useMemo(() => Number(props.contractId), [props.contractId]);
   const backHref = useMemo(() => {
@@ -297,6 +299,7 @@ export default function ContractDetailClient(props: { contractId: string }) {
 
   const [loadingRelations, setLoadingRelations] = useState(true);
   const [loadingAssetsCatalog, setLoadingAssetsCatalog] = useState(false);
+  const [roles, setRoles] = useState<string[]>([]);
 
   const [linkingDocument, setLinkingDocument] = useState(false);
   const [unlinkingDocumentId, setUnlinkingDocumentId] = useState<string | number | null>(null);
@@ -313,6 +316,8 @@ export default function ContractDetailClient(props: { contractId: string }) {
   const [showUploadEvidence, setShowUploadEvidence] = useState(false);
   const [uploadingEvidenceFile, setUploadingEvidenceFile] = useState(false);
   const [uploadEvidenceInputKey, setUploadEvidenceInputKey] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingContract, setDeletingContract] = useState(false);
 
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -369,6 +374,9 @@ export default function ContractDetailClient(props: { contractId: string }) {
     note: "",
   });
 
+  const canManage = useMemo(() => canManageContracts(roles), [roles]);
+  const canDeleteDraft = canManage && String(detail?.status ?? "").toUpperCase() === "DRAFT";
+
   const loadVendors = useCallback(async () => {
     setLoadingVendors(true);
 
@@ -384,6 +392,34 @@ export default function ContractDetailClient(props: { contractId: string }) {
     } finally {
       setLoadingVendors(false);
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMe() {
+      try {
+        const res = await apiGet<any>("/api/v1/auth/me");
+        const raw = res?.data?.data ?? res?.data ?? {};
+        const nextRoles = Array.isArray(raw?.roles)
+          ? raw.roles
+              .map((role: unknown) => String(role ?? "").trim().toUpperCase())
+              .filter(Boolean)
+          : [];
+
+        if (!active) return;
+        setRoles(nextRoles);
+      } catch {
+        if (!active) return;
+        setRoles([]);
+      }
+    }
+
+    void loadMe();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const loadDetail = useCallback(async () => {
@@ -537,6 +573,24 @@ export default function ContractDetailClient(props: { contractId: string }) {
       setErr(getErrorMessage(error, "Failed to update contract"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onDeleteDraft() {
+    if (!detail) return;
+
+    setDeletingContract(true);
+    setErr(null);
+    setSuccess(null);
+
+    try {
+      await apiDelete(`/api/v1/contracts/${detail.id}`);
+      setShowDeleteConfirm(false);
+      window.location.assign("/contracts");
+    } catch (error) {
+      setErr(getErrorMessage(error, "Failed to delete contract"));
+    } finally {
+      setDeletingContract(false);
     }
   }
 
@@ -841,11 +895,68 @@ export default function ContractDetailClient(props: { contractId: string }) {
             </p>
           </div>
 
-          <Link href={backHref} className="itam-secondary-action">
-            Back
-          </Link>
+          <div className="flex gap-3">
+            {canDeleteDraft ? (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="itam-secondary-action border-rose-200 text-rose-700 hover:bg-rose-50"
+                disabled={loading || saving}
+              >
+                Delete Draft
+              </button>
+            ) : null}
+
+            <Link href={backHref} className="itam-secondary-action">
+              Back
+            </Link>
+          </div>
         </div>
       </div>
+
+      {showDeleteConfirm && canDeleteDraft ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl border border-rose-200 bg-white shadow-2xl">
+            <div className="border-b border-rose-100 bg-rose-50 px-5 py-4">
+              <div className="text-lg font-semibold text-rose-900">Delete Draft</div>
+              <div className="mt-1 text-sm text-rose-800">
+                Contract draft ini akan dihapus permanen.
+              </div>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                Aksi ini hanya tersedia untuk contract dengan status DRAFT.
+              </div>
+
+              {err ? (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {err}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  disabled={deletingContract}
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-rose-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+                  disabled={deletingContract}
+                  onClick={() => void onDeleteDraft()}
+                >
+                  {deletingContract ? "Deleting..." : "Delete Draft"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="mt-6 rounded-3xl border border-white bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">

@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiGet, apiPostJson } from "@/app/lib/api";
+import { apiDelete, apiGet, apiPostJson } from "@/app/lib/api";
 import {
+  canDeleteAssetTransfer,
   canDecideAssetTransfer,
   canSubmitAssetTransfer,
   canViewAssetTransfer,
 } from "@/app/lib/assetTransferAccess";
+import ConfirmDangerDialog from "@/app/components/ConfirmDangerDialog";
+import ActionToast from "@/app/components/ActionToast";
 
 type MeData = {
   tenant_id: number;
@@ -468,8 +471,13 @@ export default function AssetTransferRequestDetailClient({
   const [events, setEvents] = useState<TransferRequestEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingAction, setSubmittingAction] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const canViewTransfer = useMemo(() => {
     return canViewAssetTransfer(roles);
@@ -481,6 +489,10 @@ export default function AssetTransferRequestDetailClient({
 
   const canDecideByRole = useMemo(() => {
     return canDecideAssetTransfer(roles);
+  }, [roles]);
+
+  const canDeleteByRole = useMemo(() => {
+    return canDeleteAssetTransfer(roles);
   }, [roles]);
 
   const loadDetail = useCallback(async () => {
@@ -564,6 +576,7 @@ export default function AssetTransferRequestDetailClient({
 
   const canSubmit = canSubmitByRole && request?.status === "DRAFT";
   const canDecide = canDecideByRole && request?.status === "SUBMITTED";
+  const canDeleteDraft = canDeleteByRole && request?.status === "DRAFT";
 
   const executionResetFields = useMemo(() => {
     return normalizeResetFields(request?.execution_result_json?.reset_fields);
@@ -640,6 +653,42 @@ export default function AssetTransferRequestDetailClient({
     [canDecideByRole, decisionNote, loadDetail, request]
   );
 
+  const handleDeleteDraft = useCallback(async () => {
+    if (!request || !canDeleteDraft || deleteLoading) return;
+
+    try {
+      setDeleteLoading(true);
+      setError(null);
+      setToast(null);
+
+      await apiDelete(`/api/v1/asset-transfer-requests/${request.id}`);
+
+      setDeleteOpen(false);
+      setToast({
+        type: "success",
+        message: `Draft transfer request ${request.request_code} deleted.`,
+      });
+
+      window.setTimeout(() => {
+        router.push("/asset-transfer-requests");
+      }, 700);
+    } catch (eAny: any) {
+      if (eAny?.code === "ASSET_TRANSFER_NOT_DELETABLE") {
+        setToast({
+          type: "error",
+          message: "Transfer request sudah bukan DRAFT.",
+        });
+      } else {
+        setToast({
+          type: "error",
+          message: extractErrorMessage(eAny),
+        });
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [canDeleteDraft, deleteLoading, request, router]);
+
   if (accessLoading) {
     return (
       <div className="space-y-6">
@@ -694,6 +743,22 @@ export default function AssetTransferRequestDetailClient({
 
   return (
     <div className="space-y-6">
+      <ActionToast
+        open={Boolean(toast)}
+        type={toast?.type || "success"}
+        message={toast?.message || ""}
+        onClose={() => setToast(null)}
+      />
+      <ConfirmDangerDialog
+        open={deleteOpen}
+        title="Delete draft transfer request"
+        description={`Draft transfer request ${request?.request_code || ""} akan dihapus permanen. Aksi ini hanya tersedia untuk status DRAFT.`}
+        confirmLabel="Delete Draft"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void handleDeleteDraft()}
+      />
+
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -728,7 +793,7 @@ export default function AssetTransferRequestDetailClient({
             <button
               type="button"
               onClick={() => void loadDetail()}
-              disabled={submittingAction}
+              disabled={submittingAction || deleteLoading}
               className="inline-flex items-center justify-center itam-primary-action"
             >
               Refresh
@@ -743,7 +808,7 @@ export default function AssetTransferRequestDetailClient({
         ) : null}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 lg:col-span-2">
           <h2 className="text-lg font-semibold text-gray-900">Request Summary</h2>
 
@@ -861,11 +926,22 @@ export default function AssetTransferRequestDetailClient({
             <h2 className="text-lg font-semibold text-gray-900">Actions</h2>
 
             <div className="mt-4 space-y-3">
+              {canDeleteDraft ? (
+                <button
+                  type="button"
+                  onClick={() => setDeleteOpen(true)}
+                  disabled={submittingAction || deleteLoading}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deleteLoading ? "Deleting..." : "Delete Draft"}
+                </button>
+              ) : null}
+
               {canSubmit ? (
                 <button
                   type="button"
                   onClick={() => void handleSubmitRequest()}
-                  disabled={submittingAction}
+                  disabled={submittingAction || deleteLoading}
                   className="itam-primary-action"
                 >
                   {submittingAction ? "Submitting..." : "Submit Request"}
@@ -885,7 +961,7 @@ export default function AssetTransferRequestDetailClient({
                   <button
                     type="button"
                     onClick={() => void handleDecide("APPROVE")}
-                    disabled={submittingAction}
+                    disabled={submittingAction || deleteLoading}
                     className="inline-flex w-full items-center justify-center rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {submittingAction ? "Processing..." : "Approve Request"}
@@ -894,7 +970,7 @@ export default function AssetTransferRequestDetailClient({
                   <button
                     type="button"
                     onClick={() => void handleDecide("REJECT")}
-                    disabled={submittingAction}
+                    disabled={submittingAction || deleteLoading}
                     className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {submittingAction ? "Processing..." : "Reject Request"}

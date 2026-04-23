@@ -96,6 +96,25 @@ async function apiPostJson(page: Page, path: string, body: unknown) {
   );
 }
 
+async function apiDeleteJson(page: Page, path: string) {
+  return page.evaluate(
+    async (url) => {
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+      return { status: res.status, json };
+    },
+    `${API_BASE}${path}`
+  );
+}
+
 async function fetchJson(page: Page, path: string) {
   return page.evaluate(async (url) => {
     const res = await fetch(url, { credentials: "include" });
@@ -218,6 +237,49 @@ async function createVendorViaApi(
   };
 }
 
+async function createContractViaApi(page: Page, vendorId: number) {
+  const suffix = uniqueSuffix();
+  const res = await apiPostJson(page, "/api/v1/contracts", {
+    vendor_id: vendorId,
+    contract_code: `PW-VEND-CONTRACT-${suffix}`,
+    contract_name: `Playwright Vendor Contract ${suffix}`,
+    contract_type: "SOFTWARE",
+    status: "ACTIVE",
+    start_date: "2026-04-01",
+    end_date: "2026-12-31",
+    renewal_notice_days: 30,
+    owner_identity_id: null,
+    notes: "Playwright vendor contract",
+  });
+
+  expect(res.status).toBe(201);
+  const contractId = Number(res.json?.data?.id ?? 0);
+  expect(contractId).toBeGreaterThan(0);
+
+  return { contractId };
+}
+
+async function createSoftwareProductViaApi(page: Page, vendorId: number) {
+  const suffix = uniqueSuffix();
+  const res = await apiPostJson(page, "/api/v1/software-products", {
+    product_code: `PW-VEND-SP-${suffix}`,
+    product_name: `Playwright Vendor Software ${suffix}`,
+    publisher_vendor_id: vendorId,
+    category: "BUSINESS_APPLICATION",
+    deployment_model: "SAAS",
+    licensing_metric: "SUBSCRIPTION",
+    status: "ACTIVE",
+    version_policy: "VERSIONED",
+    notes: "Playwright vendor software product",
+  });
+
+  expect(res.status).toBe(201);
+  const productId = Number(res.json?.data?.id ?? 0);
+  expect(productId).toBeGreaterThan(0);
+
+  return { productId };
+}
+
 async function ensureVendorCountAtLeast(page: Page, minCount: number) {
   const res = await fetchJson(page, "/api/v1/vendors?page=1&pageSize=20");
   const total = Number(res?.data?.total ?? 0);
@@ -286,6 +348,11 @@ test.describe.serial("Vendors", () => {
     await expect(auditorPage.getByText("Read-only access")).toBeVisible();
     await expect(auditorPage.getByText("Update code, name, type, contact, dan notes vendor.")).toHaveCount(1);
     await expect(auditorPage.getByRole("button", { name: "Save Changes" })).toHaveCount(0);
+    await expect(auditorPage.getByRole("button", { name: "Delete" })).toHaveCount(0);
+
+    const deleteAttempt = await apiDeleteJson(auditorPage, `/api/v1/vendors/${seeded.vendorId}`);
+    expect(deleteAttempt.status).toBe(403);
+    expect(deleteAttempt.json?.error?.code).toBe("FORBIDDEN");
 
     await auditorContext.close();
   });
@@ -343,6 +410,96 @@ test.describe.serial("Vendors", () => {
 
     const updated = await fetchJson(page, `/api/v1/vendors/${created.vendorId}`);
     expect(updated?.data?.vendor_name ?? updated?.vendor_name).toBe(created.updatedName);
+  });
+
+  test("vendor delete succeeds for unused vendor", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createVendorViaUi(page, {
+      vendorName: `Deletable Vendor ${uniqueSuffix()}`,
+      contactName: "Delete Contact",
+    });
+
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/vendors/${created.vendorId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete vendor" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Vendor" }).click();
+
+    const response = await deleteResponse;
+    expect(response.ok()).toBeTruthy();
+    await expect(page.getByText(`Vendor ${created.vendorCode} deleted.`)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page).toHaveURL(/\/vendors$/);
+  });
+
+  test("vendor delete is blocked by contract dependency", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createVendorViaApi(page, {
+      vendorName: `Contract Locked Vendor ${uniqueSuffix()}`,
+    });
+    await createContractViaApi(page, created.vendorId);
+
+    await page.goto(`/vendors/${created.vendorId}`);
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/vendors/${created.vendorId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete vendor" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Vendor" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body?.error?.code).toBe("VENDOR_IN_USE");
+    await expect(page.getByText("Vendor masih dipakai oleh contract atau software product.")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page).toHaveURL(new RegExp(`/vendors/${created.vendorId}$`));
+  });
+
+  test("vendor delete is blocked by software product dependency", async ({ page }) => {
+    await loginAs(page, USERS.tenantAdmin);
+    const created = await createVendorViaApi(page, {
+      vendorName: `Software Locked Vendor ${uniqueSuffix()}`,
+    });
+    await createSoftwareProductViaApi(page, created.vendorId);
+
+    await page.goto(`/vendors/${created.vendorId}`);
+    await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    const deleteResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().endsWith(`/api/v1/vendors/${created.vendorId}`),
+      { timeout: 30_000 }
+    );
+
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete vendor" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete Vendor" }).click();
+
+    const response = await deleteResponse;
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body?.error?.code).toBe("VENDOR_IN_USE");
+    await expect(page.getByText("Vendor masih dipakai oleh contract atau software product.")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page).toHaveURL(new RegExp(`/vendors/${created.vendorId}$`));
   });
 
   test("vendor list search works by code and name", async ({ page }) => {

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 type Credentials = {
@@ -9,6 +10,7 @@ type Credentials = {
 
 type EvidenceFile = {
   id: number;
+  storage_path: string;
   original_name: string;
   mime_type: string;
   size_bytes: number;
@@ -40,11 +42,20 @@ const USERS = {
 } satisfies Record<string, Credentials>;
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001").replace(/\/+$/, "");
+const UPLOADS_ROOT = path.resolve(process.cwd(), "..", "api", "uploads");
 
 let sharedEvidenceFile: EvidenceFile | null = null;
 
 function uniqueSuffix() {
   return `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
+function getEvidenceFilePath(file: EvidenceFile) {
+  return path.join(UPLOADS_ROOT, file.storage_path);
+}
+
+function evidenceRows(page: Page) {
+  return page.locator("tbody tr");
 }
 
 function isoDate(offsetDays = 0) {
@@ -169,42 +180,25 @@ async function browserRequest(page: Page, path: string, init?: { method?: string
 }
 
 async function browserLogin(page: Page, creds: Credentials) {
-  return await page.evaluate(
-    async ({ apiBase, creds }) => {
-      const res = await fetch(`${apiBase}/api/v1/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tenant_code: creds.tenantCode,
-          email: creds.email,
-          password: creds.password,
-          recaptcha_token: "test",
-        }),
-      });
-
-      const text = await res.text();
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        json = null;
-      }
-
-      if (!res.ok) {
-        const err = new Error(json?.error?.message || json?.message || `Login failed (${res.status})`);
-        (err as any).status = res.status;
-        (err as any).code = json?.error?.code || json?.code;
-        (err as any).details = json?.error?.details || json?.details;
-        throw err;
-      }
-
-      return json;
+  const response = await page.context().request.post(`${API_BASE}/api/v1/auth/login`, {
+    data: {
+      tenant_code: creds.tenantCode,
+      email: creds.email,
+      password: creds.password,
+      recaptcha_token: "test",
     },
-    { apiBase: API_BASE, creds }
-  );
+  });
+
+  const json = await response.json().catch(() => null);
+  if (!response.ok()) {
+    const err = new Error(json?.error?.message || json?.message || `Login failed (${response.status()})`);
+    (err as any).status = response.status();
+    (err as any).code = json?.error?.code || json?.code;
+    (err as any).details = json?.error?.details || json?.details;
+    throw err;
+  }
+
+  return json;
 }
 
 async function browserUploadEvidenceText(
@@ -495,6 +489,67 @@ test.describe.serial("Evidence", () => {
     await expect(page.getByRole("columnheader", { name: "SHA256" })).toBeVisible();
   });
 
+  test("itam manager can delete an unlinked evidence file from UI and disk", async ({ page }) => {
+    await loginAs(page, USERS.itamManager);
+
+    const fileName = `pw-evidence-delete-${uniqueSuffix()}.txt`;
+    const content = `Playwright evidence delete file ${uniqueSuffix()}`;
+    const uploadRes = await browserUploadEvidenceText(page, fileName, content, "text/plain");
+    const evidenceFile: EvidenceFile | null = uploadRes?.data?.file ?? uploadRes?.file ?? null;
+
+    if (!evidenceFile?.id || !evidenceFile?.storage_path) {
+      throw new Error("Uploaded evidence file is missing id/storage_path");
+    }
+
+    const fullPath = getEvidenceFilePath(evidenceFile);
+    expect(fs.existsSync(fullPath)).toBe(true);
+
+    await openEvidence(page);
+    await page.getByPlaceholder("Search filename/mime/sha...").fill(fileName);
+    await page.getByRole("button", { name: "Search" }).click();
+
+    const row = evidenceRows(page).filter({ hasText: fileName });
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await expect(row.getByRole("button", { name: "Delete" })).toBeVisible();
+
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete evidence file" })).toBeVisible({
+      timeout: 20_000,
+    });
+    const deleteResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/api/v1/evidence/files/${evidenceFile.id}`)
+    );
+    await page.getByRole("button", { name: "Delete File" }).click();
+    const deleteResponse = await deleteResponsePromise;
+
+    expect(deleteResponse.status()).toBe(200);
+    await expect(page.getByText(`Evidence file ${fileName} deleted.`)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(evidenceRows(page).filter({ hasText: fileName })).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    await expect(page.getByText("Tidak ada evidence files.")).toBeVisible({ timeout: 30_000 });
+    expect(fs.existsSync(fullPath)).toBe(false);
+
+    const auditEvents = await browserJson(page, "/api/v1/audit-events?page=1&page_size=20");
+    const auditItems = Array.isArray(auditEvents?.data?.items)
+      ? auditEvents.data.items
+      : Array.isArray(auditEvents?.data?.data?.items)
+        ? auditEvents.data.data.items
+        : [];
+
+    const deletedAudit = auditItems.find(
+      (item: any) =>
+        String(item?.action || "") === "EVIDENCE_FILE_DELETED" &&
+        Number(item?.entity_id) === evidenceFile.id
+    );
+
+    expect(deletedAudit).toBeTruthy();
+  });
+
   test("upload validation rejects unsupported file types", async ({ page }, testInfo) => {
     await loginAs(page, USERS.itamManager);
     await openEvidenceUpload(page);
@@ -559,6 +614,66 @@ test.describe.serial("Evidence", () => {
     await expect(page.getByText("Tidak ada evidence yang terhubung.")).toBeVisible({ timeout: 30_000 });
   });
 
+  test("itam manager cannot delete an evidence file that is still linked", async ({ page }) => {
+    await loginAs(page, USERS.itamManager);
+
+    const fileName = `pw-evidence-linked-${uniqueSuffix()}.txt`;
+    const content = `Playwright linked evidence delete ${uniqueSuffix()}`;
+    const uploadRes = await browserUploadEvidenceText(page, fileName, content, "text/plain");
+    const evidenceFile: EvidenceFile | null = uploadRes?.data?.file ?? uploadRes?.file ?? null;
+
+    if (!evidenceFile?.id || !evidenceFile?.storage_path) {
+      throw new Error("Uploaded evidence file is missing id/storage_path");
+    }
+
+    const contract = await browserCreateContract(page, "delete-linked");
+    const attachRes = await browserJson(page, "/api/v1/evidence/links", {
+      method: "POST",
+      body: {
+        target_type: "CONTRACT",
+        target_id: contract.id,
+        evidence_file_id: evidenceFile.id,
+        note: "linked evidence for delete guard",
+      },
+    });
+
+    expect(attachRes?.data?.link?.id).toBeTruthy();
+
+    const fullPath = getEvidenceFilePath(evidenceFile);
+    expect(fs.existsSync(fullPath)).toBe(true);
+
+    await openEvidence(page);
+    await page.getByPlaceholder("Search filename/mime/sha...").fill(fileName);
+    await page.getByRole("button", { name: "Search" }).click();
+
+    const row = evidenceRows(page).filter({ hasText: fileName });
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByRole("heading", { name: "Delete evidence file" })).toBeVisible({
+      timeout: 20_000,
+    });
+    const deleteResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "DELETE" &&
+        response.url().includes(`/api/v1/evidence/files/${evidenceFile.id}`)
+    );
+    await page.getByRole("button", { name: "Delete File" }).click();
+    const deleteResponse = await deleteResponsePromise;
+
+    expect(deleteResponse.status()).toBe(409);
+    const deleteBody = await deleteResponse.json();
+    expect(deleteBody?.error?.code).toBe("EVIDENCE_FILE_IN_USE");
+    await expect(page.getByText("Evidence file masih attached ke record lain.")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(evidenceRows(page).filter({ hasText: fileName })).toBeVisible({
+      timeout: 30_000,
+    });
+    expect(fs.existsSync(fullPath)).toBe(true);
+
+    expect(fs.existsSync(fullPath)).toBe(true);
+  });
+
   test("oversized evidence upload is rejected", async ({ page }, testInfo) => {
     await loginAs(page, USERS.itamManager);
     await openEvidenceUpload(page);
@@ -571,11 +686,10 @@ test.describe.serial("Evidence", () => {
   });
 
   test("duplicate evidence attach is blocked", async ({ page }) => {
-    console.log("[EVID-008] login ITAM manager");
     await page.context().clearCookies();
-    await page.goto("http://localhost:3000/", { waitUntil: "commit" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await browserLogin(page, USERS.itamManager);
-    await page.goto("http://localhost:3000/", { waitUntil: "commit" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     const uploadIdentity = await browserJson(page, "/api/v1/auth/me");
     expect(
       String(uploadIdentity?.data?.user?.email || uploadIdentity?.data?.email || "").toLowerCase()
@@ -583,7 +697,6 @@ test.describe.serial("Evidence", () => {
 
     const fileName = `pw-duplicate-${uniqueSuffix()}.txt`;
     const content = `duplicate guard evidence ${uniqueSuffix()}`;
-    console.log("[EVID-008] upload evidence file");
     const uploadRes = await browserUploadEvidenceText(page, fileName, content, "text/plain");
     const localEvidenceFile: EvidenceFile | null = uploadRes?.data?.file ?? uploadRes?.file ?? null;
 
@@ -591,20 +704,17 @@ test.describe.serial("Evidence", () => {
       throw new Error("Duplicate guard evidence file is not available");
     }
 
-    console.log("[EVID-008] login tenant admin");
     await page.context().clearCookies();
-    await page.goto("http://localhost:3000/", { waitUntil: "commit" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await browserLogin(page, USERS.tenantAdmin);
-    await page.goto("http://localhost:3000/", { waitUntil: "commit" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     const contractIdentity = await browserJson(page, "/api/v1/auth/me");
     expect(
       String(contractIdentity?.data?.user?.email || contractIdentity?.data?.email || "").toLowerCase()
     ).toContain("dhani@bni.com");
 
-    console.log("[EVID-008] create contract");
     const contract = await browserCreateContract(page, "duplicate");
 
-    console.log("[EVID-008] first attach");
     const firstAttach = await browserJson(page, `/api/v1/contracts/${contract.id}/evidence`, {
       method: "POST",
       body: {
@@ -615,7 +725,6 @@ test.describe.serial("Evidence", () => {
 
     expect(firstAttach?.data?.link?.id).toBeTruthy();
 
-    console.log("[EVID-008] second attach should 409");
     const duplicateResult = await page.evaluate(
       async ({ apiBase, contractId, evidenceFileId }) => {
         const res = await fetch(`${apiBase}/api/v1/contracts/${contractId}/evidence`, {
@@ -656,7 +765,6 @@ test.describe.serial("Evidence", () => {
     expect(duplicateResult.status).toBe(409);
     expect(duplicateResult.code).toBe("DUPLICATE_RELATION");
 
-    console.log("[EVID-008] done");
   });
 
   test("EVID-009 auditor cannot upload evidence via API", async ({ page }) => {

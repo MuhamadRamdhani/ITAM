@@ -38,6 +38,116 @@ function mapEvent(row) {
   };
 }
 
+export async function getDocumentByIdForDelete(app, { tenantId, documentId }) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      id,
+      tenant_id,
+      doc_type_code,
+      title,
+      status_code,
+      current_version,
+      created_at,
+      updated_at
+    FROM public.documents
+    WHERE tenant_id = $1
+      AND id = $2
+    FOR UPDATE
+    LIMIT 1
+    `,
+    [tenantId, documentId]
+  );
+
+  return mapDoc(rows[0] ?? null);
+}
+
+export async function countDocumentDeleteDependencies(app, { tenantId, documentId }) {
+  const { rows } = await app.pg.query(
+    `
+    SELECT
+      (SELECT COUNT(*)::int
+       FROM public.contract_documents cd
+       WHERE cd.tenant_id = $1
+         AND cd.document_id = $2) AS contract_documents_count,
+      (SELECT COUNT(*)::int
+       FROM public.evidence_links el
+       WHERE el.tenant_id = $1
+         AND el.target_type = 'DOCUMENT'
+         AND el.target_id = $2) AS evidence_links_count
+    `,
+    [tenantId, documentId]
+  );
+
+  const row = rows[0] ?? {};
+  const contractDocumentsCount = Number(row.contract_documents_count ?? 0);
+  const evidenceLinksCount = Number(row.evidence_links_count ?? 0);
+
+  return {
+    contract_documents_count: contractDocumentsCount,
+    evidence_links_count: evidenceLinksCount,
+    total: contractDocumentsCount + evidenceLinksCount,
+  };
+}
+
+export async function lockDocumentDeleteRelatedTables(app) {
+  await app.pg.query(`
+    LOCK TABLE public.contract_documents,
+      public.document_events,
+      public.document_versions,
+      public.evidence_links
+    IN SHARE ROW EXCLUSIVE MODE
+  `);
+}
+
+export async function deleteDocumentVersionsByDocumentId(app, { tenantId, documentId }) {
+  const { rowCount } = await app.pg.query(
+    `
+    DELETE FROM public.document_versions
+    WHERE tenant_id = $1
+      AND document_id = $2
+    `,
+    [tenantId, documentId]
+  );
+
+  return Number(rowCount ?? 0);
+}
+
+export async function deleteDocumentEventsByDocumentId(app, { tenantId, documentId }) {
+  const { rowCount } = await app.pg.query(
+    `
+    DELETE FROM public.document_events
+    WHERE tenant_id = $1
+      AND document_id = $2
+    `,
+    [tenantId, documentId]
+  );
+
+  return Number(rowCount ?? 0);
+}
+
+export async function deleteDocumentById(app, { tenantId, documentId }) {
+  const { rows } = await app.pg.query(
+    `
+    DELETE FROM public.documents
+    WHERE tenant_id = $1
+      AND id = $2
+    RETURNING
+      id,
+      tenant_id,
+      doc_type_code,
+      title,
+      status_code,
+      current_version,
+      created_at,
+      updated_at
+    `,
+    [tenantId, documentId]
+  );
+
+  return mapDoc(rows[0] ?? null);
+}
+
 export async function listDocuments(app, { tenantId, q, status, type, page, pageSize }) {
   const safePage = Math.max(1, Number(page) || 1);
   const safePageSize = Math.max(1, Math.min(200, Number(pageSize) || 20));
