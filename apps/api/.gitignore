@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+uploads/
+storage/
+_logs/
+dist/
+coverage/
+*.log
+cookies.txt
